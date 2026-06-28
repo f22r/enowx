@@ -21,6 +21,11 @@ func (s *logStore) Insert(ctx context.Context, l store.RequestLog) error {
 	return err
 }
 
+func (s *logStore) Clear(ctx context.Context) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM request_logs`)
+	return err
+}
+
 func (s *logStore) SummaryToday(ctx context.Context) (store.LogSummary, error) {
 	var sum store.LogSummary
 	err := s.db.QueryRowContext(ctx,

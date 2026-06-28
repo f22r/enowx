@@ -114,6 +114,7 @@ var groups = []docGroup{
 		Desc: "Served request history and usage statistics.",
 		Endpoints: []docEndpoint{
 			{Method: "GET", Path: "/api/requests", Desc: "Recent request log rows.", Params: []docParam{{Name: "limit", In: "query", Desc: "max rows"}}},
+			{Method: "DELETE", Path: "/api/requests", Desc: "Clear all request logs."},
 			{Method: "GET", Path: "/api/requests/summary", Desc: "Today's totals (requests, ok, errors, tokens, avg latency)."},
 			{Method: "GET", Path: "/api/requests/series", Desc: "Time-bucketed series.", Params: []docParam{{Name: "range", In: "query", Desc: "daily|7d|30d|all"}}},
 			{Method: "GET", Path: "/api/requests/top-models", Desc: "Top models today.", Params: []docParam{{Name: "limit", In: "query", Desc: "max models"}}},

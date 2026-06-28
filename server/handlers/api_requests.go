@@ -48,6 +48,14 @@ func (h *Requests) List(w http.ResponseWriter, r *http.Request) {
 	writeData(w, out)
 }
 
+func (h *Requests) Clear(w http.ResponseWriter, r *http.Request) {
+	if err := h.store.Clear(r.Context()); err != nil {
+		writeAPIErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeData(w, map[string]any{"ok": true})
+}
+
 func (h *Requests) Summary(w http.ResponseWriter, r *http.Request) {
 	sum, err := h.store.SummaryToday(r.Context())
 	if err != nil {

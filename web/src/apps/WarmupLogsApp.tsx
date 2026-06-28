@@ -3,7 +3,7 @@ import { RefreshCw, CheckCircle2, XCircle, X, Trash2, Loader2 } from "lucide-rea
 import { AppShell } from "./shell";
 import { Tooltip } from "../components/Tooltip";
 import { useDialog } from "../os/dialog";
-import { onWarmup } from "../os/warmupBus";
+import { activeWarmups, onWarmupChange, type ActiveWarmup } from "../os/warmupBus";
 import { warmupLogsApi, type WarmupLog } from "../lib/api";
 
 const OUTCOME_TONE: Record<string, string> = {
@@ -17,15 +17,9 @@ function tone(o: string) {
   return OUTCOME_TONE[o] ?? "text-white/60 bg-white/5 ring-white/15";
 }
 
-interface Pending {
-  key: string;
-  provider: string;
-  label: string;
-}
-
 export function WarmupLogsApp() {
   const [logs, setLogs] = useState<WarmupLog[] | null>(null);
-  const [pending, setPending] = useState<Pending[]>([]);
+  const [pending, setPending] = useState<ActiveWarmup[]>(activeWarmups());
   const [error, setError] = useState("");
   const [open, setOpen] = useState<WarmupLog | null>(null);
   const [filter, setFilter] = useState("all");
@@ -62,20 +56,12 @@ export function WarmupLogsApp() {
     };
   }, []);
 
-  // Optimistic "warming up" cards driven by the warmup bus.
+  // Show "warming up" cards from the global active set — works even if this app
+  // is opened mid-warmup. Refresh from the server whenever the set changes.
   useEffect(() => {
-    return onWarmup((e) => {
-      if (e.type === "start") {
-        setPending((p) => [{ key: `${e.accountId}-${Date.now()}`, provider: e.provider, label: e.label }, ...p]);
-      } else {
-        // Clear one matching pending card and refresh from the server.
-        setPending((p) => {
-          const i = p.findIndex((x) => x.provider === e.provider && x.label === e.label);
-          if (i === -1) return p;
-          return [...p.slice(0, i), ...p.slice(i + 1)];
-        });
-        load();
-      }
+    return onWarmupChange(() => {
+      setPending(activeWarmups());
+      load();
     });
   }, []);
 
@@ -150,7 +136,7 @@ export function WarmupLogsApp() {
           ) : (
             <div className="space-y-2">
               {shownPending.map((p) => (
-                <div key={p.key} className="flex items-center gap-3 rounded-xl border border-amber-500/20 bg-amber-500/[0.04] p-3">
+                <div key={p.accountId} className="flex items-center gap-3 rounded-xl border border-amber-500/20 bg-amber-500/[0.04] p-3">
                   <Loader2 className="h-4 w-4 shrink-0 animate-spin text-amber-300" />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">

@@ -130,4 +130,5 @@ type LogStore interface {
 	SummaryToday(ctx context.Context) (LogSummary, error)
 	Series(ctx context.Context, r SeriesRange) ([]SeriesPoint, error)
 	TopModels(ctx context.Context, limit int) ([]ModelStat, error)
+	Clear(ctx context.Context) error
 }

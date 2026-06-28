@@ -1,20 +1,36 @@
-// Cross-app signal: AccountsApp emits when a warmup starts/finishes so the
-// Warmup Logs app can show a live "warming up" card and refresh immediately.
-export interface WarmupEvent {
-  type: "start" | "done";
+// Cross-app warmup state: AccountsApp marks accounts as warming so the Warmup
+// Logs app can show a live "warming up" card — even if it is opened mid-warmup
+// (the active set is module-level, not tied to a component's lifetime).
+export interface ActiveWarmup {
   accountId: number;
   provider: string;
   label: string;
 }
 
-type Listener = (e: WarmupEvent) => void;
+const active = new Map<number, ActiveWarmup>();
+type Listener = () => void;
 const listeners = new Set<Listener>();
 
-export function emitWarmup(e: WarmupEvent) {
-  listeners.forEach((l) => l(e));
+function notify() {
+  listeners.forEach((l) => l());
 }
 
-export function onWarmup(l: Listener): () => void {
+export function startWarmup(w: ActiveWarmup) {
+  active.set(w.accountId, w);
+  notify();
+}
+
+export function finishWarmup(accountId: number) {
+  active.delete(accountId);
+  notify();
+}
+
+export function activeWarmups(): ActiveWarmup[] {
+  return [...active.values()];
+}
+
+// Subscribe to any change in the active warmup set. Returns an unsubscribe fn.
+export function onWarmupChange(l: Listener): () => void {
   listeners.add(l);
   return () => {
     listeners.delete(l);

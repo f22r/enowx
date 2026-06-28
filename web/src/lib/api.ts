@@ -148,6 +148,7 @@ export interface RequestRow {
   provider: string;
   model: string;
   status: string;
+  source: string;
   in_tokens: number;
   out_tokens: number;
   latency_ms: number;
@@ -176,6 +177,7 @@ export const requestsApi = {
   series: (range: SeriesRange = "daily") =>
     api.get<SeriesPoint[]>(`/api/requests/series?range=${range}`),
   topModels: (limit = 5) => api.get<ModelStat[]>(`/api/requests/top-models?limit=${limit}`),
+  clear: () => api.del<{ ok: boolean }>("/api/requests"),
 };
 
 export interface ApiKey {

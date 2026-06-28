@@ -5,7 +5,7 @@ import { ProviderIcon } from "../components/ProviderIcon";
 import { Tooltip } from "../components/Tooltip";
 import { accountsApi, providersApi, type Account, type Provider, type Usage } from "../lib/api";
 import { useDialog } from "../os/dialog";
-import { emitWarmup } from "../os/warmupBus";
+import { startWarmup, finishWarmup } from "../os/warmupBus";
 
 const STATUS_TONE: Record<string, string> = {
   active: "text-emerald-300 bg-emerald-500/10 ring-emerald-500/30",
@@ -98,7 +98,7 @@ export function AccountsApp() {
   async function warmup(a: Account) {
     setWarming(a.id);
     setError("");
-    emitWarmup({ type: "start", accountId: a.id, provider: a.provider, label: a.label });
+    startWarmup({ accountId: a.id, provider: a.provider, label: a.label });
     try {
       const r = await accountsApi.warmup(a.id);
       if (r.usage && r.usage.limit > 0) setUsage((m) => ({ ...m, [a.id]: r.usage! }));
@@ -108,7 +108,7 @@ export function AccountsApp() {
       setError(e instanceof Error ? e.message : "warmup failed");
     } finally {
       setWarming(null);
-      emitWarmup({ type: "done", accountId: a.id, provider: a.provider, label: a.label });
+      finishWarmup(a.id);
     }
   }
 

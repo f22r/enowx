@@ -74,6 +74,7 @@ func New(addr string, d Deps) *Server {
 		r.Delete("/warmup-logs", warmup.Clear)
 		r.Delete("/accounts/{id}", accounts.Delete)
 		r.Get("/requests", requests.List)
+		r.Delete("/requests", requests.Clear)
 		r.Get("/requests/summary", requests.Summary)
 		r.Get("/requests/series", requests.Series)
 		r.Get("/requests/top-models", requests.TopModels)
