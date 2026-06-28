@@ -75,11 +75,13 @@ export interface RequestRow {
 }
 
 export interface SeriesPoint {
-  hour: string;
+  bucket: string;
   requests: number;
   in_tokens: number;
   out_tokens: number;
 }
+
+export type SeriesRange = "daily" | "7d" | "30d" | "all";
 
 export interface ModelStat {
   model: string;
@@ -91,7 +93,8 @@ export interface ModelStat {
 export const requestsApi = {
   summary: () => api.get<RequestSummary>("/api/requests/summary"),
   list: (limit = 100) => api.get<RequestRow[]>(`/api/requests?limit=${limit}`),
-  series: () => api.get<SeriesPoint[]>("/api/requests/series"),
+  series: (range: SeriesRange = "daily") =>
+    api.get<SeriesPoint[]>(`/api/requests/series?range=${range}`),
   topModels: (limit = 5) => api.get<ModelStat[]>(`/api/requests/top-models?limit=${limit}`),
 };
 

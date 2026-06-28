@@ -1,71 +1,100 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "./shell";
 import { TermGauge, TermBarRow } from "../components/term/TermChart";
-import { AreaChart } from "../components/term/AreaChart";
-import { useLiveSeries } from "../lib/useLiveSeries";
+import { AreaChart, type ChartPoint } from "../components/term/AreaChart";
 import {
   requestsApi,
   type RequestSummary,
+  type SeriesPoint,
   type ModelStat,
+  type SeriesRange,
 } from "../lib/api";
 
-// Realtime counters: poll the running totals each second and chart the delta.
-async function readReqTotal(): Promise<number> {
-  const s = await requestsApi.summary();
-  return s.total;
-}
-async function readTokTotal(): Promise<number> {
-  const s = await requestsApi.summary();
-  return s.in_tokens + s.out_tokens;
-}
+const RANGES: { id: SeriesRange; label: string }[] = [
+  { id: "daily", label: "Daily" },
+  { id: "7d", label: "7d" },
+  { id: "30d", label: "30d" },
+  { id: "all", label: "All time" },
+];
 
 const compact = (n: number) =>
   n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `${(n / 1_000).toFixed(1)}K` : String(n);
 
+// daily buckets are "YYYY-MM-DD HH:00" -> show HH:00; others "YYYY-MM-DD" -> MM-DD.
+function axisLabel(bucket: string, range: SeriesRange): string {
+  if (range === "daily") return bucket.slice(11, 16);
+  return bucket.slice(5); // MM-DD
+}
+
 export function StatisticsApp() {
+  const [range, setRange] = useState<SeriesRange>("daily");
+  const [series, setSeries] = useState<SeriesPoint[]>([]);
   const [summary, setSummary] = useState<RequestSummary | null>(null);
   const [models, setModels] = useState<ModelStat[]>([]);
 
   useEffect(() => {
     let alive = true;
     const load = () => {
+      requestsApi.series(range).then((s) => alive && setSeries(s ?? [])).catch(() => alive && setSeries([]));
       requestsApi.summary().then((s) => alive && setSummary(s)).catch(() => {});
       requestsApi.topModels(8).then((m) => alive && setModels(m ?? [])).catch(() => {});
     };
     load();
-    const id = setInterval(load, 5000);
+    const id = setInterval(load, 15000);
     return () => {
       alive = false;
       clearInterval(id);
     };
-  }, []);
+  }, [range]);
 
-  const reqLive = useLiveSeries(readReqTotal, { intervalMs: 1000, capacity: 120 });
-  const tokLive = useLiveSeries(readTokTotal, { intervalMs: 1000, capacity: 120 });
-  const rps = reqLive.length ? reqLive[reqLive.length - 1].v : 0;
-  const tps = tokLive.length ? tokLive[tokLive.length - 1].v : 0;
+  const reqPoints: ChartPoint[] = useMemo(
+    () => series.map((p) => ({ label: axisLabel(p.bucket, range), value: p.requests })),
+    [series, range],
+  );
+  const tokPoints: ChartPoint[] = useMemo(
+    () => series.map((p) => ({ label: axisLabel(p.bucket, range), value: p.in_tokens + p.out_tokens })),
+    [series, range],
+  );
+
+  const totalReq = series.reduce((a, p) => a + p.requests, 0);
+  const totalTok = series.reduce((a, p) => a + p.in_tokens + p.out_tokens, 0);
   const okRate = summary && summary.total > 0 ? Math.round((summary.ok / summary.total) * 100) : 0;
   const errRate = summary && summary.total > 0 ? Math.round((summary.errors / summary.total) * 100) : 0;
-  const maxModel = Math.max(...models.map((m) => m.requests), 1);
-  // Latency gauge: map 0..2000ms onto 0..100% (lower is better, so invert tone by value).
   const latPct = summary ? Math.min(100, Math.round((summary.avg_ms / 2000) * 100)) : 0;
+  const maxModel = Math.max(...models.map((m) => m.requests), 1);
 
   return (
-    <AppShell title="Statistics" subtitle="Live usage — realtime">
+    <AppShell title="Statistics" subtitle="Usage over time">
       <div className="space-y-3">
-        <Panel title="REQUESTS / SEC (LIVE)" hint={`${rps} req/s now`}>
-          <div className="h-56">
-            <AreaChart points={reqLive} unit="req/s" />
+        <div className="flex gap-1">
+          {RANGES.map((r) => (
+            <button
+              key={r.id}
+              onClick={() => setRange(r.id)}
+              className={`rounded-md px-2.5 py-1 font-mono text-[11px] transition-colors ${
+                range === r.id
+                  ? "bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/40"
+                  : "text-white/50 hover:bg-white/5 hover:text-white/80"
+              }`}
+            >
+              {r.label}
+            </button>
+          ))}
+        </div>
+
+        <Panel title="REQUESTS" hint={`${compact(totalReq)} total`}>
+          <div className="h-52">
+            {series.length === 0 ? <Flat /> : <AreaChart points={reqPoints} unit="requests" />}
           </div>
         </Panel>
 
-        <Panel title="TOKENS / SEC (LIVE)" hint={`${compact(tps)} tok/s now`}>
-          <div className="h-56">
-            <AreaChart points={tokLive} unit="tok/s" />
+        <Panel title="TOKENS (IN+OUT)" hint={`${compact(totalTok)} total`}>
+          <div className="h-52">
+            {series.length === 0 ? <Flat /> : <AreaChart points={tokPoints} unit="tokens" />}
           </div>
         </Panel>
 
-        <Panel title="HEALTH">
+        <Panel title="HEALTH (TODAY)">
           <div className="space-y-1.5">
             <TermGauge label="success" percent={okRate} tone="text-emerald-400" />
             <TermGauge label="errors" percent={errRate} tone="text-red-400" />
@@ -82,13 +111,7 @@ export function StatisticsApp() {
           ) : (
             <div className="space-y-1">
               {models.map((m) => (
-                <TermBarRow
-                  key={m.model}
-                  label={m.model}
-                  value={m.requests}
-                  max={maxModel}
-                  suffix={`${m.requests} req`}
-                />
+                <TermBarRow key={m.model} label={m.model} value={m.requests} max={maxModel} suffix={`${m.requests} req`} />
               ))}
             </div>
           )}
@@ -107,5 +130,18 @@ function Panel({ title, hint, children }: { title: string; hint?: string; childr
       </div>
       {children}
     </div>
+  );
+}
+
+// Flat baseline when there is no data: a green line at zero, still "running".
+function Flat() {
+  return (
+    <AreaChart
+      points={[
+        { label: "", value: 0 },
+        { label: "", value: 0 },
+      ]}
+      unit=""
+    />
   );
 }

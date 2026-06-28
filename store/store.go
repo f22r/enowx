@@ -72,13 +72,23 @@ type LogSummary struct {
 	AvgMS     int64 `json:"avg_ms"`
 }
 
-// SeriesPoint is one hourly bucket of request/token counts.
+// SeriesPoint is one time bucket (hour or day) of request/token counts.
 type SeriesPoint struct {
-	Hour      string `json:"hour"`
+	Bucket    string `json:"bucket"`
 	Requests  int64  `json:"requests"`
 	InTokens  int64  `json:"in_tokens"`
 	OutTokens int64  `json:"out_tokens"`
 }
+
+// SeriesRange selects the window + bucket granularity for Series.
+type SeriesRange string
+
+const (
+	RangeDaily SeriesRange = "daily" // last 24h, hourly buckets
+	Range7d    SeriesRange = "7d"    // last 7 days, daily buckets
+	Range30d   SeriesRange = "30d"   // last 30 days, daily buckets
+	RangeAll   SeriesRange = "all"   // everything, daily buckets
+)
 
 // ModelStat is per-model usage for the current day.
 type ModelStat struct {
@@ -92,6 +102,6 @@ type LogStore interface {
 	Insert(ctx context.Context, l RequestLog) error
 	Recent(ctx context.Context, limit int) ([]RequestLog, error)
 	SummaryToday(ctx context.Context) (LogSummary, error)
-	Series24h(ctx context.Context) ([]SeriesPoint, error)
+	Series(ctx context.Context, r SeriesRange) ([]SeriesPoint, error)
 	TopModels(ctx context.Context, limit int) ([]ModelStat, error)
 }

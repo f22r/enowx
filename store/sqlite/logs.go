@@ -33,15 +33,32 @@ func (s *logStore) SummaryToday(ctx context.Context) (store.LogSummary, error) {
 	return sum, err
 }
 
-func (s *logStore) Series24h(ctx context.Context) ([]store.SeriesPoint, error) {
-	rows, err := s.db.QueryContext(ctx,
-		`SELECT strftime('%Y-%m-%d %H:00', created_at) AS hour,
-		        COUNT(*),
-		        COALESCE(SUM(in_tokens), 0),
-		        COALESCE(SUM(out_tokens), 0)
-		 FROM request_logs
-		 WHERE created_at >= datetime('now', '-24 hours')
-		 GROUP BY hour ORDER BY hour`)
+func (s *logStore) Series(ctx context.Context, r store.SeriesRange) ([]store.SeriesPoint, error) {
+	// bucket = strftime format; where = time window predicate.
+	bucket := "%Y-%m-%d" // daily buckets by default
+	where := ""
+	switch r {
+	case store.RangeDaily:
+		bucket = "%Y-%m-%d %H:00"
+		where = "WHERE created_at >= datetime('now', '-24 hours')"
+	case store.Range7d:
+		where = "WHERE created_at >= datetime('now', '-7 days')"
+	case store.Range30d:
+		where = "WHERE created_at >= datetime('now', '-30 days')"
+	case store.RangeAll:
+		where = ""
+	default:
+		bucket = "%Y-%m-%d %H:00"
+		where = "WHERE created_at >= datetime('now', '-24 hours')"
+	}
+
+	q := `SELECT strftime('` + bucket + `', created_at) AS bucket,
+	             COUNT(*),
+	             COALESCE(SUM(in_tokens), 0),
+	             COALESCE(SUM(out_tokens), 0)
+	      FROM request_logs ` + where + `
+	      GROUP BY bucket ORDER BY bucket`
+	rows, err := s.db.QueryContext(ctx, q)
 	if err != nil {
 		return nil, err
 	}
@@ -49,7 +66,7 @@ func (s *logStore) Series24h(ctx context.Context) ([]store.SeriesPoint, error) {
 	var out []store.SeriesPoint
 	for rows.Next() {
 		var p store.SeriesPoint
-		if err := rows.Scan(&p.Hour, &p.Requests, &p.InTokens, &p.OutTokens); err != nil {
+		if err := rows.Scan(&p.Bucket, &p.Requests, &p.InTokens, &p.OutTokens); err != nil {
 			return nil, err
 		}
 		out = append(out, p)

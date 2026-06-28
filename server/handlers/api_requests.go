@@ -56,7 +56,13 @@ func (h *Requests) Summary(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Requests) Series(w http.ResponseWriter, r *http.Request) {
-	pts, err := h.store.Series24h(r.Context())
+	rng := store.SeriesRange(r.URL.Query().Get("range"))
+	switch rng {
+	case store.RangeDaily, store.Range7d, store.Range30d, store.RangeAll:
+	default:
+		rng = store.RangeDaily
+	}
+	pts, err := h.store.Series(r.Context(), rng)
 	if err != nil {
 		writeAPIErr(w, http.StatusInternalServerError, err.Error())
 		return
