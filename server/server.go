@@ -23,13 +23,17 @@ type Deps struct {
 	Route    func(modelID string) string
 	Registry *provider.Registry
 	Accounts store.AccountStore
+	Logs     store.LogStore
+	Settings handlers.SettingsInfo
 }
 
 func New(addr string, d Deps) *Server {
 	r := chi.NewRouter()
-	v1 := handlers.NewV1(d.Proxy, d.Route)
+	v1 := handlers.NewV1(d.Proxy, d.Route, d.Logs)
 	providers := handlers.NewProviders(d.Registry)
 	accounts := handlers.NewAccounts(d.Accounts)
+	requests := handlers.NewRequests(d.Logs)
+	settings := handlers.NewSettings(d.Settings)
 
 	r.Get("/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.Write([]byte(`{"status":"ok"}`))
@@ -42,6 +46,9 @@ func New(addr string, d Deps) *Server {
 		r.Post("/accounts", accounts.Add)
 		r.Patch("/accounts/{id}/status", accounts.SetStatus)
 		r.Delete("/accounts/{id}", accounts.Delete)
+		r.Get("/requests", requests.List)
+		r.Get("/requests/summary", requests.Summary)
+		r.Get("/settings", settings.Get)
 	})
 
 	// WebOS SPA on the same port (everything not matched above).

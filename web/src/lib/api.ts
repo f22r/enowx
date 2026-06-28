@@ -53,3 +53,40 @@ export const accountsApi = {
     api.patch<{ ok: boolean }>(`/api/accounts/${id}/status`, { status }),
   remove: (id: number) => api.del<{ ok: boolean }>(`/api/accounts/${id}`),
 };
+
+export interface RequestSummary {
+  total: number;
+  ok: number;
+  errors: number;
+  in_tokens: number;
+  out_tokens: number;
+  avg_ms: number;
+}
+
+export interface RequestRow {
+  id: number;
+  provider: string;
+  model: string;
+  status: string;
+  in_tokens: number;
+  out_tokens: number;
+  latency_ms: number;
+  created_at: string;
+}
+
+export const requestsApi = {
+  summary: () => api.get<RequestSummary>("/api/requests/summary"),
+  list: (limit = 100) => api.get<RequestRow[]>(`/api/requests?limit=${limit}`),
+};
+
+export interface Settings {
+  version: string;
+  host: string;
+  port: number;
+  runtime_dir: string;
+  uptime_sec: number;
+}
+
+export const settingsApi = {
+  get: () => api.get<Settings>("/api/settings"),
+};

@@ -4,6 +4,7 @@ import { buildApps } from "../apps";
 import { Dock } from "./Dock";
 import { OsWindow } from "./OsWindow";
 import { TopBar } from "./TopBar";
+import { Widgets } from "./Widgets";
 import { useWindows } from "./useWindows";
 
 export function Desktop() {
@@ -14,6 +15,9 @@ export function Desktop() {
   return (
     <div className="wallpaper fixed inset-0 select-none overflow-hidden">
       <div ref={bounds} className="pointer-events-none absolute inset-x-0 top-7 bottom-20" />
+      <div className="pointer-events-none absolute inset-x-0 top-7 bottom-20">
+        <Widgets onOpen={open} />
+      </div>
       <TopBar />
       <AnimatePresence>
         {windows.map((win) => {

@@ -2,26 +2,31 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/enowdev/enowx/core/convert"
 	"github.com/enowdev/enowx/core/model"
 	"github.com/enowdev/enowx/core/proxy"
 	"github.com/enowdev/enowx/server/sse"
+	"github.com/enowdev/enowx/store"
 )
 
 type V1 struct {
 	proxy *proxy.Proxy
 	route func(modelID string) string // model → provider name
+	logs  store.LogStore
 }
 
-func NewV1(p *proxy.Proxy, route func(string) string) *V1 {
-	return &V1{proxy: p, route: route}
+func NewV1(p *proxy.Proxy, route func(string) string, logs store.LogStore) *V1 {
+	return &V1{proxy: p, route: route, logs: logs}
 }
 
 func (h *V1) ChatCompletions(w http.ResponseWriter, r *http.Request) {
+	start := time.Now()
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		writeErr(w, http.StatusBadRequest, "read body")
@@ -32,16 +37,31 @@ func (h *V1) ChatCompletions(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "invalid request")
 		return
 	}
-	stream, err := h.proxy.Forward(r.Context(), h.route(req.Model), req)
+	providerName := h.route(req.Model)
+	stream, err := h.proxy.Forward(r.Context(), providerName, req)
 	if err != nil {
+		h.log(providerName, req.Model, "error", start)
 		writeErr(w, http.StatusBadGateway, err.Error())
 		return
 	}
 	if req.Stream {
 		sse.WriteOpenAI(w, stream)
+	} else {
+		writeJSON(w, stream)
+	}
+	h.log(providerName, req.Model, "success", start)
+}
+
+func (h *V1) log(provider, modelID, status string, start time.Time) {
+	if h.logs == nil {
 		return
 	}
-	writeJSON(w, stream)
+	_ = h.logs.Insert(context.Background(), store.RequestLog{
+		Provider:  provider,
+		Model:     modelID,
+		Status:    status,
+		LatencyMS: time.Since(start).Milliseconds(),
+	})
 }
 
 func writeJSON(w http.ResponseWriter, s interface{ Recv() (model.Event, error) }) {

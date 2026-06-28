@@ -16,6 +16,7 @@ import (
 	"github.com/enowdev/enowx/core/proxy"
 	"github.com/enowdev/enowx/core/transport"
 	"github.com/enowdev/enowx/server"
+	"github.com/enowdev/enowx/server/handlers"
 	"github.com/enowdev/enowx/store/sqlite"
 )
 
@@ -60,6 +61,14 @@ func main() {
 		Route:    routeModel,
 		Registry: reg,
 		Accounts: db.Accounts(),
+		Logs:     db.Logs(),
+		Settings: handlers.SettingsInfo{
+			Version:    version,
+			Host:       cfg.Host,
+			Port:       cfg.Port,
+			RuntimeDir: cfg.RuntimeDir,
+			Started:    time.Now(),
+		},
 	})
 
 	log.Printf("enx %s listening on %s", version, cfg.Addr())

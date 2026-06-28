@@ -17,6 +17,22 @@ func (s *logStore) Insert(ctx context.Context, l store.RequestLog) error {
 	return err
 }
 
+func (s *logStore) SummaryToday(ctx context.Context) (store.LogSummary, error) {
+	var sum store.LogSummary
+	err := s.db.QueryRowContext(ctx,
+		`SELECT
+		   COUNT(*),
+		   COALESCE(SUM(CASE WHEN status = 'success' THEN 1 ELSE 0 END), 0),
+		   COALESCE(SUM(CASE WHEN status != 'success' THEN 1 ELSE 0 END), 0),
+		   COALESCE(SUM(in_tokens), 0),
+		   COALESCE(SUM(out_tokens), 0),
+		   COALESCE(CAST(AVG(latency_ms) AS INTEGER), 0)
+		 FROM request_logs
+		 WHERE created_at >= date('now')`,
+	).Scan(&sum.Total, &sum.OK, &sum.Errors, &sum.InTokens, &sum.OutTokens, &sum.AvgMS)
+	return sum, err
+}
+
 func (s *logStore) Recent(ctx context.Context, limit int) ([]store.RequestLog, error) {
 	if limit <= 0 || limit > 500 {
 		limit = 100

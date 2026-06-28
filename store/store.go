@@ -44,7 +44,18 @@ type AccountStore interface {
 	Delete(ctx context.Context, id int64) error
 }
 
+// LogSummary aggregates request_logs for the current day (server-local).
+type LogSummary struct {
+	Total     int64 `json:"total"`
+	OK        int64 `json:"ok"`
+	Errors    int64 `json:"errors"`
+	InTokens  int64 `json:"in_tokens"`
+	OutTokens int64 `json:"out_tokens"`
+	AvgMS     int64 `json:"avg_ms"`
+}
+
 type LogStore interface {
 	Insert(ctx context.Context, l RequestLog) error
 	Recent(ctx context.Context, limit int) ([]RequestLog, error)
+	SummaryToday(ctx context.Context) (LogSummary, error)
 }
