@@ -1,0 +1,7 @@
+/enowx
+/bin/
+*.db
+.DS_Store
+dashboard-ui/node_modules/
+dashboard-ui/dist/
+dashboard/spa-dist/
