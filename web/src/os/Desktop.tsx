@@ -9,10 +9,12 @@ import { Widgets } from "./Widgets";
 import { CenterTerminal } from "./CenterTerminal";
 import { TerminalLayer } from "./TerminalLayer";
 import { AppsDrawer } from "./AppsDrawer";
+import { Tooltip } from "../components/Tooltip";
 import { DocsApp } from "../apps/DocsApp";
 import { usePanels } from "./usePanels";
 import { usePersisted } from "./usePersisted";
 import { useAppLocations } from "./useSides";
+import { useShortcuts } from "./useShortcuts";
 import { useTerminals, type TermLocation } from "./useTerminals";
 import type { AppId, Location, Side } from "./types";
 
@@ -55,6 +57,26 @@ export function Desktop() {
     }
   };
 
+  // Leader-key shortcuts: 1..4 switch the center view; a letter opens an app.
+  const appShortcuts: Record<string, AppId> = {
+    p: "providers",
+    a: "accounts",
+    s: "statistics",
+    g: "settings",
+    f: "files",
+    r: "requests",
+    w: "warmup-logs",
+    k: "api-keys",
+  };
+  const leaderActive = useShortcuts((k) => {
+    const v: Record<string, CenterView> = { "1": "widget", "2": "terminal", "3": "apps", "4": "docs" };
+    if (v[k]) {
+      setView(v[k]);
+      return;
+    }
+    if (appShortcuts[k]) openApp(appShortcuts[k]);
+  });
+
   const renderPanel = (side: Side) => {
     const openT = openTermOn(side);
     if (openT) {
@@ -82,7 +104,7 @@ export function Desktop() {
   return (
     <div className="wallpaper fixed inset-0 select-none overflow-hidden">
       <div className="pointer-events-none absolute inset-x-0 top-7 bottom-3">
-        <div className="pointer-events-auto mx-auto flex h-full max-w-3xl flex-col px-5 pb-3 pt-5">
+        <div className="pointer-events-auto mx-auto flex h-full max-w-3xl flex-col px-5 pb-2 pt-3">
           <div className="relative min-h-0 flex-1 overflow-hidden">
             <div className={`absolute inset-0 overflow-auto ${view === "widget" ? "" : "hidden"}`}>
               <Widgets onOpen={openApp} />
@@ -97,11 +119,16 @@ export function Desktop() {
               <DocsApp />
             </div>
           </div>
-          <CenterNav view={view} onView={setView} />
         </div>
       </div>
 
-      <TopBar />
+      <TopBar nav={<CenterNav view={view} onView={setView} />} />
+
+      {leaderActive && (
+        <div className="pointer-events-none fixed left-1/2 top-9 z-[10000] -translate-x-1/2 rounded-lg border border-emerald-500/30 bg-black/80 px-3 py-1.5 font-mono text-[11px] text-emerald-300 shadow-lg">
+          shortcut: 1 widget · 2 terminal · 3 apps · 4 docs · p/a/s/g/f/r/w/k apps · esc
+        </div>
+      )}
 
       <SideDock
         side="left"
@@ -136,32 +163,33 @@ export function Desktop() {
   );
 }
 
+// Compact center-view switch that lives in the top bar. The leader-key hint is
+// shown in each tab's tooltip (tap Ctrl/Alt then the number).
 function CenterNav({ view, onView }: { view: CenterView; onView: (v: CenterView) => void }) {
-  const tabs: { id: CenterView; label: string; icon: typeof LayoutGrid }[] = [
-    { id: "widget", label: "Widget", icon: LayoutGrid },
-    { id: "terminal", label: "Terminal", icon: SquareTerminal },
-    { id: "apps", label: "Apps", icon: Grid3x3 },
-    { id: "docs", label: "Docs", icon: BookOpen },
+  const tabs: { id: CenterView; label: string; icon: typeof LayoutGrid; key: string }[] = [
+    { id: "widget", label: "Widget", icon: LayoutGrid, key: "1" },
+    { id: "terminal", label: "Terminal", icon: SquareTerminal, key: "2" },
+    { id: "apps", label: "Apps", icon: Grid3x3, key: "3" },
+    { id: "docs", label: "Docs", icon: BookOpen, key: "4" },
   ];
   return (
-    <div className="mt-3 flex shrink-0 justify-center">
-      <div className="glass flex gap-1 rounded-xl border border-white/10 bg-[var(--dock-bg)] p-1">
-        {tabs.map((t) => {
-          const Icon = t.icon;
-          return (
+    <div className="flex items-center gap-0.5">
+      {tabs.map((t) => {
+        const Icon = t.icon;
+        return (
+          <Tooltip key={t.id} label={`${t.label} · leader ${t.key}`} place="bottom">
             <button
-              key={t.id}
               onClick={() => onView(t.id)}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
-                view === t.id ? "bg-white/12 text-white" : "text-white/50 hover:text-white/80"
+              className={`flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11px] font-medium transition-colors ${
+                view === t.id ? "bg-white/12 text-white" : "text-white/45 hover:text-white/80"
               }`}
             >
               <Icon className="h-3.5 w-3.5" />
               {t.label}
             </button>
-          );
-        })}
-      </div>
+          </Tooltip>
+        );
+      })}
     </div>
   );
 }
