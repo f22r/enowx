@@ -4,6 +4,7 @@ import { AppShell } from "./shell";
 import { ProviderIcon } from "../components/ProviderIcon";
 import { Tooltip } from "../components/Tooltip";
 import { accountsApi, providersApi, type Account, type Provider, type Usage } from "../lib/api";
+import { useDialog } from "../os/dialog";
 
 const STATUS_TONE: Record<string, string> = {
   active: "text-emerald-300 bg-emerald-500/10 ring-emerald-500/30",
@@ -24,6 +25,7 @@ export function AccountsApp() {
   const [busy, setBusy] = useState<number | null>(null);
   const [warming, setWarming] = useState<number | null>(null);
   const [usage, setUsage] = useState<Record<number, Usage>>({});
+  const dialog = useDialog();
 
   async function load() {
     try {
@@ -81,9 +83,14 @@ export function AccountsApp() {
     }
   }
 
-  const remove = (a: Account) => {
-    if (!confirm(`Delete ${a.label || a.provider} account?`)) return;
-    act(() => accountsApi.remove(a.id), a.id);
+  const remove = async (a: Account) => {
+    const ok = await dialog.confirm({
+      title: "Delete account?",
+      message: `${a.label || a.provider} will be removed from the pool. This cannot be undone.`,
+      confirmLabel: "Delete",
+      danger: true,
+    });
+    if (ok) act(() => accountsApi.remove(a.id), a.id);
   };
   const setDisabled = (a: Account, disabled: boolean) => act(() => accountsApi.setDisabled(a.id, disabled), a.id);
 
