@@ -1,7 +1,6 @@
-/enowx
 /bin/
 *.db
 .DS_Store
-dashboard-ui/node_modules/
-dashboard-ui/dist/
-dashboard/spa-dist/
+web/node_modules/
+web/dist/
+# server/webdist IS committed (embedded by go:embed; needed for `go build`).

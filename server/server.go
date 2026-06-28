@@ -30,6 +30,9 @@ func New(addr string, d Deps) *Server {
 	})
 	r.Post("/v1/chat/completions", v1.ChatCompletions)
 
+	// WebOS SPA on the same port (everything not matched above).
+	r.Handle("/*", spaHandler())
+
 	return &Server{addr: addr, mux: r}
 }
 

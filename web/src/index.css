@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+:root {
+  --window-bg: #15161c;
+  --topbar-bg: rgba(20, 21, 27, 0.7);
+  --dock-bg: rgba(20, 21, 27, 0.55);
+  --radius-window: 14px;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  background: #0b0c10;
+  color: #e6e6ea;
+  font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+  overflow: hidden;
+}
+
+.wallpaper {
+  background:
+    radial-gradient(1200px 800px at 70% -10%, #1e2a4a 0%, transparent 60%),
+    radial-gradient(900px 700px at 10% 110%, #2a1e3a 0%, transparent 55%),
+    #0b0c10;
+}
+
+.glass {
+  backdrop-filter: blur(18px) saturate(140%);
+}
