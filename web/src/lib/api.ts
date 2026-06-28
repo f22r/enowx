@@ -254,10 +254,19 @@ export interface DocGroup {
   desc: string;
   endpoints: DocEndpoint[];
 }
+export interface Shortcut {
+  keys: string;
+  desc: string;
+}
+export interface ShortcutGroup {
+  name: string;
+  items: Shortcut[];
+}
 export interface Docs {
   version: string;
   overview: Record<string, string>;
   plugins: Record<string, string>;
+  shortcuts: { summary: string; groups: ShortcutGroup[] };
   groups: DocGroup[];
 }
 

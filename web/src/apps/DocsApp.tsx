@@ -26,7 +26,12 @@ export function DocsApp() {
   }, []);
 
   const tabs = docs
-    ? [{ id: "overview", label: "Overview" }, { id: "plugins", label: "Plugins" }, ...docs.groups.map((g) => ({ id: g.name, label: g.name }))]
+    ? [
+        { id: "overview", label: "Overview" },
+        { id: "shortcuts", label: "Shortcuts" },
+        { id: "plugins", label: "Plugins" },
+        ...docs.groups.map((g) => ({ id: g.name, label: g.name })),
+      ]
     : [];
   const activeGroup = docs?.groups.find((g) => g.name === tab);
 
@@ -58,6 +63,7 @@ export function DocsApp() {
 
           <div className="min-h-0 flex-1 overflow-auto">
             {tab === "overview" && <Overview docs={docs} />}
+            {tab === "shortcuts" && <Shortcuts docs={docs} />}
             {tab === "plugins" && <Plugins docs={docs} />}
             {activeGroup && (
               <section>
@@ -103,6 +109,27 @@ function Plugins({ docs }: { docs: Docs }) {
       <p className="mt-1 text-xs leading-relaxed text-white/55">{docs.plugins.summary}</p>
       <p className="mt-1.5 text-[11px] leading-relaxed text-white/40">{docs.plugins.discovery}</p>
     </section>
+  );
+}
+
+function Shortcuts({ docs }: { docs: Docs }) {
+  return (
+    <div className="space-y-4">
+      <p className="text-xs leading-relaxed text-white/55">{docs.shortcuts.summary}</p>
+      {docs.shortcuts.groups.map((g) => (
+        <section key={g.name}>
+          <h2 className="mb-2 text-sm font-semibold text-white">{g.name}</h2>
+          <div className="space-y-1">
+            {g.items.map((s) => (
+              <div key={s.keys} className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.03] px-3 py-1.5">
+                <span className="text-xs text-white/70">{s.desc}</span>
+                <kbd className="rounded border border-white/15 bg-black/40 px-2 py-0.5 font-mono text-[10px] text-white/80">{s.keys}</kbd>
+              </div>
+            ))}
+          </div>
+        </section>
+      ))}
+    </div>
   );
 }
 

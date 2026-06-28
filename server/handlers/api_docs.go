@@ -46,8 +46,47 @@ func (h *Docs) Get(w http.ResponseWriter, _ *http.Request) {
 			"summary":   "Plugins extend enowx via the documented HTTP API. A plugin discovers capabilities from GET /api/docs and calls the listed endpoints. A plugin marketplace (upload/install) is planned; this catalog is the contract plugins build against.",
 			"discovery": "GET /api/docs returns this catalog; treat method+path as the stable interface.",
 		},
+		"shortcuts": map[string]any{
+			"summary": "Hold Ctrl or Alt (left or right) — a hint appears; while held, press a key to switch instantly. Release to dismiss. On macOS this uses Ctrl (not Cmd), so it won't fight Cmd-based browser shortcuts.",
+			"groups":  shortcutGroups,
+		},
 		"groups": groups,
 	})
+}
+
+type shortcut struct {
+	Keys string `json:"keys"`
+	Desc string `json:"desc"`
+}
+
+type shortcutGroup struct {
+	Name  string     `json:"name"`
+	Items []shortcut `json:"items"`
+}
+
+var shortcutGroups = []shortcutGroup{
+	{
+		Name: "Center views",
+		Items: []shortcut{
+			{Keys: "Ctrl/Alt + 1", Desc: "Widget board"},
+			{Keys: "Ctrl/Alt + 2", Desc: "Terminal"},
+			{Keys: "Ctrl/Alt + 3", Desc: "Apps drawer"},
+			{Keys: "Ctrl/Alt + 4", Desc: "Docs"},
+		},
+	},
+	{
+		Name: "Open apps",
+		Items: []shortcut{
+			{Keys: "Ctrl/Alt + P", Desc: "Providers"},
+			{Keys: "Ctrl/Alt + A", Desc: "Accounts"},
+			{Keys: "Ctrl/Alt + S", Desc: "Statistics"},
+			{Keys: "Ctrl/Alt + G", Desc: "Settings"},
+			{Keys: "Ctrl/Alt + F", Desc: "Files"},
+			{Keys: "Ctrl/Alt + R", Desc: "Requests"},
+			{Keys: "Ctrl/Alt + W", Desc: "Warmup Logs"},
+			{Keys: "Ctrl/Alt + K", Desc: "API Keys"},
+		},
+	},
 }
 
 var groups = []docGroup{
