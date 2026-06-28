@@ -4,3 +4,5 @@
 web/node_modules/
 web/dist/
 # server/webdist IS committed (embedded by go:embed; needed for `go build`).
+/tmp/
+tmp/

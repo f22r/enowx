@@ -1,3 +1,5 @@
+//go:build !dev
+
 package server
 
 import (
@@ -9,8 +11,6 @@ import (
 //go:embed all:webdist
 var webFiles embed.FS
 
-// spaHandler serves the embedded WebOS SPA, falling back to index.html for
-// client-side routes.
 func spaHandler() http.Handler {
 	sub, _ := fs.Sub(webFiles, "webdist")
 	fileServer := http.FileServer(http.FS(sub))

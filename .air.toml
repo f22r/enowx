@@ -1,0 +1,13 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  cmd = "go build -tags dev -o ./tmp/enowx ./cmd/enowx"
+  bin = "./tmp/enowx"
+  full_bin = "ENOWX_PORT=8787 ENOWX_LOG_LEVEL=debug ./tmp/enowx"
+  include_ext = ["go"]
+  exclude_dir = ["web", "server/webdist", "tmp", "bin"]
+  delay = 400
+
+[misc]
+  clean_on_exit = true
