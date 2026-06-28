@@ -28,10 +28,16 @@ func NewWarmup(p *proxy.Proxy, reg *provider.Registry, s store.AccountStore, log
 	return &Warmup{proxy: p, reg: reg, store: s, logs: logs}
 }
 
-// warmupModel is the cheap model used to probe each provider.
+// warmupModel is a valid, cheap model accepted by each provider's upstream.
 var warmupModel = map[string]string{
-	"codebuddy": "gpt-4o-mini",
+	"codebuddy": "gemini-2.5-flash",
 	"kiro":      "claude-sonnet-4",
+}
+
+// warmupSystem is set for providers that reject requests without a system turn
+// (codebuddy returns "parse failed" otherwise).
+var warmupSystem = map[string]string{
+	"codebuddy": "You are a helpful assistant.",
 }
 
 func (h *Warmup) Run(w http.ResponseWriter, r *http.Request) {
@@ -161,25 +167,35 @@ func (h *Warmup) List(w http.ResponseWriter, r *http.Request) {
 }
 
 // warmupRequest builds a minimal "reply with hi" probe usable by both
-// passthrough providers (via Raw) and structured ones (via Messages).
+// passthrough providers (via Raw) and structured ones (via Messages). A system
+// turn is included for providers that require it (e.g. codebuddy).
 func warmupRequest(providerName string) *model.Request {
 	modelID := warmupModel[providerName]
 	if modelID == "" {
 		modelID = "gpt-4o-mini"
 	}
+
+	msgs := []map[string]string{}
+	parts := []model.Message{}
+	if sys := warmupSystem[providerName]; sys != "" {
+		msgs = append(msgs, map[string]string{"role": "system", "content": sys})
+		parts = append(parts, model.Message{Role: model.RoleSystem, Parts: []model.Part{{Type: "text", Text: sys}}})
+	}
+	msgs = append(msgs, map[string]string{"role": "user", "content": "reply with hi"})
+	parts = append(parts, model.Message{Role: model.RoleUser, Parts: []model.Part{{Type: "text", Text: "reply with hi"}}})
+
 	raw, _ := json.Marshal(map[string]any{
-		"model":      modelID,
-		"stream":     true,
-		"max_tokens": 8,
-		"messages":   []map[string]string{{"role": "user", "content": "reply with hi"}},
+		"model":          modelID,
+		"stream":         true,
+		"max_tokens":     8,
+		"stream_options": map[string]any{"include_usage": true},
+		"messages":       msgs,
 	})
 	return &model.Request{
-		Source: model.APIOpenAIChat,
-		Model:  modelID,
-		Stream: true,
-		Messages: []model.Message{
-			{Role: model.RoleUser, Parts: []model.Part{{Type: "text", Text: "reply with hi"}}},
-		},
-		Raw: raw,
+		Source:   model.APIOpenAIChat,
+		Model:    modelID,
+		Stream:   true,
+		Messages: parts,
+		Raw:      raw,
 	}
 }

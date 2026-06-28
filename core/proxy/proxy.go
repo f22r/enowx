@@ -93,14 +93,31 @@ func (p *Proxy) Probe(ctx context.Context, providerName string, acc provider.Acc
 	}
 	defer stream.Close()
 	var sample []byte
+	var streamErr string
 	for range 64 {
 		ev, err := stream.Recv()
-		if err != nil || ev.Type == model.EventDone || ev.Type == model.EventError {
+		if err != nil {
+			break
+		}
+		if ev.Type == model.EventError {
+			streamErr = ev.Err
+			break
+		}
+		if ev.Type == model.EventDone {
 			break
 		}
 		if len(sample) < 500 {
 			sample = append(sample, ev.Text...)
 		}
+	}
+	// A 200 that yields no content usually means the upstream rejected the
+	// request at the application layer (e.g. an unknown model). Treat as failed.
+	if len(sample) == 0 {
+		msg := streamErr
+		if msg == "" {
+			msg = "upstream returned 200 with no content (request likely rejected)"
+		}
+		return ProbeResult{Outcome: provider.OutcomeTransient, Status: resp.StatusCode, Response: msg, Err: fmt.Errorf("empty response")}
 	}
 	return ProbeResult{Outcome: provider.OutcomeOK, Status: resp.StatusCode, Response: string(sample)}
 }
