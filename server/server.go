@@ -86,6 +86,7 @@ func New(addr string, d Deps) *Server {
 
 		r.Get("/files", files.List)
 		r.Get("/files/read", files.Read)
+		r.Get("/files/raw", files.Raw)
 	})
 
 	// Real PTY shell over WebSocket — loopback-only (guarded in the handler).

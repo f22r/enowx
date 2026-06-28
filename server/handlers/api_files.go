@@ -116,3 +116,22 @@ func (h *Files) Read(w http.ResponseWriter, r *http.Request) {
 func looksBinary(b []byte) bool {
 	return bytes.IndexByte(b, 0) >= 0
 }
+
+// Raw streams a file's bytes (used for image previews). Loopback-only.
+func (h *Files) Raw(w http.ResponseWriter, r *http.Request) {
+	if !isLoopback(r) {
+		http.Error(w, "localhost only", http.StatusForbidden)
+		return
+	}
+	path := filepath.Clean(strings.TrimSpace(r.URL.Query().Get("path")))
+	if path == "" || path == "." {
+		http.Error(w, "path required", http.StatusBadRequest)
+		return
+	}
+	info, err := os.Stat(path)
+	if err != nil || info.IsDir() {
+		http.Error(w, "not a file", http.StatusBadRequest)
+		return
+	}
+	http.ServeFile(w, r, path)
+}

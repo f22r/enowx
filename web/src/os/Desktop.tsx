@@ -1,22 +1,27 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence } from "framer-motion";
-import { LayoutGrid, SquareTerminal } from "lucide-react";
+import { LayoutGrid, SquareTerminal, Code2 } from "lucide-react";
 import { buildApps } from "../apps";
 import { SideDock } from "./SideDock";
 import { SidePanel } from "./SidePanel";
 import { TopBar } from "./TopBar";
 import { Widgets } from "./Widgets";
 import { TerminalApp } from "./TerminalApp";
+import { EditorView } from "./EditorView";
+import { onOpenFile } from "./openFileBus";
 import { usePanels } from "./usePanels";
 import { useSides } from "./useSides";
 import type { AppId, Side } from "./types";
 
-type CenterView = "widget" | "terminal";
+type CenterView = "widget" | "terminal" | "editor";
 
 export function Desktop() {
   const apps = buildApps();
   const { active, toggle, close } = usePanels();
   const [view, setView] = useState<CenterView>("widget");
+
+  // Opening a file (from Files) reveals the Editor center view.
+  useEffect(() => onOpenFile(() => setView("editor")), []);
 
   const defaults = Object.fromEntries(apps.map((a) => [a.id, a.side])) as Record<AppId, Side>;
   const { sides, move } = useSides(defaults);
@@ -38,14 +43,17 @@ export function Desktop() {
     <div className="wallpaper fixed inset-0 select-none overflow-hidden">
       <div className="pointer-events-none absolute inset-x-0 top-7 bottom-3">
         <div className="pointer-events-auto mx-auto flex h-full max-w-3xl flex-col px-5 pb-3 pt-5">
-          <div className="min-h-0 flex-1 overflow-hidden">
-            {view === "widget" ? (
-              <div className="h-full overflow-auto">
-                <Widgets onOpen={(id) => toggle(sideOf(id), id)} />
-              </div>
-            ) : (
+          <div className="relative min-h-0 flex-1 overflow-hidden">
+            <div className={`absolute inset-0 overflow-auto ${view === "widget" ? "" : "hidden"}`}>
+              <Widgets onOpen={(id) => toggle(sideOf(id), id)} />
+            </div>
+            <div className={`absolute inset-0 ${view === "terminal" ? "" : "hidden"}`}>
               <TerminalApp />
-            )}
+            </div>
+            {/* Editor stays mounted so it can receive openFile events even while hidden. */}
+            <div className={`absolute inset-0 ${view === "editor" ? "" : "hidden"}`}>
+              <EditorView />
+            </div>
           </div>
           <CenterNav view={view} onView={setView} />
         </div>
@@ -66,6 +74,7 @@ function CenterNav({ view, onView }: { view: CenterView; onView: (v: CenterView)
   const tabs: { id: CenterView; label: string; icon: typeof LayoutGrid }[] = [
     { id: "widget", label: "Widget", icon: LayoutGrid },
     { id: "terminal", label: "Terminal", icon: SquareTerminal },
+    { id: "editor", label: "Editor", icon: Code2 },
   ];
   return (
     <div className="mt-3 flex shrink-0 justify-center">
