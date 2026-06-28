@@ -21,7 +21,6 @@ import {
   accountsApi,
   requestsApi,
   settingsApi,
-  keysApi,
   type Account,
   type RequestSummary,
   type Settings,
@@ -30,6 +29,8 @@ import {
   type ApiKey,
 } from "../lib/api";
 import { Sparkline } from "../components/Sparkline";
+import { useKeys } from "./useKeys";
+import { useDialog } from "./dialog";
 import type { AppId } from "./types";
 
 const fmt = (n: number) => new Intl.NumberFormat().format(n);
@@ -54,10 +55,9 @@ export function Widgets({ onOpen }: { onOpen: (id: AppId) => void }) {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [series, setSeries] = useState<SeriesPoint[]>([]);
   const [models, setModels] = useState<ModelStat[]>([]);
-  const [keys, setKeys] = useState<ApiKey[]>([]);
   const [healthy, setHealthy] = useState(true);
-
-  const reloadKeys = () => keysApi.list().then((k) => setKeys(k ?? [])).catch(() => {});
+  const { keys: keysData } = useKeys(); // shared store: stays in sync with the API Keys app
+  const keys = keysData ?? [];
 
   useEffect(() => {
     let alive = true;
@@ -67,7 +67,6 @@ export function Widgets({ onOpen }: { onOpen: (id: AppId) => void }) {
       requestsApi.series().then((s) => alive && setSeries(s ?? [])).catch(() => {});
       requestsApi.topModels().then((m) => alive && setModels(m ?? [])).catch(() => {});
       settingsApi.get().then((s) => alive && setSettings(s)).catch(() => {});
-      keysApi.list().then((k) => alive && setKeys(k ?? [])).catch(() => {});
       fetch("/health").then((r) => alive && setHealthy(r.ok)).catch(() => alive && setHealthy(false));
     };
     load();
@@ -82,7 +81,7 @@ export function Widgets({ onOpen }: { onOpen: (id: AppId) => void }) {
     <div className="pointer-events-auto h-full w-full">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <PoolWidget accounts={accounts} onOpen={onOpen} />
-        <ApiKeyWidget keys={keys} onChanged={reloadKeys} onOpen={onOpen} />
+        <ApiKeyWidget keys={keys} onOpen={onOpen} />
         <UsageWidget summary={summary} />
         <ThroughputWidget series={series} />
         <RequestsWidget summary={summary} onOpen={onOpen} />
@@ -221,74 +220,65 @@ function PoolWidget({ accounts, onOpen }: { accounts: Account[] | null; onOpen: 
   );
 }
 
-function ApiKeyWidget({
-  keys,
-  onChanged,
-  onOpen,
-}: {
-  keys: ApiKey[];
-  onChanged: () => void;
-  onOpen: (id: AppId) => void;
-}) {
-  const [creating, setCreating] = useState(false);
-  const [err, setErr] = useState("");
+function ApiKeyWidget({ keys, onOpen }: { keys: ApiKey[]; onOpen: (id: AppId) => void }) {
+  const { add } = useKeys();
+  const dialog = useDialog();
 
-  const create = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setCreating(true);
-    setErr("");
-    try {
-      await keysApi.add();
-      onChanged();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : "failed to create key");
-    } finally {
-      setCreating(false);
-    }
+  const create = async () => {
+    const v = await dialog.form({
+      title: "New API key",
+      fields: [
+        { name: "label", label: "Label" },
+        { name: "token_limit", label: "Token limit (0 = unlimited)", type: "number", placeholder: "0" },
+        { name: "max_concurrent", label: "Max concurrent (0 = unlimited)", type: "number", placeholder: "0" },
+        { name: "expires_in_days", label: "Expires in days (0 = never)", type: "number", placeholder: "0" },
+      ],
+      confirmLabel: "Create key",
+    });
+    if (!v) return;
+    await add({
+      label: v.label?.trim() || undefined,
+      token_limit: Number(v.token_limit) || 0,
+      max_concurrent: Number(v.max_concurrent) || 0,
+      expires_in_days: Number(v.expires_in_days) || 0,
+    });
   };
 
   if (keys.length === 0) {
-    // No key yet: prompt to create one (the "only visible once a key exists"
-    // detail is the populated state below).
     return (
       <Widget icon={<KeyRound />} title="API key">
-        <p className="mb-3 text-sm text-white/40">
-          No gateway key. Create one to require auth on /v1 and /anthropic.
-        </p>
+        <p className="mb-3 text-sm text-white/40">No gateway key. Create one to require auth on /v1 and /anthropic.</p>
         <button
           type="button"
           onClick={create}
-          disabled={creating}
-          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 py-1.5 text-xs font-medium text-white/80 hover:bg-white/10 disabled:opacity-50"
+          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 py-1.5 text-xs font-medium text-white/80 hover:bg-white/10"
         >
-          <Plus className="h-3.5 w-3.5" /> {creating ? "Creating..." : "Create API key"}
+          <Plus className="h-3.5 w-3.5" /> Create API key
         </button>
-        {err && <p className="mt-2 text-[11px] text-red-300">{err}</p>}
       </Widget>
     );
   }
 
   return (
-    <Widget icon={<KeyRound />} title="API key" onOpen={() => onOpen("settings")}>
+    <Widget icon={<KeyRound />} title="API key" onOpen={() => onOpen("api-keys")}>
       <div className="space-y-2">
         {keys.slice(0, 1).map((k) => (
-          <KeyRow key={k.id} apiKey={k} onChanged={onChanged} />
+          <KeyRow key={k.id} apiKey={k} />
         ))}
       </div>
       <button
         type="button"
         onClick={create}
-        disabled={creating}
-        className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 py-1.5 text-xs font-medium text-white/80 hover:bg-white/10 disabled:opacity-50"
+        className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 py-1.5 text-xs font-medium text-white/80 hover:bg-white/10"
       >
-        <Plus className="h-3.5 w-3.5" /> {creating ? "Creating..." : "New key"}
+        <Plus className="h-3.5 w-3.5" /> New key
       </button>
-      {err && <p className="mt-2 text-[11px] text-red-300">{err}</p>}
     </Widget>
   );
 }
 
-function KeyRow({ apiKey, onChanged }: { apiKey: ApiKey; onChanged: () => void }) {
+function KeyRow({ apiKey }: { apiKey: ApiKey }) {
+  const { remove } = useKeys();
   const [copied, setCopied] = useState(false);
   const masked = `${apiKey.secret.slice(0, 8)}…${apiKey.secret.slice(-4)}`;
 
@@ -311,10 +301,9 @@ function KeyRow({ apiKey, onChanged }: { apiKey: ApiKey; onChanged: () => void }
           {copied ? <Check className="h-3.5 w-3.5 text-emerald-300" /> : <Copy className="h-3.5 w-3.5" />}
         </button>
         <button
-          onClick={async (e) => {
+          onClick={(e) => {
             e.stopPropagation();
-            await keysApi.remove(apiKey.id);
-            onChanged();
+            void remove(apiKey.id);
           }}
           className="rounded p-1 text-white/40 hover:bg-red-500/30 hover:text-red-200"
         >

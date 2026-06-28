@@ -1,33 +1,21 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Plus, Copy, Check, Trash2, RefreshCw, X } from "lucide-react";
 import { AppShell } from "./shell";
 import { Tooltip } from "../components/Tooltip";
 import { useDialog } from "../os/dialog";
-import { keysApi, type ApiKey, type NewApiKey } from "../lib/api";
+import { useKeys } from "../os/useKeys";
+import { type ApiKey, type NewApiKey } from "../lib/api";
 
 const compact = (n: number) =>
   n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `${(n / 1_000).toFixed(1)}K` : `${n}`;
 
 export function ApiKeysApp() {
-  const [keys, setKeys] = useState<ApiKey[] | null>(null);
+  const { keys, reload, add, remove } = useKeys();
   const [error, setError] = useState("");
   const [creating, setCreating] = useState(false);
   const dialog = useDialog();
 
-  async function load() {
-    try {
-      setKeys(await keysApi.list());
-      setError("");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "failed to load");
-      setKeys([]);
-    }
-  }
-  useEffect(() => {
-    load();
-  }, []);
-
-  const remove = async (k: ApiKey) => {
+  const onDelete = async (k: ApiKey) => {
     const ok = await dialog.confirm({
       title: "Delete API key?",
       message: `${k.label || k.secret.slice(0, 12)} will stop working immediately.`,
@@ -35,8 +23,11 @@ export function ApiKeysApp() {
       danger: true,
     });
     if (ok) {
-      await keysApi.remove(k.id);
-      load();
+      try {
+        await remove(k.id);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "failed to delete");
+      }
     }
   };
 
@@ -52,7 +43,7 @@ export function ApiKeysApp() {
             <Plus className="h-3.5 w-3.5" /> New key
           </button>
           <Tooltip label="Reload keys" place="bottom">
-            <button onClick={load} className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] text-white/50 hover:bg-white/10 hover:text-white">
+            <button onClick={reload} className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] text-white/50 hover:bg-white/10 hover:text-white">
               <RefreshCw className="h-3.5 w-3.5" />
             </button>
           </Tooltip>
@@ -74,7 +65,7 @@ export function ApiKeysApp() {
           ) : (
             <div className="space-y-2">
               {keys.map((k) => (
-                <KeyCard key={k.id} k={k} onDelete={() => remove(k)} />
+                <KeyCard key={k.id} k={k} onDelete={() => onDelete(k)} />
               ))}
             </div>
           )}
@@ -85,9 +76,8 @@ export function ApiKeysApp() {
         <CreateModal
           onClose={() => setCreating(false)}
           onCreate={async (payload) => {
-            await keysApi.add(payload);
+            await add(payload);
             setCreating(false);
-            load();
           }}
         />
       )}
@@ -167,7 +157,7 @@ function CreateModal({ onClose, onCreate }: { onClose: () => void; onCreate: (p:
   };
 
   return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[11000] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm" onClick={onClose}>
       <div className="w-full max-w-sm overflow-hidden rounded-2xl border border-white/10 bg-[#11131a] shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-white/5 px-4 py-3">
           <p className="text-sm font-semibold text-white">New API key</p>
