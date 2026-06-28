@@ -4,7 +4,12 @@ import { SystemStats } from "./SystemStats";
 export function TopBar() {
   const [clock, setClock] = useState("--:--");
   useEffect(() => {
-    const tick = () => setClock(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+    const tick = () => {
+      const d = new Date();
+      const date = d.toLocaleDateString([], { weekday: "short", day: "2-digit", month: "short" });
+      const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      setClock(`${date} ${time}`);
+    };
     tick();
     const id = setInterval(tick, 15000);
     return () => clearInterval(id);
