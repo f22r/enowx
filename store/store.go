@@ -34,11 +34,16 @@ type RequestLog struct {
 
 // APIKey is a gateway key that protects /v1 and /anthropic when any exist.
 type APIKey struct {
-	ID        int64
-	Label     string
-	Secret    string
-	CreatedAt time.Time
-	LastUsed  *time.Time
+	ID            int64
+	Label         string
+	Secret        string
+	TokenLimit    int64      // total tokens allowed; 0 = unlimited
+	TokensUsed    int64      // running total of tokens spent
+	MaxConcurrent int64      // simultaneous in-flight requests; 0 = unlimited
+	ExpiresAt     *time.Time // nil = never expires
+	Enabled       bool
+	CreatedAt     time.Time
+	LastUsed      *time.Time
 }
 
 // WarmupLog records one account warmup attempt (a real probe request).
@@ -75,7 +80,8 @@ type KeyStore interface {
 	List(ctx context.Context) ([]APIKey, error)
 	Add(ctx context.Context, k APIKey) (int64, error)
 	Delete(ctx context.Context, id int64) error
-	Valid(ctx context.Context, secret string) (bool, error)
+	BySecret(ctx context.Context, secret string) (*APIKey, error) // nil if not found
+	AddUsage(ctx context.Context, id, tokens int64) error
 	Count(ctx context.Context) (int, error)
 }
 

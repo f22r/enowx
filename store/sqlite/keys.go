@@ -10,22 +10,37 @@ import (
 
 type keyStore struct{ db *sql.DB }
 
+func scanKey(s interface {
+	Scan(dest ...any) error
+}) (store.APIKey, error) {
+	var k store.APIKey
+	var expires, last sql.NullTime
+	if err := s.Scan(&k.ID, &k.Label, &k.Secret, &k.TokenLimit, &k.TokensUsed, &k.MaxConcurrent,
+		&expires, &k.Enabled, &k.CreatedAt, &last); err != nil {
+		return k, err
+	}
+	if expires.Valid {
+		k.ExpiresAt = &expires.Time
+	}
+	if last.Valid {
+		k.LastUsed = &last.Time
+	}
+	return k, nil
+}
+
+const keyCols = `id, label, secret, token_limit, tokens_used, max_concurrent, expires_at, enabled, created_at, last_used`
+
 func (s *keyStore) List(ctx context.Context) ([]store.APIKey, error) {
-	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, label, secret, created_at, last_used FROM api_keys ORDER BY id`)
+	rows, err := s.db.QueryContext(ctx, `SELECT `+keyCols+` FROM api_keys ORDER BY id`)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	var out []store.APIKey
 	for rows.Next() {
-		var k store.APIKey
-		var last sql.NullTime
-		if err := rows.Scan(&k.ID, &k.Label, &k.Secret, &k.CreatedAt, &last); err != nil {
+		k, err := scanKey(rows)
+		if err != nil {
 			return nil, err
-		}
-		if last.Valid {
-			k.LastUsed = &last.Time
 		}
 		out = append(out, k)
 	}
@@ -34,7 +49,9 @@ func (s *keyStore) List(ctx context.Context) ([]store.APIKey, error) {
 
 func (s *keyStore) Add(ctx context.Context, k store.APIKey) (int64, error) {
 	res, err := s.db.ExecContext(ctx,
-		`INSERT INTO api_keys (label, secret) VALUES (?, ?)`, k.Label, k.Secret)
+		`INSERT INTO api_keys (label, secret, token_limit, max_concurrent, expires_at, enabled)
+		 VALUES (?, ?, ?, ?, ?, ?)`,
+		k.Label, k.Secret, k.TokenLimit, k.MaxConcurrent, nullTime(k.ExpiresAt), k.Enabled)
 	if err != nil {
 		return 0, err
 	}
@@ -46,21 +63,33 @@ func (s *keyStore) Delete(ctx context.Context, id int64) error {
 	return err
 }
 
-func (s *keyStore) Valid(ctx context.Context, secret string) (bool, error) {
-	var id int64
-	err := s.db.QueryRowContext(ctx, `SELECT id FROM api_keys WHERE secret = ?`, secret).Scan(&id)
+func (s *keyStore) BySecret(ctx context.Context, secret string) (*store.APIKey, error) {
+	row := s.db.QueryRowContext(ctx, `SELECT `+keyCols+` FROM api_keys WHERE secret = ?`, secret)
+	k, err := scanKey(row)
 	if err == sql.ErrNoRows {
-		return false, nil
+		return nil, nil
 	}
 	if err != nil {
-		return false, err
+		return nil, err
 	}
-	_, _ = s.db.ExecContext(ctx, `UPDATE api_keys SET last_used = ? WHERE id = ?`, time.Now(), id)
-	return true, nil
+	_, _ = s.db.ExecContext(ctx, `UPDATE api_keys SET last_used = ? WHERE id = ?`, time.Now(), k.ID)
+	return &k, nil
+}
+
+func (s *keyStore) AddUsage(ctx context.Context, id, tokens int64) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE api_keys SET tokens_used = tokens_used + ? WHERE id = ?`, tokens, id)
+	return err
 }
 
 func (s *keyStore) Count(ctx context.Context) (int, error) {
 	var n int
 	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM api_keys`).Scan(&n)
 	return n, err
+}
+
+func nullTime(t *time.Time) any {
+	if t == nil {
+		return nil
+	}
+	return *t
 }

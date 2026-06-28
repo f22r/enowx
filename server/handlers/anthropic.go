@@ -19,10 +19,11 @@ type Anthropic struct {
 	proxy *proxy.Proxy
 	route func(string) string
 	logs  store.LogStore
+	keys  store.KeyStore
 }
 
-func NewAnthropic(p *proxy.Proxy, route func(string) string, logs store.LogStore) *Anthropic {
-	return &Anthropic{proxy: p, route: route, logs: logs}
+func NewAnthropic(p *proxy.Proxy, route func(string) string, logs store.LogStore, keys store.KeyStore) *Anthropic {
+	return &Anthropic{proxy: p, route: route, logs: logs, keys: keys}
 }
 
 func (h *Anthropic) Messages(w http.ResponseWriter, r *http.Request) {
@@ -47,6 +48,7 @@ func (h *Anthropic) Messages(w http.ResponseWriter, r *http.Request) {
 	us := wrapUsage(stream)
 	sse.WriteAnthropic(w, us, req.Model)
 	h.log(providerName, req.Model, "success", start, us.usage)
+	chargeKey(r, h.keys, us.usage)
 }
 
 func (h *Anthropic) log(provider, modelID, status string, start time.Time, usage model.Usage) {

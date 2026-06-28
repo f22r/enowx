@@ -184,13 +184,25 @@ export interface ApiKey {
   id: number;
   label: string;
   secret: string;
+  token_limit: number;
+  tokens_used: number;
+  max_concurrent: number;
+  expires_at: string | null;
+  enabled: boolean;
   created_at: string;
   last_used: string | null;
 }
 
+export interface NewApiKey {
+  label?: string;
+  token_limit?: number;
+  max_concurrent?: number;
+  expires_in_days?: number;
+}
+
 export const keysApi = {
   list: () => api.get<ApiKey[]>("/api/keys"),
-  add: (label?: string) => api.post<{ id: number; secret: string }>("/api/keys", { label }),
+  add: (k: NewApiKey = {}) => api.post<{ id: number; secret: string }>("/api/keys", k),
   remove: (id: number) => api.del<{ ok: boolean }>(`/api/keys/${id}`),
 };
 

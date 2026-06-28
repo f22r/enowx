@@ -19,10 +19,11 @@ type V1 struct {
 	proxy *proxy.Proxy
 	route func(modelID string) string // model → provider name
 	logs  store.LogStore
+	keys  store.KeyStore
 }
 
-func NewV1(p *proxy.Proxy, route func(string) string, logs store.LogStore) *V1 {
-	return &V1{proxy: p, route: route, logs: logs}
+func NewV1(p *proxy.Proxy, route func(string) string, logs store.LogStore, keys store.KeyStore) *V1 {
+	return &V1{proxy: p, route: route, logs: logs, keys: keys}
 }
 
 func (h *V1) ChatCompletions(w http.ResponseWriter, r *http.Request) {
@@ -51,6 +52,7 @@ func (h *V1) ChatCompletions(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, us)
 	}
 	h.log(providerName, req.Model, "success", start, us.usage)
+	chargeKey(r, h.keys, us.usage)
 }
 
 func (h *V1) log(provider, modelID, status string, start time.Time, usage model.Usage) {

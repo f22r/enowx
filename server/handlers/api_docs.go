@@ -104,8 +104,8 @@ var groups = []docGroup{
 		Name: "API keys",
 		Desc: "Gateway keys that protect /v1 and /anthropic.",
 		Endpoints: []docEndpoint{
-			{Method: "GET", Path: "/api/keys", Desc: "List gateway keys (re-viewable)."},
-			{Method: "POST", Path: "/api/keys", Desc: "Create a gateway key.", Params: []docParam{{Name: "label", In: "body", Desc: "optional"}}},
+			{Method: "GET", Path: "/api/keys", Desc: "List gateway keys (re-viewable, with limits + usage)."},
+			{Method: "POST", Path: "/api/keys", Desc: "Create a gateway key with optional limits.", Params: []docParam{{Name: "label", In: "body", Desc: "optional"}, {Name: "token_limit", In: "body", Desc: "total tokens allowed; 0 = unlimited"}, {Name: "max_concurrent", In: "body", Desc: "simultaneous requests; 0 = unlimited"}, {Name: "expires_in_days", In: "body", Desc: "expiry in days; 0 = never"}}},
 			{Method: "DELETE", Path: "/api/keys/{id}", Desc: "Delete a gateway key.", Params: []docParam{{Name: "id", In: "path", Desc: "key id"}}},
 		},
 	},

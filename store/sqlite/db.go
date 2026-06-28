@@ -68,7 +68,21 @@ func migrate(db *sql.DB) error {
 	if err := ensureColumn(db, "accounts", "disabled", "INTEGER NOT NULL DEFAULT 0"); err != nil {
 		return err
 	}
-	return ensureColumn(db, "request_logs", "source", "TEXT NOT NULL DEFAULT 'api'")
+	if err := ensureColumn(db, "request_logs", "source", "TEXT NOT NULL DEFAULT 'api'"); err != nil {
+		return err
+	}
+	for _, c := range []struct{ name, decl string }{
+		{"token_limit", "INTEGER NOT NULL DEFAULT 0"},
+		{"tokens_used", "INTEGER NOT NULL DEFAULT 0"},
+		{"max_concurrent", "INTEGER NOT NULL DEFAULT 0"},
+		{"expires_at", "TIMESTAMP"},
+		{"enabled", "INTEGER NOT NULL DEFAULT 1"},
+	} {
+		if err := ensureColumn(db, "api_keys", c.name, c.decl); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // ensureColumn adds a column to an existing table if it is missing (SQLite has

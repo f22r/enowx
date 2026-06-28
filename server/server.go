@@ -34,8 +34,8 @@ type Deps struct {
 
 func New(addr string, d Deps) *Server {
 	r := chi.NewRouter()
-	v1 := handlers.NewV1(d.Proxy, d.Route, d.Logs)
-	anthropic := handlers.NewAnthropic(d.Proxy, d.Route, d.Logs)
+	v1 := handlers.NewV1(d.Proxy, d.Route, d.Logs, d.Keys)
+	anthropic := handlers.NewAnthropic(d.Proxy, d.Route, d.Logs, d.Keys)
 	providers := handlers.NewProviders(d.Registry)
 	accounts := handlers.NewAccounts(d.Accounts)
 	requests := handlers.NewRequests(d.Logs)
@@ -49,7 +49,7 @@ func New(addr string, d Deps) *Server {
 	warmup := handlers.NewWarmup(d.Proxy, d.Registry, d.Accounts, d.Warmups, d.Logs)
 	term := handlers.NewTerminal()
 	files := handlers.NewFiles()
-	auth := middleware.APIKeyAuth(d.Keys)
+	auth := middleware.NewAuth(d.Keys)
 
 	r.Get("/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.Write([]byte(`{"status":"ok"}`))
@@ -57,7 +57,7 @@ func New(addr string, d Deps) *Server {
 
 	// Proxy endpoints, guarded by the optional API key.
 	r.Group(func(r chi.Router) {
-		r.Use(auth)
+		r.Use(auth.Handler)
 		r.Post("/v1/chat/completions", v1.ChatCompletions)
 		r.Post("/anthropic/v1/messages", anthropic.Messages)
 	})
