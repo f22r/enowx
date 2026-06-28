@@ -1,54 +1,47 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { Plus, X, SquareTerminal } from "lucide-react";
-import { TerminalView } from "./TerminalView";
+import type { useTerminals } from "./useTerminals";
 
-interface Tab {
-  id: number;
-  title: string;
-}
-
-// TerminalApp manages multiple PTY terminal tabs. Inactive tabs stay mounted
-// (hidden) so their shell session keeps running while you switch around.
-export function TerminalApp() {
-  const seq = useRef(1);
-  const [tabs, setTabs] = useState<Tab[]>([{ id: 0, title: "terminal" }]);
-  const [activeId, setActiveId] = useState(0);
+// CenterTerminal renders the center tab strip + the host div the active
+// terminal is portaled into. Tabs can be dragged onto a dock to move a session
+// out to the side; dropping a dock terminal here brings it back.
+export function CenterTerminal({
+  term,
+  setHost,
+}: {
+  term: ReturnType<typeof useTerminals>;
+  setHost: (el: HTMLElement | null) => void;
+}) {
   const [editing, setEditing] = useState<number | null>(null);
-
-  const add = () => {
-    const id = seq.current++;
-    setTabs((t) => [...t, { id, title: `terminal ${id + 1}` }]);
-    setActiveId(id);
-  };
-
-  const close = (id: number) => {
-    setTabs((t) => {
-      const next = t.filter((x) => x.id !== id);
-      if (next.length === 0) {
-        const fresh = { id: seq.current++, title: "terminal" };
-        setActiveId(fresh.id);
-        return [fresh];
-      }
-      if (id === activeId) setActiveId(next[next.length - 1].id);
-      return next;
-    });
-  };
-
-  const rename = (id: number, title: string) => {
-    setTabs((t) => t.map((x) => (x.id === id ? { ...x, title: title.trim() || x.title } : x)));
-  };
+  const centerTerms = term.terms.filter((t) => t.location === "center");
 
   return (
     <div className="flex h-full flex-col">
-      {/* Editor-style tab strip that sits on top of the terminal body. */}
-      <div className="flex shrink-0 items-stretch rounded-t-2xl border border-b-0 border-emerald-500/20 bg-black/40">
+      <div
+        className="flex shrink-0 items-stretch rounded-t-2xl border border-b-0 border-emerald-500/20 bg-black/40"
+        onDragOver={(e) => {
+          if (e.dataTransfer.types.includes("text/term-id")) e.preventDefault();
+        }}
+        onDrop={(e) => {
+          const id = e.dataTransfer.getData("text/term-id");
+          if (id) {
+            e.preventDefault();
+            term.moveTo(Number(id), "center");
+          }
+        }}
+      >
         <div className="term-tabs flex min-w-0 flex-1 items-stretch gap-0.5 overflow-x-auto p-1">
-          {tabs.map((tab) => {
-            const isActive = tab.id === activeId;
+          {centerTerms.map((tab) => {
+            const isActive = tab.id === term.activeCenter;
             return (
               <div
                 key={tab.id}
-                onClick={() => setActiveId(tab.id)}
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData("text/term-id", String(tab.id));
+                  e.dataTransfer.effectAllowed = "move";
+                }}
+                onClick={() => term.setActiveCenter(tab.id)}
                 onDoubleClick={() => setEditing(tab.id)}
                 title={tab.title}
                 className={`group flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs transition-colors ${
@@ -64,12 +57,12 @@ export function TerminalApp() {
                     defaultValue={tab.title}
                     onClick={(e) => e.stopPropagation()}
                     onBlur={(e) => {
-                      rename(tab.id, e.target.value);
+                      term.rename(tab.id, e.target.value);
                       setEditing(null);
                     }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
-                        rename(tab.id, (e.target as HTMLInputElement).value);
+                        term.rename(tab.id, (e.target as HTMLInputElement).value);
                         setEditing(null);
                       } else if (e.key === "Escape") {
                         setEditing(null);
@@ -83,9 +76,9 @@ export function TerminalApp() {
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    close(tab.id);
+                    term.close(tab.id);
                   }}
-                  className={`-mr-0.5 rounded p-0.5 text-white/30 transition-opacity hover:bg-red-500/40 hover:text-white ${
+                  className={`-mr-0.5 rounded p-0.5 text-white/30 hover:bg-red-500/40 hover:text-white ${
                     isActive ? "opacity-60" : "opacity-0 group-hover:opacity-60"
                   } hover:!opacity-100`}
                 >
@@ -96,7 +89,7 @@ export function TerminalApp() {
           })}
         </div>
         <button
-          onClick={add}
+          onClick={term.add}
           title="New terminal"
           className="flex shrink-0 items-center border-l border-white/5 px-2.5 text-white/40 transition-colors hover:bg-white/[0.05] hover:text-emerald-300"
         >
@@ -104,13 +97,8 @@ export function TerminalApp() {
         </button>
       </div>
 
-      <div className="relative min-h-0 flex-1 overflow-hidden rounded-b-2xl border border-emerald-500/20 bg-[#0b0c10] shadow-xl">
-        {tabs.map((tab) => (
-          <div key={tab.id} className={`absolute inset-0 ${tab.id === activeId ? "" : "hidden"}`}>
-            <TerminalView />
-          </div>
-        ))}
-      </div>
+      {/* Terminal instances are portaled into this host by TerminalLayer. */}
+      <div ref={setHost} className="relative min-h-0 flex-1 overflow-hidden rounded-b-2xl border border-emerald-500/20 bg-[#0b0c10] shadow-xl" />
     </div>
   );
 }

@@ -1,6 +1,7 @@
+import type { ReactNode } from "react";
 import { motion } from "framer-motion";
 import { X } from "lucide-react";
-import type { DesktopApp, Side } from "./types";
+import type { Side } from "./types";
 
 // A panel that slides in from its dock's edge and stops at the centered widget
 // board (max-w-3xl = 48rem), so the board stays visible between the two sides.
@@ -9,14 +10,20 @@ const DOCK_GAP = "5.25rem";
 const BOARD_HALF = "24rem";
 const PANEL_WIDTH = `clamp(18rem, calc(50vw - ${DOCK_GAP} - ${BOARD_HALF} - 0.75rem), 36rem)`;
 
+// Renders an app's content (children) or, for a terminal, exposes its body as a
+// host element via hostRef so the terminal layer can portal the live session in.
 export function SidePanel({
   side,
-  app,
+  title,
   onClose,
+  children,
+  hostRef,
 }: {
   side: Side;
-  app: DesktopApp;
+  title: string;
   onClose: () => void;
+  children?: ReactNode;
+  hostRef?: (el: HTMLElement | null) => void;
 }) {
   const edge = side === "left" ? { left: DOCK_GAP } : { right: DOCK_GAP };
 
@@ -30,7 +37,7 @@ export function SidePanel({
       className="glass pointer-events-auto absolute top-9 bottom-3 z-[8000] flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-[var(--window-bg)]/95 shadow-2xl"
     >
       <div className="flex items-center justify-between border-b border-white/5 px-3 py-2">
-        <span className="text-xs font-semibold text-white/80">{app.label}</span>
+        <span className="text-xs font-semibold text-white/80">{title}</span>
         <button
           onClick={onClose}
           className="rounded-md p-1 text-white/50 transition-colors hover:bg-red-500/80 hover:text-white"
@@ -38,7 +45,11 @@ export function SidePanel({
           <X className="h-3.5 w-3.5" />
         </button>
       </div>
-      <div className="flex-1 overflow-auto">{app.render()}</div>
+      {hostRef ? (
+        <div ref={hostRef} className="relative flex-1 overflow-hidden bg-[#0b0c10]" />
+      ) : (
+        <div className="flex-1 overflow-auto">{children}</div>
+      )}
     </motion.div>
   );
 }

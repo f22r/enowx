@@ -6,9 +6,11 @@ import { SideDock } from "./SideDock";
 import { SidePanel } from "./SidePanel";
 import { TopBar } from "./TopBar";
 import { Widgets } from "./Widgets";
-import { TerminalApp } from "./TerminalApp";
+import { CenterTerminal } from "./CenterTerminal";
+import { TerminalLayer } from "./TerminalLayer";
 import { usePanels } from "./usePanels";
 import { useSides } from "./useSides";
+import { useTerminals, type TermLocation } from "./useTerminals";
 import type { AppId, Side } from "./types";
 
 type CenterView = "widget" | "terminal";
@@ -20,17 +22,44 @@ export function Desktop() {
 
   const defaults = Object.fromEntries(apps.map((a) => [a.id, a.side])) as Record<AppId, Side>;
   const { sides, move } = useSides(defaults);
+  const term = useTerminals();
+
+  // Per-location DOM hosts the terminal instances are portaled into.
+  const [centerHost, setCenterHost] = useState<HTMLElement | null>(null);
+  const [leftHost, setLeftHost] = useState<HTMLElement | null>(null);
+  const [rightHost, setRightHost] = useState<HTMLElement | null>(null);
+  const hosts: Record<TermLocation, HTMLElement | null> = { center: centerHost, left: leftHost, right: rightHost };
 
   const sideOf = (id: AppId): Side => sides[id] ?? "left";
   const appsOn = (side: Side) => apps.filter((a) => sideOf(a.id) === side);
-  const find = (id: AppId | null) => apps.find((a) => a.id === id);
+  const termsOn = (side: Side) => term.terms.filter((t) => t.location === side);
+  const findApp = (id: AppId | null) => apps.find((a) => a.id === id);
+
+  // A dock side may have an app panel open OR a terminal panel open.
+  const [openTerm, setOpenTerm] = useState<Record<Side, number | null>>({ left: null, right: null });
+  const openTermOn = (side: Side) => term.terms.find((t) => t.location === side && t.id === openTerm[side]) ?? null;
 
   const renderPanel = (side: Side) => {
+    const openT = openTermOn(side);
+    if (openT) {
+      return (
+        <SidePanel
+          side={side}
+          title={openT.title}
+          onClose={() => {
+            term.close(openT.id);
+            setOpenTerm((p) => ({ ...p, [side]: null }));
+          }}
+          hostRef={side === "left" ? setLeftHost : setRightHost}
+        />
+      );
+    }
     const id = active[side];
-    const app = find(id);
-    // Only render the panel on the side the app currently lives on.
+    const app = findApp(id);
     return app && id && sideOf(id) === side ? (
-      <SidePanel side={side} app={app} onClose={() => close(side)} />
+      <SidePanel side={side} title={app.label} onClose={() => close(side)}>
+        {app.render()}
+      </SidePanel>
     ) : null;
   };
 
@@ -43,7 +72,7 @@ export function Desktop() {
               <Widgets onOpen={(id) => toggle(sideOf(id), id)} />
             </div>
             <div className={`absolute inset-0 ${view === "terminal" ? "" : "hidden"}`}>
-              <TerminalApp />
+              <CenterTerminal term={term} setHost={setCenterHost} />
             </div>
           </div>
           <CenterNav view={view} onView={setView} />
@@ -52,11 +81,35 @@ export function Desktop() {
 
       <TopBar />
 
-      <SideDock side="left" apps={appsOn("left")} activeId={active.left} onOpen={toggle} onDropApp={(id) => move(id, "left")} />
-      <SideDock side="right" apps={appsOn("right")} activeId={active.right} onOpen={toggle} onDropApp={(id) => move(id, "right")} />
+      <SideDock
+        side="left"
+        apps={appsOn("left")}
+        terms={termsOn("left")}
+        activeId={active.left}
+        openTermId={openTerm.left}
+        onOpen={toggle}
+        onOpenTerm={(id) => setOpenTerm((p) => ({ ...p, left: p.left === id ? null : id }))}
+        onCloseTerm={term.close}
+        onDropApp={(id) => move(id, "left")}
+        onDropTerm={(id) => term.moveTo(id, "left")}
+      />
+      <SideDock
+        side="right"
+        apps={appsOn("right")}
+        terms={termsOn("right")}
+        activeId={active.right}
+        openTermId={openTerm.right}
+        onOpen={toggle}
+        onOpenTerm={(id) => setOpenTerm((p) => ({ ...p, right: p.right === id ? null : id }))}
+        onCloseTerm={term.close}
+        onDropApp={(id) => move(id, "right")}
+        onDropTerm={(id) => term.moveTo(id, "right")}
+      />
 
       <AnimatePresence>{renderPanel("left")}</AnimatePresence>
       <AnimatePresence>{renderPanel("right")}</AnimatePresence>
+
+      <TerminalLayer terms={term.terms} activeCenter={term.activeCenter} hosts={hosts} />
     </div>
   );
 }
