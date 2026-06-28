@@ -18,6 +18,11 @@ func (s *warmupStore) Insert(ctx context.Context, l store.WarmupLog) error {
 	return err
 }
 
+func (s *warmupStore) Clear(ctx context.Context) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM warmup_logs`)
+	return err
+}
+
 func (s *warmupStore) Recent(ctx context.Context, limit int) ([]store.WarmupLog, error) {
 	if limit <= 0 || limit > 500 {
 		limit = 100

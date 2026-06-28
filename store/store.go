@@ -67,6 +67,7 @@ type Store interface {
 type WarmupStore interface {
 	Insert(ctx context.Context, l WarmupLog) error
 	Recent(ctx context.Context, limit int) ([]WarmupLog, error)
+	Clear(ctx context.Context) error
 }
 
 type KeyStore interface {

@@ -4,7 +4,9 @@
 package proxy
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -86,40 +88,52 @@ func (p *Proxy) Probe(ctx context.Context, providerName string, acc provider.Acc
 			Err:      fmt.Errorf("upstream %d", resp.StatusCode),
 		}
 	}
-	// Success: drain the stream briefly, collecting a short reply sample.
-	stream, err := prov.ParseResponse(resp, req)
-	if err != nil {
-		return ProbeResult{Outcome: provider.OutcomeTransient, Status: resp.StatusCode, Err: err}
-	}
-	defer stream.Close()
-	var sample []byte
-	var streamErr string
-	for range 64 {
-		ev, err := stream.Recv()
-		if err != nil {
-			break
-		}
-		if ev.Type == model.EventError {
-			streamErr = ev.Err
-			break
-		}
-		if ev.Type == model.EventDone {
-			break
-		}
-		if len(sample) < 500 {
-			sample = append(sample, ev.Text...)
+	// Read the raw 200 body: some upstreams (e.g. codebuddy) return an
+	// application-level error as JSON with HTTP 200, so we must inspect it rather
+	// than rely on extracting display text from the stream.
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	trimmed := bytes.TrimSpace(body)
+
+	if isAppError(trimmed) {
+		return ProbeResult{
+			Outcome:  provider.OutcomeDead,
+			Status:   resp.StatusCode,
+			Response: truncate(trimmed, 1000),
+			Err:      fmt.Errorf("upstream rejected request"),
 		}
 	}
-	// A 200 that yields no content usually means the upstream rejected the
-	// request at the application layer (e.g. an unknown model). Treat as failed.
-	if len(sample) == 0 {
-		msg := streamErr
-		if msg == "" {
-			msg = "upstream returned 200 with no content (request likely rejected)"
-		}
-		return ProbeResult{Outcome: provider.OutcomeTransient, Status: resp.StatusCode, Response: msg, Err: fmt.Errorf("empty response")}
+	if len(trimmed) == 0 {
+		return ProbeResult{Outcome: provider.OutcomeTransient, Status: resp.StatusCode, Response: "empty response", Err: fmt.Errorf("empty response")}
 	}
-	return ProbeResult{Outcome: provider.OutcomeOK, Status: resp.StatusCode, Response: string(sample)}
+	// Anything else with HTTP 200 and a non-error body is a live account.
+	return ProbeResult{Outcome: provider.OutcomeOK, Status: resp.StatusCode, Response: truncate(trimmed, 1000)}
+}
+
+// isAppError reports whether a 200 body is actually an error envelope (a bare
+// JSON object carrying error/code/msg, e.g. {"code":11101,"msg":"...failed"}),
+// as opposed to SSE data lines.
+func isAppError(body []byte) bool {
+	if !bytes.HasPrefix(body, []byte("{")) {
+		return false // SSE streams start with "data:" / "event:", not "{"
+	}
+	var obj struct {
+		Error   any    `json:"error"`
+		Code    any    `json:"code"`
+		Msg     string `json:"msg"`
+		Message string `json:"message"`
+	}
+	if json.Unmarshal(body, &obj) != nil {
+		return false
+	}
+	if obj.Error != nil {
+		return true
+	}
+	// A numeric non-zero code with a message is an error envelope.
+	if code, ok := obj.Code.(float64); ok && code != 0 {
+		return true
+	}
+	return false
 }
 
 func (p *Proxy) handleErr(ctx context.Context, prov provider.Provider, acc provider.Account, resp *http.Response) error {

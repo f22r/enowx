@@ -138,6 +138,15 @@ func outcomeName(o provider.Outcome) string {
 	}
 }
 
+// Clear deletes all warmup log entries.
+func (h *Warmup) Clear(w http.ResponseWriter, r *http.Request) {
+	if err := h.logs.Clear(r.Context()); err != nil {
+		writeAPIErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeData(w, map[string]any{"ok": true})
+}
+
 // List returns recent warmup log entries for the Warmup Logs app.
 func (h *Warmup) List(w http.ResponseWriter, r *http.Request) {
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))

@@ -70,6 +70,7 @@ func New(addr string, d Deps) *Server {
 		r.Get("/accounts/{id}/usage", usage.Get)
 		r.Post("/accounts/{id}/warmup", warmup.Run)
 		r.Get("/warmup-logs", warmup.List)
+		r.Delete("/warmup-logs", warmup.Clear)
 		r.Delete("/accounts/{id}", accounts.Delete)
 		r.Get("/requests", requests.List)
 		r.Get("/requests/summary", requests.Summary)

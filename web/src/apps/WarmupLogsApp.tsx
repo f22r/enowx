@@ -1,7 +1,9 @@
-import { useEffect, useState } from "react";
-import { RefreshCw, CheckCircle2, XCircle, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { RefreshCw, CheckCircle2, XCircle, X, Trash2, Loader2 } from "lucide-react";
 import { AppShell } from "./shell";
 import { Tooltip } from "../components/Tooltip";
+import { useDialog } from "../os/dialog";
+import { onWarmup } from "../os/warmupBus";
 import { warmupLogsApi, type WarmupLog } from "../lib/api";
 
 const OUTCOME_TONE: Record<string, string> = {
@@ -15,35 +17,102 @@ function tone(o: string) {
   return OUTCOME_TONE[o] ?? "text-white/60 bg-white/5 ring-white/15";
 }
 
+interface Pending {
+  key: string;
+  provider: string;
+  label: string;
+}
+
 export function WarmupLogsApp() {
   const [logs, setLogs] = useState<WarmupLog[] | null>(null);
+  const [pending, setPending] = useState<Pending[]>([]);
   const [error, setError] = useState("");
   const [open, setOpen] = useState<WarmupLog | null>(null);
+  const dialog = useDialog();
+  const alive = useRef(true);
 
   async function load() {
     try {
-      setLogs(await warmupLogsApi.list());
-      setError("");
+      const l = await warmupLogsApi.list();
+      if (alive.current) {
+        setLogs(l);
+        setError("");
+      }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "failed to load");
-      setLogs([]);
+      if (alive.current) {
+        setError(e instanceof Error ? e.message : "failed to load");
+        setLogs([]);
+      }
     }
   }
 
+  // Poll so finished warmups appear without a manual refresh.
   useEffect(() => {
+    alive.current = true;
     load();
+    const id = setInterval(load, 2000);
+    return () => {
+      alive.current = false;
+      clearInterval(id);
+    };
   }, []);
+
+  // Optimistic "warming up" cards driven by the warmup bus.
+  useEffect(() => {
+    return onWarmup((e) => {
+      if (e.type === "start") {
+        setPending((p) => [{ key: `${e.accountId}-${Date.now()}`, provider: e.provider, label: e.label }, ...p]);
+      } else {
+        // Clear one matching pending card and refresh from the server.
+        setPending((p) => {
+          const i = p.findIndex((x) => x.provider === e.provider && x.label === e.label);
+          if (i === -1) return p;
+          return [...p.slice(0, i), ...p.slice(i + 1)];
+        });
+        load();
+      }
+    });
+  }, []);
+
+  async function clear() {
+    const ok = await dialog.confirm({
+      title: "Clear warmup logs?",
+      message: "All warmup history will be deleted. This cannot be undone.",
+      confirmLabel: "Clear",
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await warmupLogsApi.clear();
+      setLogs([]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "failed to clear");
+    }
+  }
+
+  const empty = (logs?.length ?? 0) === 0 && pending.length === 0;
 
   return (
     <AppShell title="Warmup Logs" subtitle="Account warmup probe history">
       <div className="flex h-full flex-col">
         <div className="mb-3 flex items-center justify-between">
           <span className="text-[11px] text-white/40">{logs?.length ?? 0} entries</span>
-          <Tooltip label="Reload logs" place="bottom">
-            <button onClick={load} className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] text-white/50 hover:bg-white/10 hover:text-white">
-              <RefreshCw className="h-3.5 w-3.5" />
-            </button>
-          </Tooltip>
+          <div className="flex items-center gap-1">
+            <Tooltip label="Reload logs" place="bottom">
+              <button onClick={load} className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] text-white/50 hover:bg-white/10 hover:text-white">
+                <RefreshCw className="h-3.5 w-3.5" />
+              </button>
+            </Tooltip>
+            <Tooltip label="Clear all logs" place="bottom">
+              <button
+                onClick={clear}
+                disabled={empty}
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] text-white/50 hover:bg-red-500/30 hover:text-red-200 disabled:opacity-30"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </Tooltip>
+          </div>
         </div>
 
         {error && <div className="mb-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">{error}</div>}
@@ -55,12 +124,26 @@ export function WarmupLogsApp() {
                 <div key={i} className="h-16 animate-pulse rounded-xl bg-white/5" />
               ))}
             </div>
-          ) : logs.length === 0 ? (
+          ) : empty ? (
             <div className="rounded-xl border border-white/10 bg-white/[0.02] p-6 text-center text-sm text-white/40">
               No warmups yet. Run one from Accounts.
             </div>
           ) : (
             <div className="space-y-2">
+              {pending.map((p) => (
+                <div key={p.key} className="flex items-center gap-3 rounded-xl border border-amber-500/20 bg-amber-500/[0.04] p-3">
+                  <Loader2 className="h-4 w-4 shrink-0 animate-spin text-amber-300" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate text-sm font-medium text-white">{p.label || `${p.provider} account`}</span>
+                      <span className="shrink-0 rounded bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-amber-300 ring-1 ring-inset ring-amber-500/30">
+                        warming up
+                      </span>
+                    </div>
+                    <div className="mt-0.5 text-[11px] capitalize text-white/40">{p.provider}</div>
+                  </div>
+                </div>
+              ))}
               {logs.map((l) => (
                 <button
                   key={l.id}

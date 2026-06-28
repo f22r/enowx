@@ -209,6 +209,7 @@ export interface WarmupLog {
 
 export const warmupLogsApi = {
   list: (limit = 100) => api.get<WarmupLog[]>(`/api/warmup-logs?limit=${limit}`),
+  clear: () => api.del<{ ok: boolean }>("/api/warmup-logs"),
 };
 
 export interface Settings {
