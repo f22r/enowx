@@ -10,6 +10,7 @@ import (
 	"github.com/enowdev/enowx/core/provider"
 	"github.com/enowdev/enowx/core/proxy"
 	"github.com/enowdev/enowx/core/transport"
+	"github.com/enowdev/enowx/core/tunnel"
 	"github.com/enowdev/enowx/server/handlers"
 	"github.com/enowdev/enowx/server/middleware"
 	"github.com/enowdev/enowx/store"
@@ -29,6 +30,7 @@ type Deps struct {
 	Keys     store.KeyStore
 	Warmups  store.WarmupStore
 	Music    store.MusicStore
+	Tunnel   *tunnel.Manager
 	Doer     transport.Doer
 	Settings handlers.SettingsInfo
 }
@@ -51,6 +53,7 @@ func New(addr string, d Deps) *Server {
 	term := handlers.NewTerminal()
 	files := handlers.NewFiles()
 	music := handlers.NewMusic(d.Music)
+	tun := handlers.NewTunnel(d.Tunnel, d.Keys)
 	auth := middleware.NewAuth(d.Keys)
 
 	r.Get("/health", func(w http.ResponseWriter, _ *http.Request) {
@@ -100,6 +103,12 @@ func New(addr string, d Deps) *Server {
 		r.Get("/files", files.List)
 		r.Get("/files/read", files.Read)
 		r.Get("/files/raw", files.Raw)
+
+		r.Get("/tunnel/status", tun.Status)
+		r.Post("/tunnel/enable", tun.Enable)
+		r.Post("/tunnel/disable", tun.Disable)
+		r.Post("/tunnel/login", tun.Login)
+		r.Post("/tunnel/named", tun.Named)
 
 		r.Get("/music/search", music.Search)
 		r.Get("/music/stream", music.Stream)

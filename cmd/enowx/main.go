@@ -14,6 +14,7 @@ import (
 	"github.com/enowdev/enowx/core/provider/kiro"
 	"github.com/enowdev/enowx/core/proxy"
 	"github.com/enowdev/enowx/core/transport"
+	"github.com/enowdev/enowx/core/tunnel"
 	"github.com/enowdev/enowx/server"
 	"github.com/enowdev/enowx/server/handlers"
 	"github.com/enowdev/enowx/store/sqlite"
@@ -53,6 +54,7 @@ func main() {
 	reg.Register(kiro.New(doer, saveCreds))
 
 	px := proxy.New(reg, pool.New(db.Accounts()), doer)
+	tun := tunnel.New(cfg.RuntimeDir, cfg.Port)
 
 	srv := server.New(cfg.Addr(), server.Deps{
 		Proxy:    px,
@@ -63,6 +65,7 @@ func main() {
 		Keys:     db.Keys(),
 		Warmups:  db.Warmups(),
 		Music:    db.Music(),
+		Tunnel:   tun,
 		Doer:     doer,
 		Settings: handlers.SettingsInfo{
 			Version:    version,

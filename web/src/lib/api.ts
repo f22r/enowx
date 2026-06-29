@@ -274,6 +274,25 @@ export const docsApi = {
   get: () => api.get<Docs>("/api/docs"),
 };
 
+export interface TunnelStatus {
+  enabled: boolean;
+  mode: "" | "quick" | "named";
+  url: string;
+  hostname: string;
+  logged_in: boolean;
+  downloading: boolean;
+  download_pct: number;
+}
+
+export const tunnelApi = {
+  status: () => api.get<TunnelStatus>("/api/tunnel/status"),
+  enableQuick: () => api.post<TunnelStatus>("/api/tunnel/enable"),
+  disable: () => api.post<TunnelStatus>("/api/tunnel/disable"),
+  named: (hostname: string) => api.post<TunnelStatus>("/api/tunnel/named", { hostname }),
+  // login is SSE — consumed directly in the tunnel store, not here.
+  loginUrl: () => "/api/tunnel/login",
+};
+
 export interface Track {
   id: string;
   title: string;

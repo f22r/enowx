@@ -1,4 +1,4 @@
-import { KeyRound, ScrollText, Boxes, Settings, BarChart3, FolderOpen, Flame, KeySquare, Music } from "lucide-react";
+import { KeyRound, ScrollText, Boxes, Settings, BarChart3, FolderOpen, Flame, KeySquare, Music, Globe } from "lucide-react";
 import type { DesktopApp } from "../os/types";
 import { AccountsApp } from "./AccountsApp";
 import { RequestsApp } from "./RequestsApp";
@@ -9,6 +9,7 @@ import { FilesApp } from "./FilesApp";
 import { WarmupLogsApp } from "./WarmupLogsApp";
 import { ApiKeysApp } from "./ApiKeysApp";
 import { MusicApp } from "./MusicApp";
+import { TunnelApp } from "./TunnelApp";
 
 // `home` is the default location: a dock side or the Apps drawer. The dock
 // starts minimal (core apps); everything else lives in the Apps drawer and the
@@ -24,5 +25,6 @@ export function buildApps(): DesktopApp[] {
     { id: "warmup-logs", label: "Warmup Logs", icon: <Flame />, accent: "from-orange-500 to-red-600", home: "drawer", render: () => <WarmupLogsApp /> },
     { id: "api-keys", label: "API Keys", icon: <KeySquare />, accent: "from-cyan-500 to-blue-600", home: "drawer", render: () => <ApiKeysApp /> },
     { id: "music", label: "Music", icon: <Music />, accent: "from-pink-500 to-rose-600", home: "drawer", render: () => <MusicApp /> },
+    { id: "tunnel", label: "Tunnel", icon: <Globe />, accent: "from-blue-500 to-cyan-600", home: "drawer", render: () => <TunnelApp /> },
   ];
 }

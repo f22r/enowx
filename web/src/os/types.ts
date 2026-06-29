@@ -9,7 +9,8 @@ export type AppId =
   | "files"
   | "warmup-logs"
   | "api-keys"
-  | "music";
+  | "music"
+  | "tunnel";
 
 export type Side = "left" | "right";
 

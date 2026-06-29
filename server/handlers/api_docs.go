@@ -86,6 +86,7 @@ var shortcutGroups = []shortcutGroup{
 			{Keys: "Ctrl/Alt + W", Desc: "Warmup Logs"},
 			{Keys: "Ctrl/Alt + K", Desc: "API Keys"},
 			{Keys: "Ctrl/Alt + M", Desc: "Music"},
+			{Keys: "Ctrl/Alt + T", Desc: "Tunnel"},
 		},
 	},
 }
@@ -166,6 +167,17 @@ var groups = []docGroup{
 		Endpoints: []docEndpoint{
 			{Method: "GET", Path: "/api/warmup-logs", Desc: "Recent warmup entries (request, response, usage).", Params: []docParam{{Name: "limit", In: "query", Desc: "max rows"}}},
 			{Method: "DELETE", Path: "/api/warmup-logs", Desc: "Clear all warmup logs."},
+		},
+	},
+	{
+		Name: "Tunnel",
+		Desc: "Expose the gateway to the public internet via Cloudflare Tunnel. Enabling requires at least one API key (an unauthenticated public gateway would let anyone spend your accounts).",
+		Endpoints: []docEndpoint{
+			{Method: "GET", Path: "/api/tunnel/status", Desc: "Tunnel state: enabled, mode (quick|named), public url, hostname, logged_in, and binary download progress."},
+			{Method: "POST", Path: "/api/tunnel/enable", Desc: "Start a quick tunnel (random trycloudflare.com URL, no account). Downloads cloudflared on first use."},
+			{Method: "POST", Path: "/api/tunnel/disable", Desc: "Stop the tunnel."},
+			{Method: "POST", Path: "/api/tunnel/login", Desc: "SSE: run cloudflared browser login; streams progress + the authorization URL, then 'done' when the cert is saved."},
+			{Method: "POST", Path: "/api/tunnel/named", Desc: "Create/route/run a named tunnel on your own hostname (requires prior login).", Params: []docParam{{Name: "hostname", In: "body", Desc: "e.g. enowx.example.com"}}},
 		},
 	},
 	{
