@@ -387,14 +387,25 @@ var seedQueries = []string{
 func (h *Music) Discover(w http.ResponseWriter, r *http.Request) {
 	queries := h.discoverQueries(r.Context())
 
+	// Run all the seed searches in parallel — they're independent network calls,
+	// so doing them concurrently turns N round-trips into roughly one.
+	results := make([][]musicTrack, len(queries))
+	var wg sync.WaitGroup
+	for i, q := range queries {
+		wg.Add(1)
+		go func(i int, q string) {
+			defer wg.Done()
+			if tracks, err := h.searchSongs(r.Context(), q); err == nil {
+				results[i] = tracks
+			}
+		}(i, q)
+	}
+	wg.Wait()
+
+	// Merge keeping query order (top artists first), a few per query, deduped.
 	seen := map[string]bool{}
 	out := []musicTrack{}
-	for _, q := range queries {
-		tracks, err := h.searchSongs(r.Context(), q)
-		if err != nil {
-			continue
-		}
-		// Take a few from each query to keep the feed varied.
+	for _, tracks := range results {
 		n := 0
 		for _, t := range tracks {
 			if seen[t.ID] {

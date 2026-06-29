@@ -24,6 +24,7 @@ import { usePersisted } from "../os/usePersisted";
 import { musicApi, type Track, type Playlist } from "../lib/api";
 import { useMusic, play, playQueue, enqueue, toggle, currentTrack, removeFromQueue, clearQueue } from "../os/musicBus";
 import { usedPlaylists } from "../os/musicPlaylists";
+import { useDiscover } from "../os/musicDiscover";
 
 type Tab = "discover" | "search" | "playlists" | "queue";
 
@@ -73,47 +74,24 @@ export function MusicApp() {
 // ---- Discover (local "for you" feed) ----
 
 function Discover() {
-  const [tracks, setTracks] = useState<Track[] | null>(null);
-  const [error, setError] = useState("");
-  const alive = useRef(true);
-
-  async function load() {
-    setTracks(null);
-    setError("");
-    try {
-      const t = await musicApi.discover();
-      if (alive.current) setTracks(t);
-    } catch (e) {
-      if (alive.current) {
-        setError(e instanceof Error ? e.message : "failed to load");
-        setTracks([]);
-      }
-    }
-  }
-
-  useEffect(() => {
-    alive.current = true;
-    load();
-    return () => {
-      alive.current = false;
-    };
-  }, []);
+  const { tracks, loading, error, shuffle } = useDiscover();
 
   return (
     <div>
       <div className="mb-2 flex items-center justify-between">
-        <p className="text-[11px] text-white/40">Based on what you play — refreshes each visit.</p>
+        <p className="text-[11px] text-white/40">Based on what you play — Shuffle for a fresh feed.</p>
         <Tooltip label="Shuffle a fresh feed" place="left">
           <button
-            onClick={load}
-            className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] text-white/55 hover:bg-white/10 hover:text-white"
+            onClick={shuffle}
+            disabled={loading}
+            className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] text-white/55 hover:bg-white/10 hover:text-white disabled:opacity-50"
           >
-            <RefreshCw className="h-3 w-3" /> Shuffle
+            <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} /> Shuffle
           </button>
         </Tooltip>
       </div>
       {error && <div className="mb-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">{error}</div>}
-      {tracks === null ? (
+      {tracks === null || (loading && tracks.length === 0) ? (
         <ListSkeleton />
       ) : tracks.length === 0 ? (
         <Empty message="Nothing to show yet. Play a few songs and your feed will fill in." />
