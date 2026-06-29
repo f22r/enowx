@@ -3,15 +3,15 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"net"
 	"net/http"
 	"os"
 	"os/exec"
 	"runtime"
-	"strings"
 
 	"github.com/coder/websocket"
 	"github.com/creack/pty"
+
+	"github.com/enowdev/enowx/server/middleware"
 )
 
 // defaultShell picks the user's interactive shell per OS.
@@ -28,11 +28,12 @@ func defaultShell() string {
 	return "/bin/bash"
 }
 
-// Terminal serves a real PTY shell over a WebSocket. It is gated to loopback
-// clients only — a shell reachable from the network would be a takeover risk.
-type Terminal struct{}
+// Terminal serves a real PTY shell over a WebSocket. Access is gated by the
+// dashboard guard: free from localhost, session-authenticated from remote — a
+// shell reachable from the network without auth would be a takeover risk.
+type Terminal struct{ dash *middleware.Dashboard }
 
-func NewTerminal() *Terminal { return &Terminal{} }
+func NewTerminal(dash *middleware.Dashboard) *Terminal { return &Terminal{dash: dash} }
 
 type termMsg struct {
 	Type string `json:"type"`           // "input" | "resize"
@@ -42,8 +43,8 @@ type termMsg struct {
 }
 
 func (h *Terminal) WS(w http.ResponseWriter, r *http.Request) {
-	if !isLoopback(r) {
-		http.Error(w, "terminal is available on localhost only", http.StatusForbidden)
+	if !h.dash.Authorized(r) {
+		http.Error(w, "terminal requires the dashboard login when accessed remotely", http.StatusForbidden)
 		return
 	}
 
@@ -116,16 +117,3 @@ func (h *Terminal) WS(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func isLoopback(r *http.Request) bool {
-	host := r.Host
-	if h, _, err := net.SplitHostPort(r.Host); err == nil {
-		host = h
-	}
-	if host == "localhost" {
-		return true
-	}
-	if ip := net.ParseIP(host); ip != nil {
-		return ip.IsLoopback()
-	}
-	return strings.HasPrefix(host, "127.") || host == "[::1]"
-}

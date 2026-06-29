@@ -7,13 +7,16 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/enowdev/enowx/server/middleware"
 )
 
-// Files is a read-only file browser for the local machine. Loopback-only, like
-// the terminal — it exposes the filesystem to whoever holds the UI.
-type Files struct{}
+// Files is a read-only file browser for the local machine. It exposes the
+// filesystem, so access is gated by the dashboard guard: free from localhost,
+// session-authenticated from remote.
+type Files struct{ dash *middleware.Dashboard }
 
-func NewFiles() *Files { return &Files{} }
+func NewFiles(dash *middleware.Dashboard) *Files { return &Files{dash: dash} }
 
 type entryDTO struct {
 	Name  string `json:"name"`
@@ -30,8 +33,8 @@ type listDTO struct {
 }
 
 func (h *Files) List(w http.ResponseWriter, r *http.Request) {
-	if !isLoopback(r) {
-		writeAPIErr(w, http.StatusForbidden, "file browser is available on localhost only")
+	if !h.dash.Authorized(r) {
+		writeAPIErr(w, http.StatusForbidden, "file browser requires the dashboard login when accessed remotely")
 		return
 	}
 	home, _ := os.UserHomeDir()
@@ -77,8 +80,8 @@ func (h *Files) List(w http.ResponseWriter, r *http.Request) {
 const maxRead = 512 * 1024 // 512 KB preview cap
 
 func (h *Files) Read(w http.ResponseWriter, r *http.Request) {
-	if !isLoopback(r) {
-		writeAPIErr(w, http.StatusForbidden, "file browser is available on localhost only")
+	if !h.dash.Authorized(r) {
+		writeAPIErr(w, http.StatusForbidden, "file browser requires the dashboard login when accessed remotely")
 		return
 	}
 	path := filepath.Clean(strings.TrimSpace(r.URL.Query().Get("path")))
@@ -119,7 +122,7 @@ func looksBinary(b []byte) bool {
 
 // Raw streams a file's bytes (used for image previews). Loopback-only.
 func (h *Files) Raw(w http.ResponseWriter, r *http.Request) {
-	if !isLoopback(r) {
+	if !h.dash.Authorized(r) {
 		http.Error(w, "localhost only", http.StatusForbidden)
 		return
 	}

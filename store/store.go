@@ -68,7 +68,15 @@ type Store interface {
 	Keys() KeyStore
 	Warmups() WarmupStore
 	Music() MusicStore
+	Settings() SettingsStore
 	Close() error
+}
+
+// SettingsStore is a tiny key/value store for gateway settings (e.g. the
+// dashboard password hash). Values are opaque strings.
+type SettingsStore interface {
+	Get(ctx context.Context, key string) (string, error) // "" if unset
+	Set(ctx context.Context, key, value string) error
 }
 
 // MusicTrack is one song stored in a playlist or returned from a playlist read.

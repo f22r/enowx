@@ -274,6 +274,21 @@ export const docsApi = {
   get: () => api.get<Docs>("/api/docs"),
 };
 
+export interface AuthStatus {
+  password_set: boolean;
+  loopback: boolean;
+  logged_in: boolean;
+  authorized: boolean;
+}
+
+export const authApi = {
+  status: () => api.get<AuthStatus>("/api/auth/status"),
+  setup: (password: string) => api.post<{ ok: boolean }>("/api/auth/setup", { password }),
+  login: (password: string) => api.post<{ ok: boolean }>("/api/auth/login", { password }),
+  logout: () => api.post<{ ok: boolean }>("/api/auth/logout"),
+  change: (current: string, next: string) => api.post<{ ok: boolean }>("/api/auth/change", { current, new: next }),
+};
+
 export interface TunnelStatus {
   enabled: boolean;
   mode: "" | "quick" | "named";

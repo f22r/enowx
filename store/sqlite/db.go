@@ -17,12 +17,13 @@ import (
 var migrations embed.FS
 
 type DB struct {
-	db      *sql.DB
-	acct    *accountStore
-	logs    *logStore
-	keys    *keyStore
-	warmups *warmupStore
-	music   *musicStore
+	db       *sql.DB
+	acct     *accountStore
+	logs     *logStore
+	keys     *keyStore
+	warmups  *warmupStore
+	music    *musicStore
+	settings *settingsStore
 }
 
 func Open(path string) (*DB, error) {
@@ -40,15 +41,17 @@ func Open(path string) (*DB, error) {
 	d.keys = &keyStore{db: db}
 	d.warmups = &warmupStore{db: db}
 	d.music = &musicStore{db: db}
+	d.settings = &settingsStore{db: db}
 	return d, nil
 }
 
-func (d *DB) Accounts() store.AccountStore { return d.acct }
-func (d *DB) Logs() store.LogStore         { return d.logs }
-func (d *DB) Keys() store.KeyStore         { return d.keys }
-func (d *DB) Warmups() store.WarmupStore   { return d.warmups }
-func (d *DB) Music() store.MusicStore      { return d.music }
-func (d *DB) Close() error                 { return d.db.Close() }
+func (d *DB) Accounts() store.AccountStore  { return d.acct }
+func (d *DB) Logs() store.LogStore          { return d.logs }
+func (d *DB) Keys() store.KeyStore          { return d.keys }
+func (d *DB) Warmups() store.WarmupStore    { return d.warmups }
+func (d *DB) Music() store.MusicStore       { return d.music }
+func (d *DB) Settings() store.SettingsStore { return d.settings }
+func (d *DB) Close() error                  { return d.db.Close() }
 
 func migrate(db *sql.DB) error {
 	files, err := fs.Glob(migrations, "migrations/*.sql")

@@ -170,6 +170,17 @@ var groups = []docGroup{
 		},
 	},
 	{
+		Name: "Dashboard auth",
+		Desc: "Optional dashboard password. Localhost is trusted without login; remote access (e.g. via a tunnel) needs a session. The terminal and file browser require this when reached remotely.",
+		Endpoints: []docEndpoint{
+			{Method: "GET", Path: "/api/auth/status", Desc: "Whether a password is set, the request is from localhost, logged in, and authorized."},
+			{Method: "POST", Path: "/api/auth/setup", Desc: "Set the dashboard password the first time (trusted caller only).", Params: []docParam{{Name: "password", In: "body", Desc: "min 6 chars"}}},
+			{Method: "POST", Path: "/api/auth/login", Desc: "Exchange the password for a session cookie.", Params: []docParam{{Name: "password", In: "body", Desc: "dashboard password"}}},
+			{Method: "POST", Path: "/api/auth/logout", Desc: "Clear the current session."},
+			{Method: "POST", Path: "/api/auth/change", Desc: "Change the password (requires current).", Params: []docParam{{Name: "current", In: "body", Desc: "current password"}, {Name: "new", In: "body", Desc: "new password (min 6)"}}},
+		},
+	},
+	{
 		Name: "Tunnel",
 		Desc: "Expose the gateway to the public internet via Cloudflare Tunnel. Enabling requires at least one API key (an unauthenticated public gateway would let anyone spend your accounts).",
 		Endpoints: []docEndpoint{

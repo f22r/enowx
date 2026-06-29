@@ -22,17 +22,18 @@ type Server struct {
 }
 
 type Deps struct {
-	Proxy    *proxy.Proxy
-	Route    func(modelID string) string
-	Registry *provider.Registry
-	Accounts store.AccountStore
-	Logs     store.LogStore
-	Keys     store.KeyStore
-	Warmups  store.WarmupStore
-	Music    store.MusicStore
-	Tunnel   *tunnel.Manager
-	Doer     transport.Doer
-	Settings handlers.SettingsInfo
+	Proxy      *proxy.Proxy
+	Route      func(modelID string) string
+	Registry   *provider.Registry
+	Accounts   store.AccountStore
+	Logs       store.LogStore
+	Keys       store.KeyStore
+	Warmups    store.WarmupStore
+	Music      store.MusicStore
+	SettingsKV store.SettingsStore
+	Tunnel     *tunnel.Manager
+	Doer       transport.Doer
+	Settings   handlers.SettingsInfo
 }
 
 func New(addr string, d Deps) *Server {
@@ -50,10 +51,12 @@ func New(addr string, d Deps) *Server {
 	local := handlers.NewLocal(d.Accounts)
 	usage := handlers.NewUsage(d.Registry, d.Accounts)
 	warmup := handlers.NewWarmup(d.Proxy, d.Registry, d.Accounts, d.Warmups, d.Logs)
-	term := handlers.NewTerminal()
-	files := handlers.NewFiles()
+	dash := middleware.NewDashboard(d.SettingsKV)
+	term := handlers.NewTerminal(dash)
+	files := handlers.NewFiles(dash)
 	music := handlers.NewMusic(d.Music)
 	tun := handlers.NewTunnel(d.Tunnel, d.Keys)
+	authH := handlers.NewAuth(dash)
 	auth := middleware.NewAuth(d.Keys)
 
 	r.Get("/health", func(w http.ResponseWriter, _ *http.Request) {
@@ -103,6 +106,12 @@ func New(addr string, d Deps) *Server {
 		r.Get("/files", files.List)
 		r.Get("/files/read", files.Read)
 		r.Get("/files/raw", files.Raw)
+
+		r.Get("/auth/status", authH.Status)
+		r.Post("/auth/setup", authH.Setup)
+		r.Post("/auth/login", authH.Login)
+		r.Post("/auth/logout", authH.Logout)
+		r.Post("/auth/change", authH.Change)
 
 		r.Get("/tunnel/status", tun.Status)
 		r.Post("/tunnel/enable", tun.Enable)

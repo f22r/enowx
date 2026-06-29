@@ -9,6 +9,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/kkdai/youtube/v2 v2.10.6
 	github.com/shirou/gopsutil/v4 v4.26.5
+	golang.org/x/crypto v0.53.0
 	modernc.org/sqlite v1.53.0
 )
 
@@ -29,8 +30,8 @@ require (
 	github.com/tklauser/go-sysconf v0.3.16 // indirect
 	github.com/tklauser/numcpus v0.11.0 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
-	golang.org/x/sys v0.44.0 // indirect
-	golang.org/x/text v0.35.0 // indirect
+	golang.org/x/sys v0.46.0 // indirect
+	golang.org/x/text v0.38.0 // indirect
 	modernc.org/libc v1.73.4 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect

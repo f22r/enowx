@@ -57,16 +57,17 @@ func main() {
 	tun := tunnel.New(cfg.RuntimeDir, cfg.Port)
 
 	srv := server.New(cfg.Addr(), server.Deps{
-		Proxy:    px,
-		Route:    routeModel,
-		Registry: reg,
-		Accounts: db.Accounts(),
-		Logs:     db.Logs(),
-		Keys:     db.Keys(),
-		Warmups:  db.Warmups(),
-		Music:    db.Music(),
-		Tunnel:   tun,
-		Doer:     doer,
+		Proxy:      px,
+		Route:      routeModel,
+		Registry:   reg,
+		Accounts:   db.Accounts(),
+		Logs:       db.Logs(),
+		Keys:       db.Keys(),
+		Warmups:    db.Warmups(),
+		Music:      db.Music(),
+		SettingsKV: db.Settings(),
+		Tunnel:     tun,
+		Doer:       doer,
 		Settings: handlers.SettingsInfo{
 			Version:    version,
 			Host:       cfg.Host,
