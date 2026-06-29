@@ -67,7 +67,61 @@ type Store interface {
 	Logs() LogStore
 	Keys() KeyStore
 	Warmups() WarmupStore
+	Music() MusicStore
 	Close() error
+}
+
+// MusicTrack is one song stored in a playlist or returned from a playlist read.
+type MusicTrack struct {
+	VideoID   string `json:"id"`
+	Title     string `json:"title"`
+	Artist    string `json:"artist"`
+	Album     string `json:"album"`
+	Duration  string `json:"duration"`
+	Thumbnail string `json:"thumbnail"`
+}
+
+// Playlist is a locally-stored playlist (not tied to any external account).
+type Playlist struct {
+	ID          int64        `json:"id"`
+	Name        string       `json:"name"`
+	Description string       `json:"description"`
+	ShareCode   string       `json:"share_code"`
+	Count       int          `json:"count"`
+	Tracks      []MusicTrack `json:"tracks,omitempty"`
+	CreatedAt   time.Time    `json:"created_at"`
+}
+
+// PlayEvent is one recorded track play, used to compute the local "for you" feed.
+type PlayEvent struct {
+	VideoID string
+	Title   string
+	Artist  string
+	Album   string
+}
+
+// ArtistCount is an artist with how many times the user has played their tracks.
+type ArtistCount struct {
+	Artist string
+	Plays  int
+}
+
+// MusicStore persists playlists and play history locally (no external account).
+type MusicStore interface {
+	// Playlists
+	ListPlaylists(ctx context.Context) ([]Playlist, error)
+	GetPlaylist(ctx context.Context, id int64) (*Playlist, error)            // nil if not found; includes tracks
+	PlaylistByShareCode(ctx context.Context, code string) (*Playlist, error) // nil if not found; includes tracks
+	CreatePlaylist(ctx context.Context, name, description, shareCode string) (int64, error)
+	DeletePlaylist(ctx context.Context, id int64) error
+	AddTrack(ctx context.Context, playlistID int64, t MusicTrack) error
+	RemoveTrack(ctx context.Context, playlistID int64, videoID string) error
+
+	// History (feeds the local "for you" recommendations)
+	RecordPlay(ctx context.Context, e PlayEvent) error
+	RecentPlays(ctx context.Context, limit int) ([]MusicTrack, error)
+	TopArtists(ctx context.Context, limit int) ([]ArtistCount, error)
+	ClearHistory(ctx context.Context) error
 }
 
 type WarmupStore interface {

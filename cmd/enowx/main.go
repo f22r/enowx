@@ -62,6 +62,7 @@ func main() {
 		Logs:     db.Logs(),
 		Keys:     db.Keys(),
 		Warmups:  db.Warmups(),
+		Music:    db.Music(),
 		Doer:     doer,
 		Settings: handlers.SettingsInfo{
 			Version:    version,

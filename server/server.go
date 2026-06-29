@@ -28,6 +28,7 @@ type Deps struct {
 	Logs     store.LogStore
 	Keys     store.KeyStore
 	Warmups  store.WarmupStore
+	Music    store.MusicStore
 	Doer     transport.Doer
 	Settings handlers.SettingsInfo
 }
@@ -49,7 +50,7 @@ func New(addr string, d Deps) *Server {
 	warmup := handlers.NewWarmup(d.Proxy, d.Registry, d.Accounts, d.Warmups, d.Logs)
 	term := handlers.NewTerminal()
 	files := handlers.NewFiles()
-	music := handlers.NewMusic()
+	music := handlers.NewMusic(d.Music)
 	auth := middleware.NewAuth(d.Keys)
 
 	r.Get("/health", func(w http.ResponseWriter, _ *http.Request) {
@@ -102,6 +103,18 @@ func New(addr string, d Deps) *Server {
 
 		r.Get("/music/search", music.Search)
 		r.Get("/music/stream", music.Stream)
+		r.Get("/music/discover", music.Discover)
+		r.Get("/music/history", music.RecentPlays)
+		r.Post("/music/history", music.RecordPlay)
+		r.Delete("/music/history", music.ClearHistory)
+		r.Get("/music/playlists", music.ListPlaylists)
+		r.Post("/music/playlists", music.CreatePlaylist)
+		r.Post("/music/playlists/import", music.ImportPlaylist)
+		r.Get("/music/playlists/{id}", music.GetPlaylist)
+		r.Delete("/music/playlists/{id}", music.DeletePlaylist)
+		r.Get("/music/playlists/{id}/export", music.ExportPlaylist)
+		r.Post("/music/playlists/{id}/tracks", music.AddTrack)
+		r.Delete("/music/playlists/{id}/tracks/{videoId}", music.RemoveTrack)
 	})
 
 	// Real PTY shell over WebSocket — loopback-only (guarded in the handler).

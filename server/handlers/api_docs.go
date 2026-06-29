@@ -174,6 +174,18 @@ var groups = []docGroup{
 		Endpoints: []docEndpoint{
 			{Method: "GET", Path: "/api/music/search", Desc: "Search songs; returns {id, title, artist, album, duration, thumbnail}.", Params: []docParam{{Name: "q", In: "query", Desc: "search query"}}},
 			{Method: "GET", Path: "/api/music/stream", Desc: "Proxy the best audio-only stream for a video id; forwards Range for seeking.", Params: []docParam{{Name: "id", In: "query", Desc: "video id from search"}}},
+			{Method: "GET", Path: "/api/music/discover", Desc: "A shuffled 'for you' feed: biased toward your most-played artists, padded with seed genres. Cold-start uses genres only."},
+			{Method: "GET", Path: "/api/music/history", Desc: "Recently played distinct tracks.", Params: []docParam{{Name: "limit", In: "query", Desc: "max tracks"}}},
+			{Method: "POST", Path: "/api/music/history", Desc: "Record a play (feeds Discover).", Params: []docParam{{Name: "id", In: "body", Desc: "video id"}, {Name: "title", In: "body", Desc: "title"}, {Name: "artist", In: "body", Desc: "artist"}, {Name: "album", In: "body", Desc: "album"}}},
+			{Method: "DELETE", Path: "/api/music/history", Desc: "Clear all play history."},
+			{Method: "GET", Path: "/api/music/playlists", Desc: "List local playlists (id, name, share_code, track count)."},
+			{Method: "POST", Path: "/api/music/playlists", Desc: "Create a local playlist.", Params: []docParam{{Name: "name", In: "body", Desc: "playlist name"}, {Name: "description", In: "body", Desc: "optional"}}},
+			{Method: "GET", Path: "/api/music/playlists/{id}", Desc: "Get a playlist with its tracks.", Params: []docParam{{Name: "id", In: "path", Desc: "playlist id"}}},
+			{Method: "DELETE", Path: "/api/music/playlists/{id}", Desc: "Delete a playlist and its tracks.", Params: []docParam{{Name: "id", In: "path", Desc: "playlist id"}}},
+			{Method: "POST", Path: "/api/music/playlists/{id}/tracks", Desc: "Add a track to a playlist.", Params: []docParam{{Name: "id", In: "path", Desc: "playlist id"}, {Name: "id", In: "body", Desc: "video id"}, {Name: "title", In: "body", Desc: "title"}, {Name: "artist", In: "body", Desc: "artist"}}},
+			{Method: "DELETE", Path: "/api/music/playlists/{id}/tracks/{videoId}", Desc: "Remove a track from a playlist.", Params: []docParam{{Name: "id", In: "path", Desc: "playlist id"}, {Name: "videoId", In: "path", Desc: "video id"}}},
+			{Method: "GET", Path: "/api/music/playlists/{id}/export", Desc: "Export a playlist as a portable JSON document (share/plugin contract).", Params: []docParam{{Name: "id", In: "path", Desc: "playlist id"}}},
+			{Method: "POST", Path: "/api/music/playlists/import", Desc: "Import a playlist from an exported JSON document.", Params: []docParam{{Name: "name", In: "body", Desc: "playlist name"}, {Name: "tracks", In: "body", Desc: "array of tracks"}}},
 		},
 	},
 	{

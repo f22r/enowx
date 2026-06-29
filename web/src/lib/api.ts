@@ -283,10 +283,44 @@ export interface Track {
   thumbnail: string;
 }
 
+export interface Playlist {
+  id: number;
+  name: string;
+  description: string;
+  share_code: string;
+  count: number;
+  tracks?: Track[];
+  created_at: string;
+}
+
+export interface PlaylistExport {
+  version: number;
+  name: string;
+  description: string;
+  share_code: string;
+  tracks: Track[];
+}
+
 export const musicApi = {
   search: (q: string) => api.get<Track[]>(`/api/music/search?q=${encodeURIComponent(q)}`),
   // The stream URL is used directly as an <audio> src (it proxies + supports Range).
   streamUrl: (id: string) => `/api/music/stream?id=${encodeURIComponent(id)}`,
+  discover: () => api.get<Track[]>("/api/music/discover"),
+  recordPlay: (t: Track) =>
+    api.post<{ ok: boolean }>("/api/music/history", { id: t.id, title: t.title, artist: t.artist, album: t.album }),
+  history: (limit = 50) => api.get<Track[]>(`/api/music/history?limit=${limit}`),
+  clearHistory: () => api.del<{ ok: boolean }>("/api/music/history"),
+  playlists: () => api.get<Playlist[]>("/api/music/playlists"),
+  playlist: (id: number) => api.get<Playlist>(`/api/music/playlists/${id}`),
+  createPlaylist: (name: string, description = "") =>
+    api.post<{ id: number }>("/api/music/playlists", { name, description }),
+  deletePlaylist: (id: number) => api.del<{ ok: boolean }>(`/api/music/playlists/${id}`),
+  addTrack: (id: number, t: Track) => api.post<{ ok: boolean }>(`/api/music/playlists/${id}/tracks`, t),
+  removeTrack: (id: number, videoId: string) =>
+    api.del<{ ok: boolean }>(`/api/music/playlists/${id}/tracks/${encodeURIComponent(videoId)}`),
+  exportUrl: (id: number) => `/api/music/playlists/${id}/export`,
+  exportPlaylist: (id: number) => api.get<PlaylistExport>(`/api/music/playlists/${id}/export`),
+  importPlaylist: (data: PlaylistExport) => api.post<{ id: number }>("/api/music/playlists/import", data),
 };
 
 export interface DebugInfo {

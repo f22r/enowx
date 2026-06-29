@@ -3,14 +3,21 @@ package handlers
 import (
 	"bytes"
 	"context"
+	cryptorand "crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"io"
+	"math/rand/v2"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/kkdai/youtube/v2"
+
+	"github.com/enowdev/enowx/store"
 )
 
 // Music powers the Music app: it searches YouTube Music for songs and proxies
@@ -23,6 +30,7 @@ import (
 type Music struct {
 	yt    youtube.Client
 	http  *http.Client
+	store store.MusicStore
 	mu    sync.Mutex
 	cache map[string]urlEntry // videoID -> resolved audio URL (short-lived)
 }
@@ -32,9 +40,10 @@ type urlEntry struct {
 	exp time.Time
 }
 
-func NewMusic() *Music {
+func NewMusic(s store.MusicStore) *Music {
 	return &Music{
 		http:  &http.Client{Timeout: 30 * time.Second},
+		store: s,
 		cache: map[string]urlEntry{},
 	}
 }
@@ -61,9 +70,19 @@ func (h *Music) Search(w http.ResponseWriter, r *http.Request) {
 		writeData(w, []musicTrack{})
 		return
 	}
+	tracks, err := h.searchSongs(r.Context(), q)
+	if err != nil {
+		writeAPIErr(w, http.StatusBadGateway, "search failed: "+err.Error())
+		return
+	}
+	writeData(w, tracks)
+}
 
+// searchSongs runs an unauthenticated YouTube Music song search and returns the
+// parsed tracks. Reused by both Search and Discover.
+func (h *Music) searchSongs(ctx context.Context, query string) ([]musicTrack, error) {
 	body, _ := json.Marshal(map[string]any{
-		"query":  q,
+		"query":  query,
 		"params": songsParam,
 		"context": map[string]any{
 			"client": map[string]any{
@@ -75,7 +94,7 @@ func (h *Music) Search(w http.ResponseWriter, r *http.Request) {
 		},
 	})
 
-	ctx, cancel := context.WithTimeout(r.Context(), 12*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 12*time.Second)
 	defer cancel()
 	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, innerTubeSearch, bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -83,22 +102,18 @@ func (h *Music) Search(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := h.http.Do(req)
 	if err != nil {
-		writeAPIErr(w, http.StatusBadGateway, "search failed: "+err.Error())
-		return
+		return nil, err
 	}
 	defer resp.Body.Close()
 	raw, err := io.ReadAll(io.LimitReader(resp.Body, 8<<20))
 	if err != nil {
-		writeAPIErr(w, http.StatusBadGateway, "search read failed")
-		return
+		return nil, err
 	}
-
 	var parsed any
 	if err := json.Unmarshal(raw, &parsed); err != nil {
-		writeAPIErr(w, http.StatusBadGateway, "search decode failed")
-		return
+		return nil, err
 	}
-	writeData(w, parseSongResults(parsed))
+	return parseSongResults(parsed), nil
 }
 
 // parseSongResults walks the InnerTube response for musicResponsiveListItem
@@ -356,3 +371,281 @@ var errNoAudio = errString("no audio stream available")
 type errString string
 
 func (e errString) Error() string { return string(e) }
+
+// ---- Discover / "for you" feed (local history, no cookies) ----
+
+// seedQueries are genre/mood searches used to fill the Discover feed when the
+// user has little or no play history.
+var seedQueries = []string{
+	"top hits", "pop", "lo-fi", "hip hop", "rock", "jazz", "edm",
+	"indie", "r&b", "acoustic", "chill", "classical", "k-pop", "metal",
+}
+
+// Discover returns a shuffled "for you" feed. With play history it biases
+// toward the user's most-played artists; otherwise it samples seed genres.
+// Results are shuffled so opening the app shows something fresh each time.
+func (h *Music) Discover(w http.ResponseWriter, r *http.Request) {
+	queries := h.discoverQueries(r.Context())
+
+	seen := map[string]bool{}
+	out := []musicTrack{}
+	for _, q := range queries {
+		tracks, err := h.searchSongs(r.Context(), q)
+		if err != nil {
+			continue
+		}
+		// Take a few from each query to keep the feed varied.
+		n := 0
+		for _, t := range tracks {
+			if seen[t.ID] {
+				continue
+			}
+			seen[t.ID] = true
+			out = append(out, t)
+			if n++; n >= 6 {
+				break
+			}
+		}
+		if len(out) >= 40 {
+			break
+		}
+	}
+	rand.Shuffle(len(out), func(i, j int) { out[i], out[j] = out[j], out[i] })
+	writeData(w, out)
+}
+
+// discoverQueries picks the searches that seed the feed: top artists first
+// (weighted by play count), padded with random seed genres.
+func (h *Music) discoverQueries(ctx context.Context) []string {
+	var queries []string
+	if artists, err := h.store.TopArtists(ctx, 6); err == nil {
+		for _, a := range artists {
+			queries = append(queries, a.Artist+" songs")
+		}
+	}
+	// Pad with a couple of random genres for discovery.
+	seeds := append([]string(nil), seedQueries...)
+	rand.Shuffle(len(seeds), func(i, j int) { seeds[i], seeds[j] = seeds[j], seeds[i] })
+	want := 4
+	if len(queries) == 0 {
+		want = 6 // cold start: all genres
+	}
+	for i := 0; i < want && i < len(seeds); i++ {
+		queries = append(queries, seeds[i])
+	}
+	return queries
+}
+
+// ---- Play history ----
+
+type historyTrack struct {
+	ID     string `json:"id"`
+	Title  string `json:"title"`
+	Artist string `json:"artist"`
+	Album  string `json:"album"`
+}
+
+func (h *Music) RecordPlay(w http.ResponseWriter, r *http.Request) {
+	var t historyTrack
+	if err := json.NewDecoder(r.Body).Decode(&t); err != nil || strings.TrimSpace(t.ID) == "" {
+		writeAPIErr(w, http.StatusBadRequest, "id is required")
+		return
+	}
+	if err := h.store.RecordPlay(r.Context(), store.PlayEvent{
+		VideoID: t.ID, Title: t.Title, Artist: t.Artist, Album: t.Album,
+	}); err != nil {
+		writeAPIErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeData(w, map[string]any{"ok": true})
+}
+
+func (h *Music) RecentPlays(w http.ResponseWriter, r *http.Request) {
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	tracks, err := h.store.RecentPlays(r.Context(), limit)
+	if err != nil {
+		writeAPIErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeData(w, tracks)
+}
+
+func (h *Music) ClearHistory(w http.ResponseWriter, r *http.Request) {
+	if err := h.store.ClearHistory(r.Context()); err != nil {
+		writeAPIErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeData(w, map[string]any{"ok": true})
+}
+
+// ---- Playlists (local) ----
+
+func (h *Music) ListPlaylists(w http.ResponseWriter, r *http.Request) {
+	pls, err := h.store.ListPlaylists(r.Context())
+	if err != nil {
+		writeAPIErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if pls == nil {
+		pls = []store.Playlist{}
+	}
+	writeData(w, pls)
+}
+
+func (h *Music) GetPlaylist(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		writeAPIErr(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	p, err := h.store.GetPlaylist(r.Context(), id)
+	if err != nil {
+		writeAPIErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if p == nil {
+		writeAPIErr(w, http.StatusNotFound, "playlist not found")
+		return
+	}
+	writeData(w, p)
+}
+
+type newPlaylist struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+func (h *Music) CreatePlaylist(w http.ResponseWriter, r *http.Request) {
+	var in newPlaylist
+	_ = json.NewDecoder(r.Body).Decode(&in)
+	in.Name = strings.TrimSpace(in.Name)
+	if in.Name == "" {
+		writeAPIErr(w, http.StatusBadRequest, "name is required")
+		return
+	}
+	id, err := h.store.CreatePlaylist(r.Context(), in.Name, strings.TrimSpace(in.Description), newShareCode())
+	if err != nil {
+		writeAPIErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeData(w, map[string]any{"id": id})
+}
+
+func (h *Music) DeletePlaylist(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		writeAPIErr(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	if err := h.store.DeletePlaylist(r.Context(), id); err != nil {
+		writeAPIErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeData(w, map[string]any{"ok": true})
+}
+
+func (h *Music) AddTrack(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		writeAPIErr(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	var t store.MusicTrack
+	if err := json.NewDecoder(r.Body).Decode(&t); err != nil || strings.TrimSpace(t.VideoID) == "" {
+		writeAPIErr(w, http.StatusBadRequest, "track id is required")
+		return
+	}
+	if err := h.store.AddTrack(r.Context(), id, t); err != nil {
+		writeAPIErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeData(w, map[string]any{"ok": true})
+}
+
+func (h *Music) RemoveTrack(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		writeAPIErr(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	videoID := chi.URLParam(r, "videoId")
+	if videoID == "" {
+		writeAPIErr(w, http.StatusBadRequest, "video id is required")
+		return
+	}
+	if err := h.store.RemoveTrack(r.Context(), id, videoID); err != nil {
+		writeAPIErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeData(w, map[string]any{"ok": true})
+}
+
+// ---- Export / import (portable + plugin contract) ----
+
+// playlistExport is the portable shape a playlist serializes to. A plugin or a
+// remote backend consumes this exact structure to share/import playlists.
+type playlistExport struct {
+	Version     int                `json:"version"`
+	Name        string             `json:"name"`
+	Description string             `json:"description"`
+	ShareCode   string             `json:"share_code"`
+	Tracks      []store.MusicTrack `json:"tracks"`
+}
+
+func (h *Music) ExportPlaylist(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		writeAPIErr(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	p, err := h.store.GetPlaylist(r.Context(), id)
+	if err != nil {
+		writeAPIErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if p == nil {
+		writeAPIErr(w, http.StatusNotFound, "playlist not found")
+		return
+	}
+	writeData(w, playlistExport{
+		Version:     1,
+		Name:        p.Name,
+		Description: p.Description,
+		ShareCode:   p.ShareCode,
+		Tracks:      p.Tracks,
+	})
+}
+
+func (h *Music) ImportPlaylist(w http.ResponseWriter, r *http.Request) {
+	var in playlistExport
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		writeAPIErr(w, http.StatusBadRequest, "invalid import payload")
+		return
+	}
+	in.Name = strings.TrimSpace(in.Name)
+	if in.Name == "" {
+		in.Name = "Imported playlist"
+	}
+	id, err := h.store.CreatePlaylist(r.Context(), in.Name, strings.TrimSpace(in.Description), newShareCode())
+	if err != nil {
+		writeAPIErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	for _, t := range in.Tracks {
+		if strings.TrimSpace(t.VideoID) == "" {
+			continue
+		}
+		_ = h.store.AddTrack(r.Context(), id, t)
+	}
+	writeData(w, map[string]any{"id": id})
+}
+
+// newShareCode returns a short random code used to address a playlist for
+// sharing (e.g. via a future central backend / plugin).
+func newShareCode() string {
+	b := make([]byte, 6)
+	if _, err := cryptorand.Read(b); err != nil {
+		return strconv.FormatInt(time.Now().UnixNano(), 16)
+	}
+	return hex.EncodeToString(b)
+}

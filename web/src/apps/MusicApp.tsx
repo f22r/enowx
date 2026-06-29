@@ -1,26 +1,129 @@
-import { useRef, useState } from "react";
-import { Search, Play, Pause, Plus, Trash2, ListX, Loader2, Music2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import {
+  Search,
+  Play,
+  Pause,
+  Plus,
+  Trash2,
+  Loader2,
+  Music2,
+  Sparkles,
+  ListMusic,
+  RefreshCw,
+  Share2,
+  Download,
+  ChevronLeft,
+  FolderPlus,
+} from "lucide-react";
 import { AppShell, Empty } from "./shell";
 import { Tooltip } from "../components/Tooltip";
-import { musicApi, type Track } from "../lib/api";
-import {
-  useMusic,
-  play,
-  enqueue,
-  removeFromQueue,
-  clearQueue,
-  toggle,
-  currentTrack,
-} from "../os/musicBus";
+import { useDialog } from "../os/dialog";
+import { usePersisted } from "../os/usePersisted";
+import { musicApi, type Track, type Playlist } from "../lib/api";
+import { useMusic, play, playQueue, enqueue, toggle, currentTrack } from "../os/musicBus";
+import { usedPlaylists } from "../os/musicPlaylists";
+
+type Tab = "discover" | "search" | "playlists";
 
 export function MusicApp() {
-  const m = useMusic();
+  const [tab, setTab] = usePersisted<Tab>("music-tab", "discover");
+
+  const tabs: { id: Tab; label: string; icon: typeof Sparkles }[] = [
+    { id: "discover", label: "Discover", icon: Sparkles },
+    { id: "search", label: "Search", icon: Search },
+    { id: "playlists", label: "Playlists", icon: ListMusic },
+  ];
+
+  return (
+    <AppShell title="Music" subtitle="Search, discover, and build playlists">
+      <div className="mb-3 flex gap-1">
+        {tabs.map((t) => {
+          const Icon = t.icon;
+          return (
+            <Tooltip key={t.id} label={t.label} place="bottom">
+              <button
+                onClick={() => setTab(t.id)}
+                className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                  tab === t.id ? "bg-white/12 text-white" : "text-white/50 hover:bg-white/5 hover:text-white/80"
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                {t.label}
+              </button>
+            </Tooltip>
+          );
+        })}
+      </div>
+
+      {tab === "discover" && <Discover />}
+      {tab === "search" && <SearchTab />}
+      {tab === "playlists" && <Playlists />}
+    </AppShell>
+  );
+}
+
+// ---- Discover (local "for you" feed) ----
+
+function Discover() {
+  const [tracks, setTracks] = useState<Track[] | null>(null);
+  const [error, setError] = useState("");
+  const alive = useRef(true);
+
+  async function load() {
+    setTracks(null);
+    setError("");
+    try {
+      const t = await musicApi.discover();
+      if (alive.current) setTracks(t);
+    } catch (e) {
+      if (alive.current) {
+        setError(e instanceof Error ? e.message : "failed to load");
+        setTracks([]);
+      }
+    }
+  }
+
+  useEffect(() => {
+    alive.current = true;
+    load();
+    return () => {
+      alive.current = false;
+    };
+  }, []);
+
+  return (
+    <div>
+      <div className="mb-2 flex items-center justify-between">
+        <p className="text-[11px] text-white/40">Based on what you play — refreshes each visit.</p>
+        <Tooltip label="Shuffle a fresh feed" place="left">
+          <button
+            onClick={load}
+            className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] text-white/55 hover:bg-white/10 hover:text-white"
+          >
+            <RefreshCw className="h-3 w-3" /> Shuffle
+          </button>
+        </Tooltip>
+      </div>
+      {error && <div className="mb-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">{error}</div>}
+      {tracks === null ? (
+        <ListSkeleton />
+      ) : tracks.length === 0 ? (
+        <Empty message="Nothing to show yet. Play a few songs and your feed will fill in." />
+      ) : (
+        <TrackList tracks={tracks} onPlayAll={() => playQueue(tracks, 0)} />
+      )}
+    </div>
+  );
+}
+
+// ---- Search ----
+
+function SearchTab() {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<Track[] | null>(null);
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState("");
   const reqId = useRef(0);
-  const current = currentTrack();
 
   async function search(e?: React.FormEvent) {
     e?.preventDefault();
@@ -43,7 +146,7 @@ export function MusicApp() {
   }
 
   return (
-    <AppShell title="Music" subtitle="Search and play tracks from YouTube Music">
+    <div>
       <form onSubmit={search} className="mb-3 flex gap-2">
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-white/30" />
@@ -68,78 +171,268 @@ export function MusicApp() {
 
       {error && <div className="mb-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">{error}</div>}
 
-      {/* Now playing / queue */}
-      {m.queue.length > 0 && (
-        <section className="mb-4">
-          <div className="mb-1.5 flex items-center justify-between">
-            <h2 className="text-[11px] font-semibold uppercase tracking-wide text-white/40">Queue · {m.queue.length}</h2>
-            <Tooltip label="Clear the queue" place="bottom">
-              <button onClick={clearQueue} className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-white/50 hover:bg-white/10 hover:text-white/80">
-                <ListX className="h-3 w-3" /> Clear
+      {results === null ? (
+        <Empty message="Search for a song to get started." />
+      ) : results.length === 0 ? (
+        <Empty message="No results." />
+      ) : (
+        <TrackList tracks={results} onPlayAll={() => playQueue(results, 0)} />
+      )}
+    </div>
+  );
+}
+
+// ---- Playlists ----
+
+function Playlists() {
+  const { playlists, create, remove, importPlaylist } = usedPlaylists();
+  const [openId, setOpenId] = useState<number | null>(null);
+  const dialog = useDialog();
+
+  async function onCreate() {
+    const name = await dialog.prompt({ title: "New playlist", placeholder: "Playlist name", confirmLabel: "Create" });
+    if (name && name.trim()) await create(name.trim());
+  }
+
+  async function onImport() {
+    const json = await dialog.prompt({
+      title: "Import playlist",
+      message: "Paste an exported playlist JSON.",
+      placeholder: '{"version":1,"name":"…","tracks":[…]}',
+      confirmLabel: "Import",
+    });
+    if (!json) return;
+    try {
+      const data = JSON.parse(json);
+      await importPlaylist(data);
+    } catch {
+      await dialog.alert({ title: "Import failed", message: "That doesn't look like valid playlist JSON." });
+    }
+  }
+
+  async function onDelete(p: Playlist) {
+    const ok = await dialog.confirm({
+      title: "Delete playlist?",
+      message: `"${p.name}" and its ${p.count} track(s) will be removed.`,
+      danger: true,
+      confirmLabel: "Delete",
+    });
+    if (ok) await remove(p.id);
+  }
+
+  if (openId !== null) {
+    return <PlaylistDetail id={openId} onBack={() => setOpenId(null)} />;
+  }
+
+  return (
+    <div>
+      <div className="mb-2 flex items-center justify-end gap-1">
+        <Tooltip label="Import a playlist from JSON" place="bottom">
+          <button onClick={onImport} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] text-white/55 hover:bg-white/10 hover:text-white">
+            <Download className="h-3 w-3" /> Import
+          </button>
+        </Tooltip>
+        <Tooltip label="Create a new playlist" place="bottom">
+          <button onClick={onCreate} className="flex items-center gap-1 rounded-lg bg-white/10 px-2 py-1 text-[11px] font-medium text-white hover:bg-white/15">
+            <FolderPlus className="h-3 w-3" /> New
+          </button>
+        </Tooltip>
+      </div>
+
+      {playlists === null ? (
+        <ListSkeleton />
+      ) : playlists.length === 0 ? (
+        <Empty message="No playlists yet. Create one and add songs from Search or Discover." />
+      ) : (
+        <div className="space-y-1">
+          {playlists.map((p) => (
+            <div
+              key={p.id}
+              className="group flex items-center gap-2.5 rounded-lg border border-white/5 bg-white/[0.02] px-2.5 py-2 hover:bg-white/[0.05]"
+            >
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded bg-gradient-to-br from-pink-500/30 to-rose-600/30">
+                <ListMusic className="h-4 w-4 text-pink-200" />
+              </div>
+              <button onClick={() => setOpenId(p.id)} className="min-w-0 flex-1 text-left">
+                <div className="truncate text-xs font-medium text-white/85">{p.name}</div>
+                <div className="truncate text-[11px] text-white/40">{p.count} track{p.count === 1 ? "" : "s"}</div>
+              </button>
+              <Tooltip label="Delete playlist" place="left">
+                <button onClick={() => onDelete(p)} className="rounded p-1 text-white/40 opacity-0 transition-opacity hover:bg-white/10 hover:text-red-300 group-hover:opacity-100">
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </Tooltip>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PlaylistDetail({ id, onBack }: { id: number; onBack: () => void }) {
+  const { playlists, removeTrack } = usedPlaylists();
+  const [pl, setPl] = useState<Playlist | null>(null);
+  const [error, setError] = useState("");
+  const dialog = useDialog();
+
+  // Reload the detail whenever the shared playlist summary changes (e.g. a
+  // track was added/removed somewhere) so the view stays in sync.
+  const stamp = playlists?.find((p) => p.id === id)?.count;
+
+  useEffect(() => {
+    let alive = true;
+    musicApi
+      .playlist(id)
+      .then((p) => alive && setPl(p))
+      .catch((e) => alive && setError(e instanceof Error ? e.message : "failed to load"));
+    return () => {
+      alive = false;
+    };
+  }, [id, stamp]);
+
+  async function onShare() {
+    try {
+      const data = await musicApi.exportPlaylist(id);
+      await navigator.clipboard.writeText(JSON.stringify(data));
+      await dialog.alert({
+        title: "Playlist exported",
+        message: `The playlist JSON (share code ${data.share_code}) was copied to your clipboard. Import it on another enowx instance.`,
+      });
+    } catch {
+      await dialog.alert({ title: "Export failed", message: "Could not export this playlist." });
+    }
+  }
+
+  const tracks = pl?.tracks ?? [];
+
+  return (
+    <div>
+      <div className="mb-2 flex items-center gap-1.5">
+        <Tooltip label="Back to playlists" place="bottom">
+          <button onClick={onBack} className="rounded-lg p-1 text-white/55 hover:bg-white/10 hover:text-white">
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+        </Tooltip>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-sm font-semibold text-white">{pl?.name ?? "…"}</div>
+          <div className="text-[11px] text-white/40">{tracks.length} track{tracks.length === 1 ? "" : "s"}</div>
+        </div>
+        {tracks.length > 0 && (
+          <Tooltip label="Play all" place="bottom">
+            <button onClick={() => playQueue(tracks, 0)} className="flex items-center gap-1 rounded-lg bg-white/10 px-2 py-1 text-[11px] font-medium text-white hover:bg-white/15">
+              <Play className="h-3 w-3" /> Play
+            </button>
+          </Tooltip>
+        )}
+        <Tooltip label="Export / share this playlist" place="bottom">
+          <button onClick={onShare} className="rounded-lg p-1.5 text-white/55 hover:bg-white/10 hover:text-white">
+            <Share2 className="h-3.5 w-3.5" />
+          </button>
+        </Tooltip>
+      </div>
+
+      {error && <div className="mb-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">{error}</div>}
+      {pl === null ? (
+        <ListSkeleton />
+      ) : tracks.length === 0 ? (
+        <Empty message="This playlist is empty. Add songs from Search or Discover." />
+      ) : (
+        <TrackList
+          tracks={tracks}
+          onPlayAll={() => playQueue(tracks, 0)}
+          rowAction={(t) => (
+            <Tooltip label="Remove from playlist" place="left">
+              <button onClick={() => removeTrack(id, t.id)} className="rounded p-1 text-white/40 hover:bg-white/10 hover:text-red-300">
+                <Trash2 className="h-3.5 w-3.5" />
               </button>
             </Tooltip>
-          </div>
-          <div className="space-y-1">
-            {m.queue.map((t) => {
-              const isCurrent = current?.id === t.id;
-              return (
-                <Row
-                  key={t.id}
-                  track={t}
-                  active={isCurrent}
-                  playing={isCurrent && m.playing}
-                  onPlay={() => (isCurrent ? toggle() : play(t))}
-                  trailing={
-                    <Tooltip label="Remove from queue" place="left">
-                      <button onClick={() => removeFromQueue(t.id)} className="rounded p-1 text-white/40 hover:bg-white/10 hover:text-red-300">
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </Tooltip>
-                  }
-                />
-              );
-            })}
-          </div>
-        </section>
+          )}
+        />
       )}
+    </div>
+  );
+}
 
-      {/* Search results */}
-      <section>
-        <h2 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-white/40">Results</h2>
-        {results === null ? (
-          <Empty message="Search for a song to get started." />
-        ) : results.length === 0 ? (
-          <Empty message="No results." />
-        ) : (
-          <div className="space-y-1">
-            {results.map((t) => {
-              const inQueue = m.queue.some((x) => x.id === t.id);
-              const isCurrent = current?.id === t.id;
-              return (
-                <Row
-                  key={t.id}
-                  track={t}
-                  active={isCurrent}
-                  playing={isCurrent && m.playing}
-                  onPlay={() => (isCurrent ? toggle() : play(t))}
-                  trailing={
-                    <Tooltip label={inQueue ? "Already in queue" : "Add to queue"} place="left">
-                      <button
-                        onClick={() => enqueue(t)}
-                        disabled={inQueue}
-                        className="rounded p-1 text-white/40 hover:bg-white/10 hover:text-white/80 disabled:opacity-30"
-                      >
-                        <Plus className="h-3.5 w-3.5" />
-                      </button>
-                    </Tooltip>
-                  }
-                />
-              );
-            })}
-          </div>
-        )}
-      </section>
-    </AppShell>
+// ---- Shared track list + row ----
+
+function TrackList({
+  tracks,
+  onPlayAll,
+  rowAction,
+}: {
+  tracks: Track[];
+  onPlayAll?: () => void;
+  rowAction?: (t: Track) => React.ReactNode;
+}) {
+  const m = useMusic();
+  const current = currentTrack();
+  return (
+    <div className="space-y-1">
+      {onPlayAll && tracks.length > 1 && (
+        <div className="mb-1 flex justify-end">
+          <Tooltip label="Play all as a queue" place="left">
+            <button onClick={onPlayAll} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] text-white/55 hover:bg-white/10 hover:text-white">
+              <Play className="h-3 w-3" /> Play all
+            </button>
+          </Tooltip>
+        </div>
+      )}
+      {tracks.map((t) => {
+        const isCurrent = current?.id === t.id;
+        return (
+          <Row
+            key={t.id}
+            track={t}
+            active={isCurrent}
+            playing={isCurrent && m.playing}
+            onPlay={() => (isCurrent ? toggle() : play(t))}
+            action={rowAction ? rowAction(t) : <AddToActions track={t} />}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+// Per-row actions for search/discover rows: enqueue + add-to-playlist.
+function AddToActions({ track }: { track: Track }) {
+  const m = useMusic();
+  const { playlists, create, addTrack } = usedPlaylists();
+  const dialog = useDialog();
+  const inQueue = m.queue.some((x) => x.id === track.id);
+
+  async function onAddToPlaylist() {
+    const list = playlists ?? [];
+    const result = await dialog.form({
+      title: "Add to playlist",
+      message:
+        list.length > 0
+          ? `Type an existing name (${list.map((p) => p.name).join(", ")}) or a new one to create it.`
+          : "Type a name to create a new playlist.",
+      fields: [{ name: "name", label: "Playlist", placeholder: "Playlist name" }],
+      confirmLabel: "Add",
+    });
+    const name = result?.name?.trim();
+    if (!name) return;
+    const existing = list.find((p) => p.name.toLowerCase() === name.toLowerCase());
+    const targetId = existing ? existing.id : (await create(name)).id;
+    await addTrack(targetId, track);
+  }
+
+  return (
+    <div className="flex items-center">
+      <Tooltip label="Add to playlist" place="left">
+        <button onClick={onAddToPlaylist} className="rounded p-1 text-white/40 hover:bg-white/10 hover:text-white/80">
+          <ListMusic className="h-3.5 w-3.5" />
+        </button>
+      </Tooltip>
+      <Tooltip label={inQueue ? "Already in queue" : "Add to queue"} place="left">
+        <button onClick={() => enqueue(track)} disabled={inQueue} className="rounded p-1 text-white/40 hover:bg-white/10 hover:text-white/80 disabled:opacity-30">
+          <Plus className="h-3.5 w-3.5" />
+        </button>
+      </Tooltip>
+    </div>
   );
 }
 
@@ -148,13 +441,13 @@ function Row({
   active,
   playing,
   onPlay,
-  trailing,
+  action,
 }: {
   track: Track;
   active: boolean;
   playing: boolean;
   onPlay: () => void;
-  trailing: React.ReactNode;
+  action: React.ReactNode;
 }) {
   return (
     <div
@@ -185,7 +478,17 @@ function Row({
         </div>
       </button>
       {track.duration && <span className="shrink-0 font-mono text-[10px] text-white/35">{track.duration}</span>}
-      {trailing}
+      {action}
+    </div>
+  );
+}
+
+function ListSkeleton() {
+  return (
+    <div className="space-y-1">
+      {[0, 1, 2, 3, 4].map((i) => (
+        <div key={i} className="h-12 animate-pulse rounded-lg bg-white/5" />
+      ))}
     </div>
   );
 }

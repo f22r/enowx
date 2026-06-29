@@ -83,7 +83,10 @@ function getAudio(): HTMLAudioElement {
   a.addEventListener("timeupdate", () => set({ position: a.currentTime }));
   a.addEventListener("durationchange", () => set({ duration: isFinite(a.duration) ? a.duration : 0 }));
   a.addEventListener("loadedmetadata", () => set({ duration: isFinite(a.duration) ? a.duration : 0 }));
-  a.addEventListener("playing", () => set({ playing: true, loading: false }));
+  a.addEventListener("playing", () => {
+    set({ playing: true, loading: false });
+    recordCurrentPlay();
+  });
   a.addEventListener("pause", () => set({ playing: false }));
   a.addEventListener("waiting", () => set({ loading: true }));
   a.addEventListener("canplay", () => set({ loading: false }));
@@ -93,10 +96,24 @@ function getAudio(): HTMLAudioElement {
   return a;
 }
 
+// Track the id we last recorded a play for, so resuming after a pause doesn't
+// log the same track repeatedly — only a fresh load counts as a new play.
+let recordedFor = "";
+
+function recordCurrentPlay() {
+  const track = state.queue[state.index];
+  if (!track || recordedFor === track.id) return;
+  recordedFor = track.id;
+  musicApi.recordPlay(track).catch(() => {
+    /* history is best-effort */
+  });
+}
+
 function loadIndex(i: number, autoplay: boolean) {
   const track = state.queue[i];
   if (!track) return;
   const a = getAudio();
+  recordedFor = ""; // new load — allow a fresh history record on play
   set({ index: i, error: "", position: 0, duration: 0, loading: true });
   savePersisted();
   a.src = musicApi.streamUrl(track.id);
