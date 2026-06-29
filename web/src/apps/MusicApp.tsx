@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { AppShell, Empty } from "./shell";
 import { Tooltip } from "../components/Tooltip";
+import { Popover } from "../components/Popover";
 import { useDialog } from "../os/dialog";
 import { usePersisted } from "../os/usePersisted";
 import { musicApi, type Track, type Playlist } from "../lib/api";
@@ -468,39 +469,35 @@ function AddToActions({ track }: { track: Track }) {
       </Tooltip>
 
       {picking && (
-        <>
-          {/* click-away backdrop */}
-          <div className="fixed inset-0 z-[10000]" onClick={() => setPicking(false)} />
-          <div className="absolute right-0 top-7 z-[10001] w-52 overflow-hidden rounded-xl border border-white/10 bg-[#11131a]/98 shadow-2xl glass">
-            <div className="border-b border-white/5 px-3 py-2 text-[11px] font-semibold text-white/60">Add to playlist</div>
-            <div className="max-h-56 overflow-auto py-1">
-              {list.length === 0 ? (
-                <div className="px-3 py-2 text-[11px] text-white/40">No playlists yet.</div>
-              ) : (
-                list.map((p) => {
-                  const has = p.tracks?.some((x) => x.id === track.id);
-                  return (
-                    <button
-                      key={p.id}
-                      onClick={() => !has && addToExisting(p)}
-                      disabled={busy || has}
-                      className="flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-xs text-white/80 hover:bg-white/10 disabled:opacity-40"
-                    >
-                      <span className="truncate">{p.name}</span>
-                      <span className="shrink-0 text-[10px] text-white/35">{has ? "added" : `${p.count}`}</span>
-                    </button>
-                  );
-                })
-              )}
-            </div>
-            <button
-              onClick={addToNew}
-              className="flex w-full items-center gap-1.5 border-t border-white/5 px-3 py-2 text-left text-xs font-medium text-emerald-300 hover:bg-white/5"
-            >
-              <FolderPlus className="h-3.5 w-3.5" /> New playlist…
-            </button>
+        <Popover onClose={() => setPicking(false)} anchor="right" className="w-52 overflow-hidden rounded-xl border border-white/10 bg-[#11131a]/98 shadow-2xl glass">
+          <div className="border-b border-white/5 px-3 py-2 text-[11px] font-semibold text-white/60">Add to playlist</div>
+          <div className="max-h-56 overflow-auto py-1">
+            {list.length === 0 ? (
+              <div className="px-3 py-2 text-[11px] text-white/40">No playlists yet.</div>
+            ) : (
+              list.map((p) => {
+                const has = p.tracks?.some((x) => x.id === track.id);
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => !has && addToExisting(p)}
+                    disabled={busy || has}
+                    className="flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-xs text-white/80 hover:bg-white/10 disabled:opacity-40"
+                  >
+                    <span className="truncate">{p.name}</span>
+                    <span className="shrink-0 text-[10px] text-white/35">{has ? "added" : `${p.count}`}</span>
+                  </button>
+                );
+              })
+            )}
           </div>
-        </>
+          <button
+            onClick={addToNew}
+            className="flex w-full items-center gap-1.5 border-t border-white/5 px-3 py-2 text-left text-xs font-medium text-emerald-300 hover:bg-white/5"
+          >
+            <FolderPlus className="h-3.5 w-3.5" /> New playlist…
+          </button>
+        </Popover>
       )}
     </div>
   );

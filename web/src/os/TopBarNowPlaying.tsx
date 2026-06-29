@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, X, Music2, Loader2 } from "lucide-react";
 import { Tooltip } from "../components/Tooltip";
+import { Popover } from "../components/Popover";
 import { useMusic, toggle, next, prev, seek, setVolume, currentTrack, clearQueue, fmtTime } from "./musicBus";
 
 // Now-playing readout that lives in the TopBar center. Compact controls inline;
@@ -66,7 +67,7 @@ function NowPlayingPopover({ pct, onClose }: { pct: number; onClose: () => void 
   if (!track) return null;
 
   return (
-    <div className="absolute left-1/2 top-8 z-[10000] w-72 -translate-x-1/2 overflow-hidden rounded-2xl border border-white/10 bg-[#11131a]/98 shadow-2xl glass">
+    <Popover onClose={onClose} anchor="center" className="w-72 overflow-hidden rounded-2xl border border-white/10 bg-[#11131a]/98 shadow-2xl glass">
       <div className="flex items-center gap-2.5 border-b border-white/5 px-3 py-2.5">
         <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded bg-white/10">
           {track.thumbnail ? (
@@ -153,6 +154,6 @@ function NowPlayingPopover({ pct, onClose }: { pct: number; onClose: () => void 
           Close player &amp; clear queue
         </button>
       </div>
-    </div>
+    </Popover>
   );
 }

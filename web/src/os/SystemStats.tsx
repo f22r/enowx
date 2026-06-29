@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Cpu, MemoryStick, X } from "lucide-react";
 import { debugApi, type DebugInfo } from "../lib/api";
 import { Sparkline } from "../components/Sparkline";
+import { Popover } from "../components/Popover";
 
 const mb = (b: number) => `${(b / 1024 / 1024).toFixed(0)} MB`;
 
@@ -82,7 +83,7 @@ function DebugPopover({
   onClose: () => void;
 }) {
   return (
-    <div className="absolute right-0 top-8 z-[10000] w-80 overflow-hidden rounded-2xl border border-white/10 bg-[#11131a]/98 shadow-2xl glass">
+    <Popover onClose={onClose} anchor="right" className="w-80 overflow-hidden rounded-2xl border border-white/10 bg-[#11131a]/98 shadow-2xl glass">
       <div className="flex items-center justify-between border-b border-white/5 px-3 py-2">
         <span className="text-xs font-semibold text-white/80">Debug · enx process</span>
         <button onClick={onClose} className="rounded p-1 text-white/40 hover:bg-white/10 hover:text-white">
@@ -118,7 +119,7 @@ function DebugPopover({
           <Row k="Uptime" v={uptime(info.uptime_seconds)} />
         </Section>
       </div>
-    </div>
+    </Popover>
   );
 }
 
