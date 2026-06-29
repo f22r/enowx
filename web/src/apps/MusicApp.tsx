@@ -14,24 +14,28 @@ import {
   Download,
   ChevronLeft,
   FolderPlus,
+  ListVideo,
+  ListX,
 } from "lucide-react";
 import { AppShell, Empty } from "./shell";
 import { Tooltip } from "../components/Tooltip";
 import { useDialog } from "../os/dialog";
 import { usePersisted } from "../os/usePersisted";
 import { musicApi, type Track, type Playlist } from "../lib/api";
-import { useMusic, play, playQueue, enqueue, toggle, currentTrack } from "../os/musicBus";
+import { useMusic, play, playQueue, enqueue, toggle, currentTrack, removeFromQueue, clearQueue } from "../os/musicBus";
 import { usedPlaylists } from "../os/musicPlaylists";
 
-type Tab = "discover" | "search" | "playlists";
+type Tab = "discover" | "search" | "playlists" | "queue";
 
 export function MusicApp() {
   const [tab, setTab] = usePersisted<Tab>("music-tab", "discover");
+  const m = useMusic();
 
-  const tabs: { id: Tab; label: string; icon: typeof Sparkles }[] = [
+  const tabs: { id: Tab; label: string; icon: typeof Sparkles; badge?: number }[] = [
     { id: "discover", label: "Discover", icon: Sparkles },
     { id: "search", label: "Search", icon: Search },
     { id: "playlists", label: "Playlists", icon: ListMusic },
+    { id: "queue", label: "Queue", icon: ListVideo, badge: m.queue.length },
   ];
 
   return (
@@ -49,6 +53,9 @@ export function MusicApp() {
               >
                 <Icon className="h-3.5 w-3.5" />
                 {t.label}
+                {t.badge ? (
+                  <span className="rounded-full bg-white/15 px-1.5 text-[10px] font-semibold leading-tight text-white/70">{t.badge}</span>
+                ) : null}
               </button>
             </Tooltip>
           );
@@ -58,6 +65,7 @@ export function MusicApp() {
       {tab === "discover" && <Discover />}
       {tab === "search" && <SearchTab />}
       {tab === "playlists" && <Playlists />}
+      {tab === "queue" && <Queue />}
     </AppShell>
   );
 }
@@ -350,6 +358,51 @@ function PlaylistDetail({ id, onBack }: { id: number; onBack: () => void }) {
           )}
         />
       )}
+    </div>
+  );
+}
+
+// ---- Queue (the current playback queue, from musicBus) ----
+
+function Queue() {
+  const m = useMusic();
+  const current = currentTrack();
+
+  if (m.queue.length === 0) {
+    return <Empty message="Queue is empty. Play a song or use 'Play all' from Discover, Search, or a playlist." />;
+  }
+
+  return (
+    <div>
+      <div className="mb-2 flex items-center justify-between">
+        <p className="text-[11px] text-white/40">{m.queue.length} track{m.queue.length === 1 ? "" : "s"} · plays in order</p>
+        <Tooltip label="Clear the queue" place="left">
+          <button onClick={clearQueue} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] text-white/55 hover:bg-white/10 hover:text-red-300">
+            <ListX className="h-3 w-3" /> Clear
+          </button>
+        </Tooltip>
+      </div>
+      <div className="space-y-1">
+        {m.queue.map((t) => {
+          const isCurrent = current?.id === t.id;
+          return (
+            <Row
+              key={t.id}
+              track={t}
+              active={isCurrent}
+              playing={isCurrent && m.playing}
+              onPlay={() => (isCurrent ? toggle() : play(t))}
+              action={
+                <Tooltip label="Remove from queue" place="left">
+                  <button onClick={() => removeFromQueue(t.id)} className="rounded p-1 text-white/40 hover:bg-white/10 hover:text-red-300">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </Tooltip>
+              }
+            />
+          );
+        })}
+      </div>
     </div>
   );
 }
