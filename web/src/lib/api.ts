@@ -274,6 +274,21 @@ export const docsApi = {
   get: () => api.get<Docs>("/api/docs"),
 };
 
+export interface Track {
+  id: string;
+  title: string;
+  artist: string;
+  album: string;
+  duration: string;
+  thumbnail: string;
+}
+
+export const musicApi = {
+  search: (q: string) => api.get<Track[]>(`/api/music/search?q=${encodeURIComponent(q)}`),
+  // The stream URL is used directly as an <audio> src (it proxies + supports Range).
+  streamUrl: (id: string) => `/api/music/stream?id=${encodeURIComponent(id)}`,
+};
+
 export interface DebugInfo {
   process: { cpu_percent: number; rss: number; pid: number };
   memory: {

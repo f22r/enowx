@@ -49,6 +49,7 @@ func New(addr string, d Deps) *Server {
 	warmup := handlers.NewWarmup(d.Proxy, d.Registry, d.Accounts, d.Warmups, d.Logs)
 	term := handlers.NewTerminal()
 	files := handlers.NewFiles()
+	music := handlers.NewMusic()
 	auth := middleware.NewAuth(d.Keys)
 
 	r.Get("/health", func(w http.ResponseWriter, _ *http.Request) {
@@ -98,6 +99,9 @@ func New(addr string, d Deps) *Server {
 		r.Get("/files", files.List)
 		r.Get("/files/read", files.Read)
 		r.Get("/files/raw", files.Raw)
+
+		r.Get("/music/search", music.Search)
+		r.Get("/music/stream", music.Stream)
 	})
 
 	// Real PTY shell over WebSocket — loopback-only (guarded in the handler).

@@ -8,7 +8,8 @@ export type AppId =
   | "statistics"
   | "files"
   | "warmup-logs"
-  | "api-keys";
+  | "api-keys"
+  | "music";
 
 export type Side = "left" | "right";
 

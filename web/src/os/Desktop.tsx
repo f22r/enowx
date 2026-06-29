@@ -9,6 +9,7 @@ import { Widgets } from "./Widgets";
 import { CenterTerminal } from "./CenterTerminal";
 import { TerminalLayer } from "./TerminalLayer";
 import { AppsDrawer } from "./AppsDrawer";
+import { MiniPlayer } from "./MiniPlayer";
 import { Tooltip } from "../components/Tooltip";
 import { DocsApp } from "../apps/DocsApp";
 import { usePanels } from "./usePanels";
@@ -67,6 +68,7 @@ export function Desktop() {
     r: "requests",
     w: "warmup-logs",
     k: "api-keys",
+    m: "music",
   };
   const leaderActive = useShortcuts((k) => {
     const v: Record<string, CenterView> = { "1": "widget", "2": "terminal", "3": "apps", "4": "docs" };
@@ -126,7 +128,7 @@ export function Desktop() {
 
       {leaderActive && (
         <div className="pointer-events-none fixed left-1/2 top-9 z-[10000] -translate-x-1/2 rounded-lg border border-emerald-500/30 bg-black/80 px-3 py-1.5 font-mono text-[11px] text-emerald-300 shadow-lg">
-          hold + press: 1 widget · 2 terminal · 3 apps · 4 docs · p a s g f r w k apps
+          hold + press: 1 widget · 2 terminal · 3 apps · 4 docs · p a s g f r w k m apps
         </div>
       )}
 
@@ -159,6 +161,8 @@ export function Desktop() {
       <AnimatePresence>{renderPanel("right")}</AnimatePresence>
 
       <TerminalLayer terms={term.terms} activeCenter={term.activeCenter} hosts={hosts} />
+
+      <MiniPlayer />
     </div>
   );
 }

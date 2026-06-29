@@ -85,6 +85,7 @@ var shortcutGroups = []shortcutGroup{
 			{Keys: "Ctrl/Alt + R", Desc: "Requests"},
 			{Keys: "Ctrl/Alt + W", Desc: "Warmup Logs"},
 			{Keys: "Ctrl/Alt + K", Desc: "API Keys"},
+			{Keys: "Ctrl/Alt + M", Desc: "Music"},
 		},
 	},
 }
@@ -165,6 +166,14 @@ var groups = []docGroup{
 		Endpoints: []docEndpoint{
 			{Method: "GET", Path: "/api/warmup-logs", Desc: "Recent warmup entries (request, response, usage).", Params: []docParam{{Name: "limit", In: "query", Desc: "max rows"}}},
 			{Method: "DELETE", Path: "/api/warmup-logs", Desc: "Clear all warmup logs."},
+		},
+	},
+	{
+		Name: "Music",
+		Desc: "Search YouTube Music for songs and proxy the chosen track's audio for playback.",
+		Endpoints: []docEndpoint{
+			{Method: "GET", Path: "/api/music/search", Desc: "Search songs; returns {id, title, artist, album, duration, thumbnail}.", Params: []docParam{{Name: "q", In: "query", Desc: "search query"}}},
+			{Method: "GET", Path: "/api/music/stream", Desc: "Proxy the best audio-only stream for a video id; forwards Range for seeking.", Params: []docParam{{Name: "id", In: "query", Desc: "video id from search"}}},
 		},
 	},
 	{
