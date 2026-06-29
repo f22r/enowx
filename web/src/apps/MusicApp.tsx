@@ -8,6 +8,7 @@ import {
   Loader2,
   Music2,
   Sparkles,
+  Home,
   ListMusic,
   RefreshCw,
   Share2,
@@ -27,15 +28,14 @@ import { useMusic, playInContext, playList, playFromQueue, enqueue, toggle, curr
 import { usedPlaylists } from "../os/musicPlaylists";
 import { useDiscover } from "../os/musicDiscover";
 
-type Tab = "discover" | "search" | "playlists" | "queue";
+type Tab = "home" | "playlists" | "queue";
 
 export function MusicApp() {
-  const [tab, setTab] = usePersisted<Tab>("music-tab", "discover");
+  const [tab, setTab] = usePersisted<Tab>("music-tab", "home");
   const m = useMusic();
 
   const tabs: { id: Tab; label: string; icon: typeof Sparkles; badge?: number }[] = [
-    { id: "discover", label: "Discover", icon: Sparkles },
-    { id: "search", label: "Search", icon: Search },
+    { id: "home", label: "Home", icon: Home },
     { id: "playlists", label: "Playlists", icon: ListMusic },
     { id: "queue", label: "Queue", icon: ListVideo, badge: m.queue.length },
   ];
@@ -64,50 +64,23 @@ export function MusicApp() {
         })}
       </div>
 
-      {tab === "discover" && <Discover />}
-      {tab === "search" && <SearchTab />}
+      {tab === "home" && <HomeTab />}
       {tab === "playlists" && <Playlists />}
       {tab === "queue" && <Queue />}
     </AppShell>
   );
 }
 
-// ---- Discover (local "for you" feed) ----
+// ---- Home: Discover feed + search in one place ----
 
-function Discover() {
-  const { tracks, loading, error, shuffle } = useDiscover();
+function HomeTab() {
+  const { tracks: discover, loading: discoverLoading, error: discoverError, shuffle } = useDiscover();
 
-  return (
-    <div>
-      <div className="mb-2 flex items-center justify-between">
-        <p className="text-[11px] text-white/40">Based on what you play — Shuffle for a fresh feed.</p>
-        <Tooltip label="Shuffle a fresh feed" place="left">
-          <button
-            onClick={shuffle}
-            disabled={loading}
-            className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] text-white/55 hover:bg-white/10 hover:text-white disabled:opacity-50"
-          >
-            <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin" : ""}`} /> Shuffle
-          </button>
-        </Tooltip>
-      </div>
-      {error && <div className="mb-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">{error}</div>}
-      {tracks === null || (loading && tracks.length === 0) ? (
-        <ListSkeleton />
-      ) : tracks.length === 0 ? (
-        <Empty message="Nothing to show yet. Play a few songs and your feed will fill in." />
-      ) : (
-        <TrackList tracks={tracks} onPlayAll={() => playList(tracks, 0)} />
-      )}
-    </div>
-  );
-}
-
-// ---- Search ----
-
-function SearchTab() {
-  const [q, setQ] = useState("");
-  const [results, setResults] = useState<Track[] | null>(null);
+  // Persisted so the view survives leaving/reopening the app: the query, the
+  // last results, and whether we're showing search results or the Discover feed.
+  const [q, setQ] = usePersisted("music-q", "");
+  const [results, setResults] = usePersisted<Track[] | null>("music-results", null);
+  const [showResults, setShowResults] = usePersisted("music-show-results", false);
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState("");
   const reqId = useRef(0);
@@ -115,26 +88,52 @@ function SearchTab() {
   async function search(e?: React.FormEvent) {
     e?.preventDefault();
     const query = q.trim();
-    if (!query) return;
+    if (!query) {
+      goHome();
+      return;
+    }
     const id = ++reqId.current;
     setSearching(true);
     setError("");
     try {
       const r = await musicApi.search(query);
-      if (id === reqId.current) setResults(r);
+      if (id === reqId.current) {
+        setResults(r);
+        setShowResults(true);
+      }
     } catch (err) {
       if (id === reqId.current) {
         setError(err instanceof Error ? err.message : "search failed");
         setResults([]);
+        setShowResults(true);
       }
     } finally {
       if (id === reqId.current) setSearching(false);
     }
   }
 
+  function goHome() {
+    setQ("");
+    setResults(null);
+    setShowResults(false);
+    setError("");
+  }
+
   return (
     <div>
       <form onSubmit={search} className="mb-3 flex gap-2">
+        {showResults && (
+          <Tooltip label="Back to Discover" place="bottom">
+            <button
+              type="button"
+              onClick={goHome}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/10 text-white/55 hover:bg-white/10 hover:text-white"
+              aria-label="Home"
+            >
+              <Home className="h-4 w-4" />
+            </button>
+          </Tooltip>
+        )}
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-white/30" />
           <input
@@ -156,14 +155,40 @@ function SearchTab() {
         </Tooltip>
       </form>
 
-      {error && <div className="mb-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">{error}</div>}
-
-      {results === null ? (
-        <Empty message="Search for a song to get started." />
-      ) : results.length === 0 ? (
-        <Empty message="No results." />
+      {showResults ? (
+        <>
+          {error && <div className="mb-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">{error}</div>}
+          {results === null ? (
+            <Empty message="Search for a song." />
+          ) : results.length === 0 ? (
+            <Empty message="No results." />
+          ) : (
+            <TrackList tracks={results} onPlayAll={() => playList(results, 0)} />
+          )}
+        </>
       ) : (
-        <TrackList tracks={results} onPlayAll={() => playList(results, 0)} />
+        <>
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-[11px] text-white/40">Based on what you play — Shuffle for a fresh feed.</p>
+            <Tooltip label="Shuffle a fresh feed" place="left">
+              <button
+                onClick={shuffle}
+                disabled={discoverLoading}
+                className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] text-white/55 hover:bg-white/10 hover:text-white disabled:opacity-50"
+              >
+                <RefreshCw className={`h-3 w-3 ${discoverLoading ? "animate-spin" : ""}`} /> Shuffle
+              </button>
+            </Tooltip>
+          </div>
+          {discoverError && <div className="mb-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">{discoverError}</div>}
+          {discover === null || (discoverLoading && discover.length === 0) ? (
+            <ListSkeleton />
+          ) : discover.length === 0 ? (
+            <Empty message="Nothing to show yet. Play a few songs and your feed will fill in." />
+          ) : (
+            <TrackList tracks={discover} onPlayAll={() => playList(discover, 0)} />
+          )}
+        </>
       )}
     </div>
   );
