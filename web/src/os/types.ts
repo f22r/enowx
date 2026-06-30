@@ -12,7 +12,8 @@ export type AppId =
   | "music"
   | "tunnel"
   | "profile"
-  | "chat";
+  | "chat"
+  | "shop";
 
 export type Side = "left" | "right";
 

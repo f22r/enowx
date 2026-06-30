@@ -1,5 +1,5 @@
 import { ShieldCheck, Coins, Link as LinkIcon } from "lucide-react";
-import type { TopRole, ProfileLink } from "../lib/api";
+import type { TopRole, ProfileLink, Equipped } from "../lib/api";
 
 // CardProfile is the shape the card renders. Both SyncUser (self) and
 // PublicProfile (others) satisfy it, so the card is reused in both places.
@@ -19,6 +19,7 @@ export interface CardProfile {
   guild_tag?: string;
   kleos?: number;
   is_moderator?: boolean;
+  equipped?: Equipped;
   created_at?: string;
 }
 
@@ -40,13 +41,20 @@ export function ProfileCard({ p, footer, compact }: { p: CardProfile; footer?: R
     : "rgba(255,255,255,0.03)";
   // The avatar outline follows the primary color (falls back to dark when grey).
   const ring = p.primary_color || "#0b0c10";
+  // Equipped cosmetics (bought with Kleos): banner preset gradient, title, badge,
+  // and a visual effect class.
+  const eq = p.equipped;
+  const effectCls = eq?.effect === "glow" ? "shadow-[0_0_24px_-4px] shadow-indigo-500/40" : eq?.effect === "holo" ? "ring-1 ring-fuchsia-400/30" : "";
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-white/10">
-      {/* Banner — grey by default; holds an image/gif when set (a future
-          role-gated perk). Shorter in compact mode (e.g. a popover). */}
-      <div className={`${compact ? "h-24" : "h-40"} w-full bg-white/[0.06]`}>
-        {p.banner_url && <img src={p.banner_url} alt="" className="h-full w-full object-cover" />}
+    <div className={`overflow-hidden rounded-2xl border border-white/10 ${effectCls}`}>
+      {/* Banner — equipped preset gradient, else image/gif, else grey. Shorter
+          in compact mode (e.g. a popover). */}
+      <div
+        className={`${compact ? "h-24" : "h-40"} w-full bg-white/[0.06]`}
+        style={eq?.banner ? { background: eq.banner } : undefined}
+      >
+        {!eq?.banner && p.banner_url && <img src={p.banner_url} alt="" className="h-full w-full object-cover" />}
       </div>
 
       <div className="px-4 pb-4" style={{ background: body }}>
@@ -78,6 +86,10 @@ export function ProfileCard({ p, footer, compact }: { p: CardProfile; footer?: R
           )}
         </div>
 
+        {/* Equipped title (cosmetic). */}
+        {eq?.title && (
+          <p className="text-[11px] font-medium uppercase tracking-wide text-indigo-300/80">{eq.title}</p>
+        )}
         {/* Name + handle + pronouns. */}
         <div className="flex items-baseline gap-1.5">
           <span className="truncate text-base font-bold text-white">{p.display_name || p.username}</span>
@@ -90,6 +102,11 @@ export function ProfileCard({ p, footer, compact }: { p: CardProfile; footer?: R
           {p.top_role?.name ? <RoleBadge role={p.top_role} /> : p.plan && <PlanBadge plan={p.plan} />}
           {p.wears_tag && <TagBadge tag={p.guild_tag} />}
           {p.is_moderator && <ModBadge />}
+          {eq?.badge && (
+            <span className="inline-flex items-center rounded-full bg-fuchsia-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-fuchsia-200 ring-1 ring-inset ring-fuchsia-400/20">
+              {eq.badge}
+            </span>
+          )}
         </div>
 
         {/* About: bio + links + member since. */}

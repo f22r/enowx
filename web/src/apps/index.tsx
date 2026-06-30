@@ -1,4 +1,4 @@
-import { KeyRound, ScrollText, Boxes, Settings, BarChart3, FolderOpen, Flame, KeySquare, Music, Globe, UserCircle, MessagesSquare } from "lucide-react";
+import { KeyRound, ScrollText, Boxes, Settings, BarChart3, FolderOpen, Flame, KeySquare, Music, Globe, UserCircle, MessagesSquare, ShoppingBag } from "lucide-react";
 import type { DesktopApp } from "../os/types";
 import { AccountsApp } from "./AccountsApp";
 import { RequestsApp } from "./RequestsApp";
@@ -12,6 +12,7 @@ import { MusicApp } from "./MusicApp";
 import { TunnelApp } from "./TunnelApp";
 import { ProfileApp } from "./ProfileApp";
 import { ChatApp } from "./ChatApp";
+import { ShopApp } from "./ShopApp";
 
 // `home` is the default location: a dock side or the Apps drawer. The dock
 // starts minimal (core apps); everything else lives in the Apps drawer and the
@@ -30,5 +31,6 @@ export function buildApps(): DesktopApp[] {
     { id: "tunnel", label: "Tunnel", icon: <Globe />, accent: "from-blue-500 to-cyan-600", home: "drawer", render: () => <TunnelApp /> },
     { id: "profile", label: "Profile", icon: <UserCircle />, accent: "from-indigo-500 to-violet-600", home: "drawer", render: () => <ProfileApp /> },
     { id: "chat", label: "Community", icon: <MessagesSquare />, accent: "from-fuchsia-500 to-purple-600", home: "drawer", render: () => <ChatApp /> },
+    { id: "shop", label: "Shop", icon: <ShoppingBag />, accent: "from-amber-500 to-yellow-600", home: "drawer", render: () => <ShopApp /> },
   ];
 }

@@ -69,10 +69,6 @@ function ensureStream() {
           return { ...m, reactions: incoming.map((rx) => ({ ...rx, me: mine.has(rx.emoji) })) };
         });
         emit();
-      } else if (ev.event === "upvote_changed" && ev.data) {
-        // Count is community-wide; keep our own `upvoted`.
-        messages = messages.map((m) => (m.id === ev.data.message_id ? { ...m, upvotes: ev.data.count } : m));
-        emit();
       }
     } catch {
       /* ignore malformed frames */
@@ -109,11 +105,6 @@ export async function reactChat(id: number, emoji: string) {
   emit();
 }
 
-export async function upvoteChat(id: number) {
-  const r = await chatApi.upvote(id);
-  messages = messages.map((m) => (m.id === id ? { ...m, upvotes: r.count, upvoted: r.me } : m));
-  emit();
-}
 
 export interface ChatState {
   messages: ChatMessage[];

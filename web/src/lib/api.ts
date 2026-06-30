@@ -299,6 +299,7 @@ export interface SyncUser {
   accent_color?: string;
   primary_color?: string;
   pronouns?: string;
+  equipped?: Equipped;
   links?: ProfileLink[];
   created_at?: string;
 }
@@ -322,6 +323,34 @@ export const profileApi = {
   publicById: (id: string) => api.get<PublicProfile>(`/api/users/${encodeURIComponent(id)}/profile`),
 };
 
+export interface Equipped {
+  title: string;
+  badge: string;
+  effect: string;
+  banner: string;
+}
+
+export interface CosmeticItem {
+  id: string;
+  kind: "title" | "badge" | "effect" | "banner";
+  name: string;
+  price: number;
+  payload: string;
+}
+
+export interface ShopState {
+  catalog: CosmeticItem[];
+  owned: string[];
+  kleos: number;
+  equipped: Equipped;
+}
+
+export const shopApi = {
+  get: () => api.get<ShopState>("/api/shop"),
+  buy: (item_id: string) => api.post<{ kleos: number; owned: string[] }>("/api/shop/buy", { item_id }),
+  equip: (kind: string, item_id: string) => api.post<{ equipped: Equipped }>("/api/shop/equip", { kind, item_id }),
+};
+
 // ChatMessage carries the message + a snapshot of the author's identity.
 export interface ChatMessage {
   id: number;
@@ -339,8 +368,6 @@ export interface ChatMessage {
   wears_tag?: boolean;
   guild_tag?: string;
   reactions?: Reaction[];
-  upvotes?: number;
-  upvoted?: boolean;
 }
 
 export interface Reaction {
@@ -355,7 +382,6 @@ export const chatApi = {
   edit: (id: number, content: string) => api.patch<{ id: number; content: string }>(`/api/chat/messages/${id}`, { content }),
   remove: (id: number) => api.del<{ deleted: number }>(`/api/chat/messages/${id}`),
   react: (id: number, emoji: string) => api.post<{ message_id: number; reactions: Reaction[] }>(`/api/chat/messages/${id}/reactions`, { emoji }),
-  upvote: (id: number) => api.post<{ message_id: number; count: number; me: boolean; kleos_awarded: number }>(`/api/chat/messages/${id}/upvote`),
 };
 
 // PublicProfile is what other members can see (social data only — no secrets).
@@ -375,6 +401,7 @@ export interface PublicProfile {
   primary_color: string;
   pronouns: string;
   is_moderator?: boolean;
+  equipped?: Equipped;
   links: ProfileLink[];
   created_at: string;
 }

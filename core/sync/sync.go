@@ -236,6 +236,33 @@ func (m *Manager) PublicProfile(ctx context.Context, id string) (string, error) 
 	return string(raw), nil
 }
 
+// Shop fetches the cosmetics catalog + the user's owned/equipped/balance.
+func (m *Manager) Shop(ctx context.Context) (string, error) {
+	var raw json.RawMessage
+	if err := m.call(ctx, http.MethodGet, "/shop", nil, &raw); err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
+
+// ShopBuy spends Kleos to buy a cosmetic.
+func (m *Manager) ShopBuy(ctx context.Context, body json.RawMessage) (string, error) {
+	var raw json.RawMessage
+	if err := m.call(ctx, http.MethodPost, "/shop/buy", body, &raw); err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
+
+// ShopEquip equips/unequips a cosmetic.
+func (m *Manager) ShopEquip(ctx context.Context, body json.RawMessage) (string, error) {
+	var raw json.RawMessage
+	if err := m.call(ctx, http.MethodPost, "/shop/equip", body, &raw); err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
+
 // ChatList fetches a page of community chat messages (path includes any query).
 func (m *Manager) ChatList(ctx context.Context, query string) (string, error) {
 	var raw json.RawMessage
@@ -276,15 +303,6 @@ func (m *Manager) ChatDelete(ctx context.Context, id string) (string, error) {
 func (m *Manager) ChatReact(ctx context.Context, id string, body json.RawMessage) (string, error) {
 	var raw json.RawMessage
 	if err := m.call(ctx, http.MethodPost, "/chat/messages/"+id+"/reactions", body, &raw); err != nil {
-		return "", err
-	}
-	return string(raw), nil
-}
-
-// ChatUpvote toggles the caller's upvote on a chat message.
-func (m *Manager) ChatUpvote(ctx context.Context, id string) (string, error) {
-	var raw json.RawMessage
-	if err := m.call(ctx, http.MethodPost, "/chat/messages/"+id+"/upvote", nil, &raw); err != nil {
 		return "", err
 	}
 	return string(raw), nil

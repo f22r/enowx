@@ -114,6 +114,50 @@ func (h *Sync) PublicProfile(w http.ResponseWriter, r *http.Request) {
 	writeData(w, profile)
 }
 
+// Shop proxies the cosmetics catalog + owned/equipped/balance.
+func (h *Sync) Shop(w http.ResponseWriter, r *http.Request) {
+	raw, err := h.mgr.Shop(r.Context())
+	if err != nil {
+		writeAPIErr(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	var out any
+	if raw != "" {
+		_ = json.Unmarshal([]byte(raw), &out)
+	}
+	writeData(w, out)
+}
+
+// ShopBuy proxies buying a cosmetic with Kleos.
+func (h *Sync) ShopBuy(w http.ResponseWriter, r *http.Request) {
+	body, _ := io.ReadAll(io.LimitReader(r.Body, 4096))
+	raw, err := h.mgr.ShopBuy(r.Context(), body)
+	if err != nil {
+		writeAPIErr(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	var out any
+	if raw != "" {
+		_ = json.Unmarshal([]byte(raw), &out)
+	}
+	writeData(w, out)
+}
+
+// ShopEquip proxies equipping a cosmetic.
+func (h *Sync) ShopEquip(w http.ResponseWriter, r *http.Request) {
+	body, _ := io.ReadAll(io.LimitReader(r.Body, 4096))
+	raw, err := h.mgr.ShopEquip(r.Context(), body)
+	if err != nil {
+		writeAPIErr(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	var out any
+	if raw != "" {
+		_ = json.Unmarshal([]byte(raw), &out)
+	}
+	writeData(w, out)
+}
+
 // ChatList proxies a page of community chat messages.
 func (h *Sync) ChatList(w http.ResponseWriter, r *http.Request) {
 	query := ""
@@ -183,21 +227,6 @@ func (h *Sync) ChatReact(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	body, _ := io.ReadAll(io.LimitReader(r.Body, 1024))
 	raw, err := h.mgr.ChatReact(r.Context(), id, body)
-	if err != nil {
-		writeAPIErr(w, http.StatusBadGateway, err.Error())
-		return
-	}
-	var out any
-	if raw != "" {
-		_ = json.Unmarshal([]byte(raw), &out)
-	}
-	writeData(w, out)
-}
-
-// ChatUpvote proxies toggling an upvote on a chat message.
-func (h *Sync) ChatUpvote(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "id")
-	raw, err := h.mgr.ChatUpvote(r.Context(), id)
 	if err != nil {
 		writeAPIErr(w, http.StatusBadGateway, err.Error())
 		return
