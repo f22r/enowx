@@ -296,6 +296,8 @@ export interface SyncUser {
   display_name?: string;
   bio?: string;
   accent_color?: string;
+  primary_color?: string;
+  pronouns?: string;
   links?: ProfileLink[];
   created_at?: string;
 }
@@ -309,6 +311,8 @@ export interface ProfileEdit {
   display_name: string;
   bio: string;
   accent_color: string;
+  primary_color: string;
+  pronouns: string;
   links: ProfileLink[];
 }
 
@@ -331,6 +335,8 @@ export interface PublicProfile {
   display_name: string;
   bio: string;
   accent_color: string;
+  primary_color: string;
+  pronouns: string;
   links: ProfileLink[];
   created_at: string;
 }

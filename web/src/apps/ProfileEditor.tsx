@@ -1,22 +1,26 @@
 import { useState } from "react";
 import { Loader2, Check, Plus, X, Pencil } from "lucide-react";
-import { Tooltip } from "../components/Tooltip";
 import { useProfile } from "../os/useProfile";
+import { ProfileCard } from "../components/ProfileCard";
 import type { ProfileLink } from "../lib/api";
 
 // Field limits mirror the server (it re-validates; this is just nicer UX).
 const MAX_DISPLAY = 32;
+const MAX_PRONOUNS = 40;
 const MAX_BIO = 190;
 const MAX_LINKS = 5;
 
-// ProfileEditor lets the signed-in user edit their profile (display name, bio,
-// accent color, links). The server validates + sanitizes on save.
+// ProfileEditor: a Discord-style two-column editor in a wide modal — the left
+// column edits fields, the right column shows a live <ProfileCard> preview that
+// updates as you type. The server validates + sanitizes on save.
 export function ProfileEditor() {
   const profile = useProfile();
   const u = profile.user;
   const [open, setOpen] = useState(false);
   const [displayName, setDisplayName] = useState(u?.display_name ?? "");
+  const [pronouns, setPronouns] = useState(u?.pronouns ?? "");
   const [bio, setBio] = useState(u?.bio ?? "");
+  const [primary, setPrimary] = useState(u?.primary_color || "#11131a");
   const [accent, setAccent] = useState(u?.accent_color || "#6366f1");
   const [links, setLinks] = useState<ProfileLink[]>(u?.links ?? []);
   const [busy, setBusy] = useState(false);
@@ -36,15 +40,27 @@ export function ProfileEditor() {
     setLinks(links.filter((_, j) => j !== i));
   }
 
+  // Live preview merges the saved identity with the in-progress edits.
+  const preview = {
+    ...u!,
+    display_name: displayName,
+    pronouns,
+    bio,
+    primary_color: primary,
+    accent_color: accent,
+    links: links.filter((l) => l.url.trim()),
+  };
+
   async function save() {
     setError("");
     setBusy(true);
     try {
       await profile.saveProfile({
         display_name: displayName.trim(),
+        pronouns: pronouns.trim(),
         bio: bio.trim(),
+        primary_color: primary,
         accent_color: accent,
-        // Drop blank rows; the server keeps only valid http(s) links.
         links: links.filter((l) => l.url.trim()),
       });
       setDone(true);
@@ -57,101 +73,134 @@ export function ProfileEditor() {
     }
   }
 
-  if (!open) {
-    return (
+  return (
+    <>
       <button
         onClick={() => setOpen(true)}
         className="flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-white/60 hover:bg-white/5 hover:text-white"
       >
         <Pencil className="h-3.5 w-3.5" /> Edit profile
       </button>
-    );
-  }
 
-  return (
-    <div className="space-y-3 rounded-xl border border-white/10 bg-white/[0.02] p-3.5">
-      {error && <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">{error}</div>}
-
-      <Field label="Display name" hint={`${displayName.length}/${MAX_DISPLAY}`}>
-        <input
-          value={displayName}
-          maxLength={MAX_DISPLAY}
-          onChange={(e) => setDisplayName(e.target.value)}
-          placeholder={u.username}
-          className="w-full rounded-lg border border-white/10 bg-black/20 px-2.5 py-1.5 text-xs text-white outline-none focus:border-white/25"
-        />
-      </Field>
-
-      <Field label="Bio" hint={`${bio.length}/${MAX_BIO}`}>
-        <textarea
-          value={bio}
-          maxLength={MAX_BIO}
-          rows={2}
-          onChange={(e) => setBio(e.target.value)}
-          placeholder="A short line about you"
-          className="w-full resize-none rounded-lg border border-white/10 bg-black/20 px-2.5 py-1.5 text-xs text-white outline-none focus:border-white/25"
-        />
-      </Field>
-
-      <Field label="Accent color">
-        <div className="flex items-center gap-2">
-          <input
-            type="color"
-            value={accent}
-            onChange={(e) => setAccent(e.target.value)}
-            className="h-7 w-10 cursor-pointer rounded border border-white/10 bg-transparent"
-          />
-          <span className="font-mono text-[11px] text-white/50">{accent}</span>
-        </div>
-      </Field>
-
-      <Field label="Links" hint={`${links.length}/${MAX_LINKS}`}>
-        <div className="space-y-1.5">
-          {links.map((l, i) => (
-            <div key={i} className="flex items-center gap-1.5">
-              <input
-                value={l.label}
-                onChange={(e) => setLink(i, { label: e.target.value })}
-                placeholder="Label"
-                className="w-24 rounded-lg border border-white/10 bg-black/20 px-2 py-1 text-[11px] text-white outline-none focus:border-white/25"
-              />
-              <input
-                value={l.url}
-                onChange={(e) => setLink(i, { url: e.target.value })}
-                placeholder="https://…"
-                className="min-w-0 flex-1 rounded-lg border border-white/10 bg-black/20 px-2 py-1 text-[11px] text-white outline-none focus:border-white/25"
-              />
-              <button onClick={() => removeLink(i)} className="rounded p-1 text-white/40 hover:bg-white/10 hover:text-white">
-                <X className="h-3.5 w-3.5" />
+      {open && (
+        <div
+          className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+          onClick={() => !busy && setOpen(false)}
+        >
+          <div
+            className="flex max-h-[88vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#0e1016] shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-white/5 px-4 py-3">
+              <p className="text-sm font-semibold text-white">Edit profile</p>
+              <button onClick={() => !busy && setOpen(false)} className="rounded-md p-1 text-white/40 hover:bg-white/10 hover:text-white">
+                <X className="h-4 w-4" />
               </button>
             </div>
-          ))}
-          {links.length < MAX_LINKS && (
-            <button onClick={addLink} className="flex items-center gap-1 text-[11px] text-white/50 hover:text-white">
-              <Plus className="h-3 w-3" /> Add link
-            </button>
-          )}
-        </div>
-      </Field>
 
-      <div className="flex items-center gap-2 pt-1">
-        <Tooltip label="Save your profile" place="bottom">
-          <button
-            onClick={save}
-            disabled={busy}
-            className="flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-medium text-white hover:bg-white/15 disabled:opacity-50"
-          >
-            {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : done ? <Check className="h-3.5 w-3.5 text-emerald-300" /> : null}
-            Save
-          </button>
-        </Tooltip>
-        <button onClick={() => setOpen(false)} disabled={busy} className="rounded-lg px-3 py-1.5 text-xs text-white/50 hover:text-white disabled:opacity-50">
-          Cancel
-        </button>
-      </div>
-    </div>
+            <div className="grid min-h-0 flex-1 grid-cols-1 gap-0 overflow-hidden md:grid-cols-[1fr_300px]">
+              {/* Left: the form */}
+              <div className="space-y-4 overflow-auto px-4 py-4">
+                {error && <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">{error}</div>}
+
+                <Field label="Display name" hint={`${displayName.length}/${MAX_DISPLAY}`}>
+                  <input
+                    value={displayName}
+                    maxLength={MAX_DISPLAY}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    placeholder={u.username}
+                    className={inputCls}
+                  />
+                </Field>
+
+                <Field label="Pronouns" hint={`${pronouns.length}/${MAX_PRONOUNS}`}>
+                  <input
+                    value={pronouns}
+                    maxLength={MAX_PRONOUNS}
+                    onChange={(e) => setPronouns(e.target.value)}
+                    placeholder="e.g. they/them"
+                    className={inputCls}
+                  />
+                </Field>
+
+                <Field label="Profile theme">
+                  <div className="flex gap-4">
+                    <Swatch label="Primary" value={primary} onChange={setPrimary} />
+                    <Swatch label="Accent" value={accent} onChange={setAccent} />
+                  </div>
+                </Field>
+
+                <Field label="Bio" hint={`${bio.length}/${MAX_BIO}`}>
+                  <textarea
+                    value={bio}
+                    maxLength={MAX_BIO}
+                    rows={3}
+                    onChange={(e) => setBio(e.target.value)}
+                    placeholder="A short line about you"
+                    className={`${inputCls} resize-none`}
+                  />
+                </Field>
+
+                <Field label="Links" hint={`${links.length}/${MAX_LINKS}`}>
+                  <div className="space-y-1.5">
+                    {links.map((l, i) => (
+                      <div key={i} className="flex items-center gap-1.5">
+                        <input
+                          value={l.label}
+                          onChange={(e) => setLink(i, { label: e.target.value })}
+                          placeholder="Label"
+                          className={`${inputCls} w-24`}
+                        />
+                        <input
+                          value={l.url}
+                          onChange={(e) => setLink(i, { url: e.target.value })}
+                          placeholder="https://…"
+                          className={`${inputCls} min-w-0 flex-1`}
+                        />
+                        <button onClick={() => removeLink(i)} className="rounded p-1 text-white/40 hover:bg-white/10 hover:text-white">
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                    {links.length < MAX_LINKS && (
+                      <button onClick={addLink} className="flex items-center gap-1 text-[11px] text-white/50 hover:text-white">
+                        <Plus className="h-3 w-3" /> Add link
+                      </button>
+                    )}
+                  </div>
+                </Field>
+              </div>
+
+              {/* Right: live preview */}
+              <div className="hidden flex-col border-l border-white/5 bg-black/20 px-4 py-4 md:flex">
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-white/40">Preview</p>
+                <ProfileCard p={preview} />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-2 border-t border-white/5 px-4 py-3">
+              <button onClick={() => setOpen(false)} disabled={busy} className="rounded-lg px-3 py-1.5 text-xs text-white/50 hover:text-white disabled:opacity-50">
+                Cancel
+              </button>
+              <button
+                onClick={save}
+                disabled={busy}
+                className="flex items-center gap-1.5 rounded-lg bg-indigo-500/90 px-3.5 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-50"
+              >
+                {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : done ? <Check className="h-3.5 w-3.5" /> : null}
+                Save changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
+
+const inputCls =
+  "w-full rounded-lg border border-white/10 bg-black/20 px-2.5 py-1.5 text-xs text-white outline-none focus:border-white/25";
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
@@ -162,5 +211,19 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
       </div>
       {children}
     </div>
+  );
+}
+
+function Swatch({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <label className="flex cursor-pointer flex-col items-center gap-1">
+      <input
+        type="color"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-9 w-12 cursor-pointer rounded-lg border border-white/10 bg-transparent"
+      />
+      <span className="text-[10px] text-white/40">{label}</span>
+    </label>
   );
 }

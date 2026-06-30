@@ -9,6 +9,8 @@ export interface CardProfile {
   display_name?: string;
   bio?: string;
   accent_color?: string;
+  primary_color?: string;
+  pronouns?: string;
   links?: ProfileLink[];
   plan?: string;
   top_role?: TopRole | null;
@@ -24,10 +26,15 @@ export interface CardProfile {
 export function ProfileCard({ p, footer }: { p: CardProfile; footer?: React.ReactNode }) {
   const accent = p.accent_color || "#6366f1";
   const initial = (p.display_name || p.username || "?").charAt(0).toUpperCase();
+  // primary_color (when set) themes the card surface, like Discord's profile theme.
+  const surface = p.primary_color || undefined;
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]">
-      {/* Banner — accent gradient (image upload is a future tag-gated perk). */}
+    <div
+      className="overflow-hidden rounded-2xl border border-white/10"
+      style={{ background: surface ?? "rgba(255,255,255,0.03)" }}
+    >
+      {/* Banner — accent gradient (image banner is a future role-gated perk). */}
       <div
         className="h-20 w-full"
         style={{ background: `linear-gradient(135deg, ${accent}, ${accent}55)` }}
@@ -61,11 +68,12 @@ export function ProfileCard({ p, footer }: { p: CardProfile; footer?: React.Reac
           )}
         </div>
 
-        {/* Name + handle. */}
+        {/* Name + handle + pronouns. */}
         <div className="flex items-baseline gap-1.5">
           <span className="truncate text-base font-bold text-white">{p.display_name || p.username}</span>
           {p.display_name && <span className="truncate text-xs text-white/35">@{p.username}</span>}
         </div>
+        {p.pronouns && <p className="text-[11px] text-white/40">{p.pronouns}</p>}
 
         {/* Badges. */}
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
