@@ -176,8 +176,9 @@ func (m *Manager) LoginStart(ctx context.Context, _ string) (authorizeURL, state
 		AuthorizeURL string `json:"authorize_url"`
 		State        string `json:"state"`
 	}
-	// /auth is public (no token yet).
-	if err := m.callNoAuth(ctx, http.MethodPost, "/auth/discord/start", nil, &resp); err != nil {
+	// /auth is public (no token yet). Send our stable device id so the server
+	// can use it as an anti-fraud (shared-device) signal.
+	if err := m.callNoAuth(ctx, http.MethodPost, "/auth/discord/start", map[string]any{"device": m.deviceID(ctx)}, &resp); err != nil {
 		return "", "", err
 	}
 	return resp.AuthorizeURL, resp.State, nil
