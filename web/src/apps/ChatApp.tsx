@@ -3,13 +3,11 @@ import { Loader2, Send, Wifi, WifiOff, Pencil, Trash2, Copy, Reply, X, SmilePlus
 import { AppShell } from "./shell";
 import { Popover } from "../components/Popover";
 import { ProfileCard } from "../components/ProfileCard";
+import { EmojiPicker } from "../components/EmojiPicker";
 import { useProfile } from "../os/useProfile";
 import { useChat, sendChat, editChat, deleteChat, reactChat } from "../os/chatBus";
 import { useDialog } from "../os/dialog";
 import { profileApi, type ChatMessage, type PublicProfile } from "../lib/api";
-
-// A small, friendly reaction set (full emoji picker can come later).
-const QUICK_EMOJI = ["👍", "❤️", "😂", "🔥", "🎉", "😮", "😢", "👀"];
 
 interface ReplyTarget {
   id: number;
@@ -204,13 +202,7 @@ function MessageRow({
           <ActBtn label="React" onClick={() => setPickerOpen((v) => !v)}><SmilePlus className="h-3.5 w-3.5" /></ActBtn>
           {pickerOpen && (
             <Popover onClose={() => setPickerOpen(false)} anchor="right" className="w-max">
-              <div className="flex gap-0.5 rounded-lg border border-white/10 bg-[#16181f] p-1 shadow-xl">
-                {QUICK_EMOJI.map((e) => (
-                  <button key={e} onClick={() => react(e)} className="rounded p-1 text-base hover:bg-white/10">
-                    {e}
-                  </button>
-                ))}
-              </div>
+              <EmojiPicker onPick={react} />
             </Popover>
           )}
         </div>
