@@ -5,7 +5,7 @@ import { Tooltip } from "../components/Tooltip";
 import { usePersisted } from "../os/usePersisted";
 import { syncApi, type SyncStatus } from "../lib/api";
 
-const DEFAULT_SERVER = "http://localhost:8787";
+const DEFAULT_SERVER = "https://api-dev.enowxlabs.com";
 
 export function SyncApp() {
   const [status, setStatus] = useState<SyncStatus | null>(null);
