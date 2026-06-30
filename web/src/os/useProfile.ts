@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { syncApi, type SyncStatus, type SyncUser } from "../lib/api";
+import { syncApi, profileApi, type SyncStatus, type SyncUser, type ProfileEdit } from "../lib/api";
 
 // Shared profile/account state: the single source of truth for "is the user
 // signed in (with Discord), and what plan/roles do they have". Login unlocks
@@ -35,6 +35,7 @@ export interface Profile {
   logout: () => Promise<void>;
   setAutoSync: (on: boolean) => Promise<void>;
   has: (capability: string) => boolean; // server-computed entitlement check (lock UX)
+  saveProfile: (e: ProfileEdit) => Promise<void>;
 }
 
 export function useProfile(): Profile {
@@ -71,6 +72,10 @@ export function useProfile(): Profile {
       await refreshProfile();
     },
     has: (capability: string) => !!cache?.user?.entitlements?.includes(capability),
+    saveProfile: async (e: ProfileEdit) => {
+      await profileApi.update(e);
+      await refreshProfile();
+    },
   };
 }
 

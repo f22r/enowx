@@ -293,6 +293,44 @@ export interface SyncUser {
   guild_tag?: string;
   kleos?: number;
   entitlements?: string[];
+  display_name?: string;
+  bio?: string;
+  accent_color?: string;
+  links?: ProfileLink[];
+}
+
+export interface ProfileLink {
+  label: string;
+  url: string;
+}
+
+export interface ProfileEdit {
+  display_name: string;
+  bio: string;
+  accent_color: string;
+  links: ProfileLink[];
+}
+
+export const profileApi = {
+  update: (e: ProfileEdit) => api.patch<SyncUser>("/api/profile", e),
+  publicById: (id: string) => api.get<PublicProfile>(`/api/users/${encodeURIComponent(id)}/profile`),
+};
+
+// PublicProfile is what other members can see (social data only — no secrets).
+export interface PublicProfile {
+  id: string;
+  username: string;
+  avatar_url: string;
+  plan: string;
+  top_role_id: string;
+  wears_tag: boolean;
+  guild_tag: string;
+  kleos: number;
+  display_name: string;
+  bio: string;
+  accent_color: string;
+  links: ProfileLink[];
+  created_at: string;
 }
 
 export interface SyncStatus {

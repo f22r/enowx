@@ -168,6 +168,29 @@ func (m *Manager) Me(ctx context.Context) (string, error) {
 	return string(raw), nil
 }
 
+// UpdateProfile edits the user's own profile fields on the server, refreshes the
+// cached /me, and returns the updated user JSON.
+func (m *Manager) UpdateProfile(ctx context.Context, body json.RawMessage) (string, error) {
+	var raw json.RawMessage
+	if err := m.call(ctx, http.MethodPatch, "/me/profile", body, &raw); err != nil {
+		return "", err
+	}
+	// Refresh the cached identity so the UI reflects the edit immediately.
+	if me, err := m.Me(ctx); err == nil {
+		return me, nil
+	}
+	return string(raw), nil
+}
+
+// PublicProfile fetches another user's public profile by id.
+func (m *Manager) PublicProfile(ctx context.Context, id string) (string, error) {
+	var raw json.RawMessage
+	if err := m.call(ctx, http.MethodGet, "/users/"+id+"/profile", nil, &raw); err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
+
 // --- protocol types (must match the enowxlabs server) ---
 
 type item struct {

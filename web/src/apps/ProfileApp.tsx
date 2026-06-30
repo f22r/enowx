@@ -3,6 +3,7 @@ import { Loader2, LogOut, LogIn, ShieldCheck, Sparkles, Coins, Settings as Setti
 import { AppShell } from "./shell";
 import { Tooltip } from "../components/Tooltip";
 import { useProfile } from "../os/useProfile";
+import { ProfileEditor } from "./ProfileEditor";
 import { type SyncUser } from "../lib/api";
 
 // ProfileApp is the account surface: sign in with Discord to unlock features
@@ -80,7 +81,15 @@ export function ProfileApp() {
               </div>
             )}
             <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-semibold text-white">{profile.user.username || "Signed in"}</div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="truncate text-sm font-semibold text-white">
+                  {profile.user.display_name || profile.user.username || "Signed in"}
+                </span>
+                {profile.user.display_name && (
+                  <span className="truncate text-[11px] text-white/35">@{profile.user.username}</span>
+                )}
+              </div>
+              {profile.user.bio && <p className="mt-0.5 truncate text-[11px] text-white/55">{profile.user.bio}</p>}
               <div className="mt-1 flex flex-wrap items-center gap-1.5">
                 <RoleBadge user={profile.user} />
                 {profile.user.wears_tag && <TagBadge tag={profile.user.guild_tag} />}
@@ -88,6 +97,8 @@ export function ProfileApp() {
               </div>
             </div>
           </div>
+
+          <ProfileEditor />
 
           {/* What login unlocks */}
           <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3.5">

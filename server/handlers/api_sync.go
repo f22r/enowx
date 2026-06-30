@@ -2,7 +2,10 @@ package handlers
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
+
+	"github.com/go-chi/chi/v5"
 
 	syncpkg "github.com/enowdev/enowx/core/sync"
 )
@@ -79,6 +82,36 @@ func (h *Sync) Logout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeData(w, map[string]any{"ok": true})
+}
+
+// UpdateProfile edits the signed-in user's profile on the cloud server.
+func (h *Sync) UpdateProfile(w http.ResponseWriter, r *http.Request) {
+	body, _ := io.ReadAll(io.LimitReader(r.Body, 8192))
+	userJSON, err := h.mgr.UpdateProfile(r.Context(), body)
+	if err != nil {
+		writeAPIErr(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	var user any
+	if userJSON != "" {
+		_ = json.Unmarshal([]byte(userJSON), &user)
+	}
+	writeData(w, map[string]any{"user": user})
+}
+
+// PublicProfile fetches another user's public profile by id.
+func (h *Sync) PublicProfile(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	profileJSON, err := h.mgr.PublicProfile(r.Context(), id)
+	if err != nil {
+		writeAPIErr(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	var profile any
+	if profileJSON != "" {
+		_ = json.Unmarshal([]byte(profileJSON), &profile)
+	}
+	writeData(w, profile)
 }
 
 // Now runs a one-off reconcile.
