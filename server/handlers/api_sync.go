@@ -178,6 +178,22 @@ func (h *Sync) ChatDelete(w http.ResponseWriter, r *http.Request) {
 	writeData(w, out)
 }
 
+// ChatReact proxies toggling an emoji reaction on a chat message.
+func (h *Sync) ChatReact(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	body, _ := io.ReadAll(io.LimitReader(r.Body, 1024))
+	raw, err := h.mgr.ChatReact(r.Context(), id, body)
+	if err != nil {
+		writeAPIErr(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	var out any
+	if raw != "" {
+		_ = json.Unmarshal([]byte(raw), &out)
+	}
+	writeData(w, out)
+}
+
 // ChatStream is a Server-Sent Events stream relaying live cloud events (chat
 // messages, announcements) to the browser.
 func (h *Sync) ChatStream(w http.ResponseWriter, r *http.Request) {

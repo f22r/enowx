@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { chatApi, type ChatMessage } from "../lib/api";
+import { chatApi, type ChatMessage, type Reaction } from "../lib/api";
 
 // chatBus is the shared community-chat store: it loads history, holds the live
 // message list, and keeps a single SSE connection (/api/chat/stream) open so new
@@ -60,6 +60,15 @@ function ensureStream() {
       } else if (ev.event === "message_deleted" && ev.data) {
         messages = messages.filter((m) => m.id !== ev.data.id);
         emit();
+      } else if (ev.event === "reaction_changed" && ev.data) {
+        // Broadcast carries counts; `me` is per-viewer, so preserve our own.
+        const incoming: Reaction[] = ev.data.reactions ?? [];
+        messages = messages.map((m) => {
+          if (m.id !== ev.data.message_id) return m;
+          const mine = new Set((m.reactions ?? []).filter((rx) => rx.me).map((rx) => rx.emoji));
+          return { ...m, reactions: incoming.map((rx) => ({ ...rx, me: mine.has(rx.emoji) })) };
+        });
+        emit();
       }
     } catch {
       /* ignore malformed frames */
@@ -86,6 +95,13 @@ export async function editChat(id: number, content: string) {
 export async function deleteChat(id: number) {
   await chatApi.remove(id);
   messages = messages.filter((m) => m.id !== id);
+  emit();
+}
+
+export async function reactChat(id: number, emoji: string) {
+  // The response has the canonical aggregate with our own `me` correct.
+  const r = await chatApi.react(id, emoji);
+  messages = messages.map((m) => (m.id === id ? { ...m, reactions: r.reactions } : m));
   emit();
 }
 

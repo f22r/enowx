@@ -87,7 +87,7 @@ func (m *Manager) liveOnce(ctx context.Context, onChange func()) error {
 				onChange()
 			}
 			return nil // drop the connection; RunLive will idle until re-login
-		case "chat_message", "message_edited", "message_deleted":
+		case "chat_message", "message_edited", "message_deleted", "reaction_changed":
 			// Relay community chat events straight to any UI subscribers (SSE).
 			m.publish(ev)
 		case "announcement":

@@ -337,6 +337,13 @@ export interface ChatMessage {
   top_role?: TopRole | null;
   wears_tag?: boolean;
   guild_tag?: string;
+  reactions?: Reaction[];
+}
+
+export interface Reaction {
+  emoji: string;
+  count: number;
+  me: boolean;
 }
 
 export const chatApi = {
@@ -344,6 +351,7 @@ export const chatApi = {
   send: (content: string, reply_to?: number) => api.post<ChatMessage>("/api/chat/messages", { content, reply_to: reply_to ?? null }),
   edit: (id: number, content: string) => api.patch<{ id: number; content: string }>(`/api/chat/messages/${id}`, { content }),
   remove: (id: number) => api.del<{ deleted: number }>(`/api/chat/messages/${id}`),
+  react: (id: number, emoji: string) => api.post<{ message_id: number; reactions: Reaction[] }>(`/api/chat/messages/${id}/reactions`, { emoji }),
 };
 
 // PublicProfile is what other members can see (social data only — no secrets).

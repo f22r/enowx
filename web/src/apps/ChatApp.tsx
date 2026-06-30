@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import { Loader2, Send, Wifi, WifiOff, Pencil, Trash2, Copy, Reply, X } from "lucide-react";
+import { Loader2, Send, Wifi, WifiOff, Pencil, Trash2, Copy, Reply, X, SmilePlus } from "lucide-react";
 import { AppShell } from "./shell";
 import { Popover } from "../components/Popover";
 import { ProfileCard } from "../components/ProfileCard";
 import { useProfile } from "../os/useProfile";
-import { useChat, sendChat, editChat, deleteChat } from "../os/chatBus";
+import { useChat, sendChat, editChat, deleteChat, reactChat } from "../os/chatBus";
 import { useDialog } from "../os/dialog";
 import { profileApi, type ChatMessage, type PublicProfile } from "../lib/api";
+
+// A small, friendly reaction set (full emoji picker can come later).
+const QUICK_EMOJI = ["👍", "❤️", "😂", "🔥", "🎉", "😮", "😢", "👀"];
 
 interface ReplyTarget {
   id: number;
@@ -153,6 +156,16 @@ function MessageRow({
   const name = m.display_name || m.username;
   const [editing, setEditing] = useState(false);
   const [editText, setEditText] = useState(m.content);
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  async function react(emoji: string) {
+    setPickerOpen(false);
+    try {
+      await reactChat(m.id, emoji);
+    } catch {
+      /* ignore */
+    }
+  }
 
   async function saveEdit() {
     const t = editText.trim();
@@ -182,7 +195,21 @@ function MessageRow({
   return (
     <div className="group relative flex gap-2.5 rounded-lg px-2 py-1 hover:bg-white/[0.03]">
       {/* Hover action menu (top-right). */}
-      <div className="absolute -top-2 right-2 hidden items-center gap-0.5 rounded-lg border border-white/10 bg-[#16181f] px-1 py-0.5 shadow-lg group-hover:flex">
+      <div className={`absolute -top-2 right-2 items-center gap-0.5 rounded-lg border border-white/10 bg-[#16181f] px-1 py-0.5 shadow-lg ${pickerOpen ? "flex" : "hidden group-hover:flex"}`}>
+        <div className="relative">
+          <ActBtn label="React" onClick={() => setPickerOpen((v) => !v)}><SmilePlus className="h-3.5 w-3.5" /></ActBtn>
+          {pickerOpen && (
+            <Popover onClose={() => setPickerOpen(false)} anchor="right" className="w-max">
+              <div className="flex gap-0.5 rounded-lg border border-white/10 bg-[#16181f] p-1 shadow-xl">
+                {QUICK_EMOJI.map((e) => (
+                  <button key={e} onClick={() => react(e)} className="rounded p-1 text-base hover:bg-white/10">
+                    {e}
+                  </button>
+                ))}
+              </div>
+            </Popover>
+          )}
+        </div>
         <ActBtn label="Reply" onClick={onReply}><Reply className="h-3.5 w-3.5" /></ActBtn>
         <ActBtn label="Copy" onClick={() => navigator.clipboard?.writeText(m.content)}><Copy className="h-3.5 w-3.5" /></ActBtn>
         {mine && (
@@ -243,6 +270,24 @@ function MessageRow({
             {m.content}
             {m.edited_at && <span className="ml-1 text-[10px] text-white/25">(edited)</span>}
           </p>
+        )}
+        {m.reactions && m.reactions.length > 0 && (
+          <div className="mt-1 flex flex-wrap gap-1">
+            {m.reactions.map((rx) => (
+              <button
+                key={rx.emoji}
+                onClick={() => react(rx.emoji)}
+                className={`flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[11px] transition-colors ${
+                  rx.me
+                    ? "border-indigo-400/40 bg-indigo-500/20 text-white"
+                    : "border-white/10 bg-white/5 text-white/70 hover:bg-white/10"
+                }`}
+              >
+                <span>{rx.emoji}</span>
+                <span className="tabular-nums">{rx.count}</span>
+              </button>
+            ))}
+          </div>
         )}
       </div>
     </div>

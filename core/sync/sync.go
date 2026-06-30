@@ -272,6 +272,15 @@ func (m *Manager) ChatDelete(ctx context.Context, id string) (string, error) {
 	return string(raw), nil
 }
 
+// ChatReact toggles an emoji reaction on a chat message.
+func (m *Manager) ChatReact(ctx context.Context, id string, body json.RawMessage) (string, error) {
+	var raw json.RawMessage
+	if err := m.call(ctx, http.MethodPost, "/chat/messages/"+id+"/reactions", body, &raw); err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
+
 // --- protocol types (must match the enowxlabs server) ---
 
 type item struct {
