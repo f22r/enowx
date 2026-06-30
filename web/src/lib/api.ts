@@ -321,6 +321,25 @@ export const profileApi = {
   publicById: (id: string) => api.get<PublicProfile>(`/api/users/${encodeURIComponent(id)}/profile`),
 };
 
+// ChatMessage carries the message + a snapshot of the author's identity.
+export interface ChatMessage {
+  id: number;
+  user_id: string;
+  content: string;
+  created_at: string;
+  username: string;
+  display_name?: string;
+  avatar_url?: string;
+  top_role?: TopRole | null;
+  wears_tag?: boolean;
+  guild_tag?: string;
+}
+
+export const chatApi = {
+  list: (before?: number) => api.get<{ messages: ChatMessage[] }>(`/api/chat/messages${before ? `?before=${before}` : ""}`),
+  send: (content: string) => api.post<ChatMessage>("/api/chat/messages", { content }),
+};
+
 // PublicProfile is what other members can see (social data only — no secrets).
 export interface PublicProfile {
   id: string;

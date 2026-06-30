@@ -87,8 +87,11 @@ func (m *Manager) liveOnce(ctx context.Context, onChange func()) error {
 				onChange()
 			}
 			return nil // drop the connection; RunLive will idle until re-login
+		case "chat_message":
+			// Relay community chat straight to any UI subscribers (SSE).
+			m.publish(ev)
 		case "announcement":
-			// Surfaced to the UI via cached state / future notification store.
+			m.publish(ev)
 		case "ping", "ready":
 			// keepalive / hello — nothing to do
 		}

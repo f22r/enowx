@@ -114,6 +114,75 @@ func (h *Sync) PublicProfile(w http.ResponseWriter, r *http.Request) {
 	writeData(w, profile)
 }
 
+// ChatList proxies a page of community chat messages.
+func (h *Sync) ChatList(w http.ResponseWriter, r *http.Request) {
+	query := ""
+	if before := r.URL.Query().Get("before"); before != "" {
+		query = "?before=" + before
+	}
+	raw, err := h.mgr.ChatList(r.Context(), query)
+	if err != nil {
+		writeAPIErr(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	var out any
+	if raw != "" {
+		_ = json.Unmarshal([]byte(raw), &out)
+	}
+	writeData(w, out)
+}
+
+// ChatSend proxies sending a community chat message.
+func (h *Sync) ChatSend(w http.ResponseWriter, r *http.Request) {
+	body, _ := io.ReadAll(io.LimitReader(r.Body, 8192))
+	raw, err := h.mgr.ChatSend(r.Context(), body)
+	if err != nil {
+		writeAPIErr(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	var out any
+	if raw != "" {
+		_ = json.Unmarshal([]byte(raw), &out)
+	}
+	writeData(w, out)
+}
+
+// ChatStream is a Server-Sent Events stream relaying live cloud events (chat
+// messages, announcements) to the browser.
+func (h *Sync) ChatStream(w http.ResponseWriter, r *http.Request) {
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+
+	ch, cancel := h.mgr.Subscribe()
+	defer cancel()
+
+	// Initial comment so the client knows the stream is open.
+	_, _ = w.Write([]byte(": connected\n\n"))
+	flusher.Flush()
+
+	for {
+		select {
+		case <-r.Context().Done():
+			return
+		case ev, ok := <-ch:
+			if !ok {
+				return
+			}
+			b, _ := json.Marshal(ev)
+			_, _ = w.Write([]byte("data: "))
+			_, _ = w.Write(b)
+			_, _ = w.Write([]byte("\n\n"))
+			flusher.Flush()
+		}
+	}
+}
+
 // Now runs a one-off reconcile.
 func (h *Sync) Now(w http.ResponseWriter, r *http.Request) {
 	pushed, pulled, err := h.mgr.Sync(r.Context())

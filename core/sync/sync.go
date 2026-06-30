@@ -14,6 +14,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	stdsync "sync"
 	"strings"
 	"time"
 
@@ -42,10 +43,54 @@ type Manager struct {
 	music    store.MusicStore
 	logs     store.LogStore
 	http     *http.Client
+
+	subsMu stdsync.Mutex
+	subs   map[int]chan LiveEvent
+	nextID int
+}
+
+// LiveEvent is a cloud event relayed to UI subscribers (e.g. chat messages).
+type LiveEvent struct {
+	Event string          `json:"event"`
+	Data  json.RawMessage `json:"data,omitempty"`
 }
 
 func New(settings store.SettingsStore, music store.MusicStore, logs store.LogStore) *Manager {
-	return &Manager{settings: settings, music: music, logs: logs, http: &http.Client{Timeout: 30 * time.Second}}
+	return &Manager{
+		settings: settings, music: music, logs: logs,
+		http: &http.Client{Timeout: 30 * time.Second},
+		subs: map[int]chan LiveEvent{},
+	}
+}
+
+// Subscribe registers a channel that receives relayed cloud live events until
+// the returned cancel func is called.
+func (m *Manager) Subscribe() (<-chan LiveEvent, func()) {
+	ch := make(chan LiveEvent, 16)
+	m.subsMu.Lock()
+	id := m.nextID
+	m.nextID++
+	m.subs[id] = ch
+	m.subsMu.Unlock()
+	return ch, func() {
+		m.subsMu.Lock()
+		delete(m.subs, id)
+		close(ch)
+		m.subsMu.Unlock()
+	}
+}
+
+// publish fans a live event out to all subscribers (non-blocking).
+func (m *Manager) publish(ev liveEvent) {
+	out := LiveEvent{Event: ev.Event, Data: ev.Data}
+	m.subsMu.Lock()
+	for _, ch := range m.subs {
+		select {
+		case ch <- out:
+		default: // drop if a slow subscriber is full
+		}
+	}
+	m.subsMu.Unlock()
 }
 
 // deviceID returns a stable id for this device, generating one on first use.
@@ -186,6 +231,24 @@ func (m *Manager) UpdateProfile(ctx context.Context, body json.RawMessage) (stri
 func (m *Manager) PublicProfile(ctx context.Context, id string) (string, error) {
 	var raw json.RawMessage
 	if err := m.call(ctx, http.MethodGet, "/users/"+id+"/profile", nil, &raw); err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
+
+// ChatList fetches a page of community chat messages (path includes any query).
+func (m *Manager) ChatList(ctx context.Context, query string) (string, error) {
+	var raw json.RawMessage
+	if err := m.call(ctx, http.MethodGet, "/chat/messages"+query, nil, &raw); err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
+
+// ChatSend posts a community chat message.
+func (m *Manager) ChatSend(ctx context.Context, body json.RawMessage) (string, error) {
+	var raw json.RawMessage
+	if err := m.call(ctx, http.MethodPost, "/chat/messages", body, &raw); err != nil {
 		return "", err
 	}
 	return string(raw), nil

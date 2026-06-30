@@ -11,7 +11,8 @@ export type AppId =
   | "api-keys"
   | "music"
   | "tunnel"
-  | "profile";
+  | "profile"
+  | "chat";
 
 export type Side = "left" | "right";
 

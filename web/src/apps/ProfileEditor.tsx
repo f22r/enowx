@@ -20,8 +20,10 @@ export function ProfileEditor() {
   const [displayName, setDisplayName] = useState(u?.display_name ?? "");
   const [pronouns, setPronouns] = useState(u?.pronouns ?? "");
   const [bio, setBio] = useState(u?.bio ?? "");
-  const [primary, setPrimary] = useState(u?.primary_color || "#11131a");
-  const [accent, setAccent] = useState(u?.accent_color || "#6366f1");
+  // Default the swatches to a neutral grey so an untouched card stays grey;
+  // picking real colors themes the card body (Primary→Accent gradient).
+  const [primary, setPrimary] = useState(u?.primary_color || "#2b2d36");
+  const [accent, setAccent] = useState(u?.accent_color || "#2b2d36");
   const [links, setLinks] = useState<ProfileLink[]>(u?.links ?? []);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
@@ -142,24 +144,26 @@ export function ProfileEditor() {
                 </Field>
 
                 <Field label="Links" hint={`${links.length}/${MAX_LINKS}`}>
-                  <div className="space-y-1.5">
+                  <div className="space-y-2">
                     {links.map((l, i) => (
-                      <div key={i} className="flex items-center gap-1.5">
-                        <input
-                          value={l.label}
-                          onChange={(e) => setLink(i, { label: e.target.value })}
-                          placeholder="Label"
-                          className={`${inputCls} w-24`}
-                        />
+                      <div key={i} className="rounded-lg border border-white/10 bg-black/20 p-2">
+                        <div className="mb-1.5 flex items-center gap-1.5">
+                          <input
+                            value={l.label}
+                            onChange={(e) => setLink(i, { label: e.target.value })}
+                            placeholder="Label (e.g. GitHub)"
+                            className={`${inputCls} flex-1 border-white/5 bg-black/30`}
+                          />
+                          <button onClick={() => removeLink(i)} className="rounded p-1 text-white/40 hover:bg-white/10 hover:text-white">
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                         <input
                           value={l.url}
                           onChange={(e) => setLink(i, { url: e.target.value })}
                           placeholder="https://…"
-                          className={`${inputCls} min-w-0 flex-1`}
+                          className={`${inputCls} border-white/5 bg-black/30`}
                         />
-                        <button onClick={() => removeLink(i)} className="rounded p-1 text-white/40 hover:bg-white/10 hover:text-white">
-                          <X className="h-3.5 w-3.5" />
-                        </button>
                       </div>
                     ))}
                     {links.length < MAX_LINKS && (

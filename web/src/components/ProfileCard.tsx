@@ -6,6 +6,7 @@ import type { TopRole, ProfileLink } from "../lib/api";
 export interface CardProfile {
   username: string;
   avatar_url?: string;
+  banner_url?: string; // image/gif banner (role-gated perk; grey when unset)
   display_name?: string;
   bio?: string;
   accent_color?: string;
@@ -20,32 +21,40 @@ export interface CardProfile {
   created_at?: string;
 }
 
-// ProfileCard is the Discord-style profile card: accent banner, large avatar
+// ProfileCard is the Discord-style profile card: grey banner, large avatar
 // overlapping it, name + handle, badges row, and an About section (bio, links,
 // member-since). Used as the Profile-app hero and (later) as a popover.
 export function ProfileCard({ p, footer }: { p: CardProfile; footer?: React.ReactNode }) {
-  const accent = p.accent_color || "#6366f1";
   const initial = (p.display_name || p.username || "?").charAt(0).toUpperCase();
-  // primary_color (when set) themes the card surface, like Discord's profile theme.
-  const surface = p.primary_color || undefined;
+  // Like Discord: the card BODY is themed by a Primary→Accent gradient; the
+  // banner is a separate element that defaults to grey (image/gif banner is a
+  // future role-gated perk). When no theme is set, the body stays grey too.
+  const hasTheme = !!(p.primary_color || p.accent_color);
+  const primary = p.primary_color || p.accent_color || "#1a1c23";
+  const accent = p.accent_color || p.primary_color || "#1a1c23";
+  // Discord themes the body with a top-to-bottom Primary→Accent gradient. Even
+  // 50:50 spread so neither color dominates.
+  const body = hasTheme
+    ? `linear-gradient(to bottom, ${primary} 0%, ${accent} 100%)`
+    : "rgba(255,255,255,0.03)";
+  // The avatar outline follows the primary color (falls back to dark when grey).
+  const ring = p.primary_color || "#0b0c10";
 
   return (
-    <div
-      className="overflow-hidden rounded-2xl border border-white/10"
-      style={{ background: surface ?? "rgba(255,255,255,0.03)" }}
-    >
-      {/* Banner — accent gradient (image banner is a future role-gated perk). */}
-      <div
-        className="h-20 w-full"
-        style={{ background: `linear-gradient(135deg, ${accent}, ${accent}55)` }}
-      />
+    <div className="overflow-hidden rounded-2xl border border-white/10">
+      {/* Banner — wide, grey by default; holds an image/gif when set (the latter
+          is a future role-gated perk). Tall enough for a real banner ratio. */}
+      <div className="h-40 w-full bg-white/[0.06]">
+        {p.banner_url && <img src={p.banner_url} alt="" className="h-full w-full object-cover" />}
+      </div>
 
-      <div className="px-4 pb-4">
-        {/* Avatar overlapping the banner. */}
-        <div className="-mt-9 mb-2 flex items-end justify-between">
+      <div className="px-4 pb-4" style={{ background: body }}>
+        {/* Only the avatar overlaps the banner (pulled up like Discord); the
+            rest of the row (Kleos badge) stays in normal flow. */}
+        <div className="mb-2 flex items-start justify-between pt-2">
           <div
-            className="flex h-[72px] w-[72px] items-center justify-center rounded-full ring-4"
-            style={{ ["--tw-ring-color" as string]: "#0b0c10" }}
+            className="-ml-1 -mt-14 flex h-[72px] w-[72px] items-center justify-center rounded-full ring-[6px]"
+            style={{ ["--tw-ring-color" as string]: ring }}
           >
             {p.avatar_url ? (
               <img src={p.avatar_url} alt="" className="h-full w-full rounded-full" />
