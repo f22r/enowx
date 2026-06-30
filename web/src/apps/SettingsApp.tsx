@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { Lock, LogOut, Loader2, Check } from "lucide-react";
+import { Lock, LogOut, Loader2, Check, RefreshCw, Cloud } from "lucide-react";
 import { AppShell } from "./shell";
 import { Tooltip } from "../components/Tooltip";
 import { useDialog } from "../os/dialog";
-import { authApi, settingsApi, type AuthStatus, type Settings } from "../lib/api";
+import { authApi, settingsApi, syncApi, type AuthStatus, type Settings } from "../lib/api";
+import { useProfile } from "../os/useProfile";
 
 export function SettingsApp() {
   const [info, setInfo] = useState<Settings | null>(null);
@@ -24,6 +25,10 @@ export function SettingsApp() {
 
   return (
     <AppShell title="Settings" subtitle="Gateway info & dashboard security">
+      <Section title="Cloud sync">
+        <CloudSyncCard />
+      </Section>
+
       <Section title="Dashboard password">
         <PasswordCard auth={auth} reload={loadAuth} />
       </Section>
@@ -36,6 +41,107 @@ export function SettingsApp() {
         </div>
       </Section>
     </AppShell>
+  );
+}
+
+// CloudSyncCard configures how cloud sync behaves: the global automatic-sync
+// toggle, status, and a manual "Sync now". Identity (login / sign out / role)
+// lives in the Profile app. Login-gated — it points to Profile when signed out.
+// The dashboard password and session are never synced; only safe data
+// (playlists, settings) flows to the cloud.
+function CloudSyncCard() {
+  const profile = useProfile();
+  const [busy, setBusy] = useState("");
+  const [synced, setSynced] = useState("");
+  const [error, setError] = useState("");
+
+  if (profile.loading) return <div className="h-10 animate-pulse rounded-lg bg-white/5" />;
+
+  if (!profile.loggedIn) {
+    return (
+      <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3.5 text-[11px] leading-relaxed text-white/55">
+        Sign in with Discord in the <span className="text-white/80">Profile</span> app to sync your playlists across
+        devices.
+      </div>
+    );
+  }
+
+  async function toggleAuto() {
+    setError("");
+    setBusy("toggle");
+    try {
+      await profile.setAutoSync(!profile.autoSync);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "couldn't update");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function syncNow() {
+    setError("");
+    setSynced("");
+    setBusy("sync");
+    try {
+      const r = await syncApi.now();
+      setSynced(`Synced · ${r.pushed} up, ${r.pulled} down`);
+      setTimeout(() => setSynced(""), 4000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "sync failed");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3.5">
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5 text-xs font-medium text-white">
+            <Cloud className="h-3.5 w-3.5 text-white/50" /> Automatic sync
+          </div>
+          <p className="mt-0.5 text-[11px] leading-relaxed text-white/45">
+            Push changes automatically and pull updates from your other devices.
+          </p>
+        </div>
+        <Tooltip label={profile.autoSync ? "Turn off automatic sync" : "Turn on automatic sync"} place="bottom">
+          <button
+            onClick={toggleAuto}
+            disabled={!!busy}
+            role="switch"
+            aria-checked={profile.autoSync}
+            className={`relative h-5 w-9 shrink-0 rounded-full transition-colors disabled:opacity-50 ${
+              profile.autoSync ? "bg-emerald-500/80" : "bg-white/15"
+            }`}
+          >
+            <span
+              className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white transition-transform ${
+                profile.autoSync ? "translate-x-4" : "translate-x-0"
+              }`}
+            />
+          </button>
+        </Tooltip>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <Tooltip label="Reconcile with the cloud now" place="bottom">
+          <button
+            onClick={syncNow}
+            disabled={!!busy}
+            className="flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-medium text-white hover:bg-white/15 disabled:opacity-50"
+          >
+            {busy === "sync" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+            Sync now
+          </button>
+        </Tooltip>
+        {synced && (
+          <span className="flex items-center gap-1 text-[11px] text-emerald-300">
+            <Check className="h-3 w-3" /> {synced}
+          </span>
+        )}
+        {error && <span className="text-[11px] text-red-300">{error}</span>}
+      </div>
+    </div>
   );
 }
 

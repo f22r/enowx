@@ -121,6 +121,7 @@ func New(addr string, d Deps) *Server {
 		r.Get("/sync/login/poll", syncH.LoginPoll)
 		r.Post("/sync/logout", syncH.Logout)
 		r.Post("/sync/now", syncH.Now)
+		r.Post("/sync/auto", syncH.SetAuto)
 
 		r.Get("/tunnel/status", tun.Status)
 		r.Post("/tunnel/enable", tun.Enable)

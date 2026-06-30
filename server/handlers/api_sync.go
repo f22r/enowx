@@ -22,9 +22,26 @@ func (h *Sync) Status(w http.ResponseWriter, r *http.Request) {
 	writeData(w, map[string]any{
 		"configured": h.mgr.Configured(ctx),
 		"enabled":    h.mgr.Enabled(ctx),
+		"auto":       h.mgr.AutoEnabled(ctx),
 		"server_url": h.mgr.ServerURL(ctx),
 		"user":       user,
 	})
+}
+
+// SetAuto flips the global automatic-sync toggle.
+func (h *Sync) SetAuto(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		On bool `json:"on"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeAPIErr(w, http.StatusBadRequest, "invalid body")
+		return
+	}
+	if err := h.mgr.SetAuto(r.Context(), body.On); err != nil {
+		writeAPIErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeData(w, map[string]any{"auto": h.mgr.AutoEnabled(r.Context())})
 }
 
 // LoginStart returns the Discord authorize URL + state to poll.

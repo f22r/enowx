@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/enowdev/enowx/core/syncbus"
 	"github.com/enowdev/enowx/store"
 )
 
@@ -95,6 +96,7 @@ func (s *musicStore) touch(ctx context.Context, playlistID int64) {
 	_, _ = s.db.ExecContext(ctx,
 		`UPDATE playlists SET sync_updated_at = ?, sync_version = sync_version + 1 WHERE id = ?`,
 		time.Now().UnixMilli(), playlistID)
+	syncbus.Dirty("playlist")
 }
 
 func (s *musicStore) CreatePlaylist(ctx context.Context, name, description, shareCode string) (int64, error) {
@@ -104,6 +106,7 @@ func (s *musicStore) CreatePlaylist(ctx context.Context, name, description, shar
 	if err != nil {
 		return 0, err
 	}
+	syncbus.Dirty("playlist")
 	return res.LastInsertId()
 }
 
@@ -124,7 +127,11 @@ func (s *musicStore) DeletePlaylist(ctx context.Context, id int64) error {
 		time.Now().UnixMilli(), id); err != nil {
 		return err
 	}
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	syncbus.Dirty("playlist")
+	return nil
 }
 
 func (s *musicStore) AddTrack(ctx context.Context, playlistID int64, t store.MusicTrack) error {
