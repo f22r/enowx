@@ -54,6 +54,7 @@ function ChatRoom() {
   }, [messages.length]);
 
   const myUsername = profile.user?.username;
+  const canModerate = profile.has("chat.moderate");
 
   function startReply(m: ChatMessage) {
     setReply({ id: m.id, author: m.display_name || m.username, content: m.content });
@@ -95,6 +96,7 @@ function ChatRoom() {
               key={m.id}
               m={m}
               mine={!!myUsername && m.username === myUsername}
+              canModerate={canModerate}
               onOpenUser={() => setOpenUser(m.user_id)}
               open={openUser === m.user_id}
               onClose={() => setOpenUser(null)}
@@ -140,6 +142,7 @@ function ChatRoom() {
 function MessageRow({
   m,
   mine,
+  canModerate,
   onOpenUser,
   open,
   onClose,
@@ -147,6 +150,7 @@ function MessageRow({
 }: {
   m: ChatMessage;
   mine: boolean;
+  canModerate: boolean;
   onOpenUser: () => void;
   open: boolean;
   onClose: () => void;
@@ -213,10 +217,10 @@ function MessageRow({
         <ActBtn label="Reply" onClick={onReply}><Reply className="h-3.5 w-3.5" /></ActBtn>
         <ActBtn label="Copy" onClick={() => navigator.clipboard?.writeText(m.content)}><Copy className="h-3.5 w-3.5" /></ActBtn>
         {mine && (
-          <>
-            <ActBtn label="Edit" onClick={() => { setEditText(m.content); setEditing(true); }}><Pencil className="h-3.5 w-3.5" /></ActBtn>
-            <ActBtn label="Delete" onClick={doDelete} danger><Trash2 className="h-3.5 w-3.5" /></ActBtn>
-          </>
+          <ActBtn label="Edit" onClick={() => { setEditText(m.content); setEditing(true); }}><Pencil className="h-3.5 w-3.5" /></ActBtn>
+        )}
+        {(mine || canModerate) && (
+          <ActBtn label={mine ? "Delete" : "Delete (mod)"} onClick={doDelete} danger><Trash2 className="h-3.5 w-3.5" /></ActBtn>
         )}
       </div>
 

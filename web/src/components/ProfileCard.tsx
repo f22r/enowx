@@ -18,6 +18,7 @@ export interface CardProfile {
   wears_tag?: boolean;
   guild_tag?: string;
   kleos?: number;
+  is_moderator?: boolean;
   created_at?: string;
 }
 
@@ -88,6 +89,7 @@ export function ProfileCard({ p, footer, compact }: { p: CardProfile; footer?: R
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
           {p.top_role?.name ? <RoleBadge role={p.top_role} /> : p.plan && <PlanBadge plan={p.plan} />}
           {p.wears_tag && <TagBadge tag={p.guild_tag} />}
+          {p.is_moderator && <ModBadge />}
         </div>
 
         {/* About: bio + links + member since. */}
@@ -151,6 +153,14 @@ function PlanBadge({ plan }: { plan: string }) {
   return (
     <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-emerald-300">
       {plan}
+    </span>
+  );
+}
+
+function ModBadge() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-300 ring-1 ring-inset ring-sky-400/20">
+      <ShieldCheck className="h-3 w-3" /> Mod
     </span>
   );
 }

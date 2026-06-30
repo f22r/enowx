@@ -292,6 +292,7 @@ export interface SyncUser {
   wears_tag?: boolean;
   guild_tag?: string;
   kleos?: number;
+  is_moderator?: boolean;
   entitlements?: string[];
   display_name?: string;
   bio?: string;
@@ -370,6 +371,7 @@ export interface PublicProfile {
   accent_color: string;
   primary_color: string;
   pronouns: string;
+  is_moderator?: boolean;
   links: ProfileLink[];
   created_at: string;
 }
