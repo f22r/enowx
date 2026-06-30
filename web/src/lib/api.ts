@@ -390,7 +390,32 @@ export interface Post {
   upvotes: number;
   upvoted: boolean;
   reactions?: Reaction[];
+  comment_count?: number;
 }
+
+export interface Comment {
+  id: number;
+  post_id: number;
+  user_id: string;
+  body: string;
+  created_at: string;
+  edited_at?: string | null;
+  username: string;
+  display_name?: string;
+  avatar_url?: string;
+  top_role?: TopRole | null;
+  wears_tag?: boolean;
+  guild_tag?: string;
+  reactions?: Reaction[];
+}
+
+export const commentsApi = {
+  list: (postId: number) => api.get<{ comments: Comment[] }>(`/api/posts/${postId}/comments`),
+  add: (postId: number, body: string) => api.post<Comment>(`/api/posts/${postId}/comments`, { body }),
+  edit: (id: number, body: string) => api.patch<{ id: number }>(`/api/comments/${id}`, { body }),
+  remove: (id: number) => api.del<{ deleted: number }>(`/api/comments/${id}`),
+  react: (id: number, emoji: string) => api.post<{ id: number; reactions: Reaction[] }>(`/api/comments/${id}/reactions`, { emoji }),
+};
 
 export const postsApi = {
   list: (opts?: { sort?: string; category?: string; before?: number; offset?: number }) => {

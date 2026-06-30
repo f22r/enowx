@@ -263,6 +263,33 @@ func (m *Manager) PostAction(ctx context.Context, method, id, suffix string, bod
 	return string(raw), nil
 }
 
+// PostComments fetches a post's comments.
+func (m *Manager) PostComments(ctx context.Context, postID string) (string, error) {
+	var raw json.RawMessage
+	if err := m.call(ctx, http.MethodGet, "/posts/"+postID+"/comments", nil, &raw); err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
+
+// CommentAdd posts a comment on a post.
+func (m *Manager) CommentAdd(ctx context.Context, postID string, body json.RawMessage) (string, error) {
+	var raw json.RawMessage
+	if err := m.call(ctx, http.MethodPost, "/posts/"+postID+"/comments", body, &raw); err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
+
+// CommentAction proxies an action on a comment by id (edit/delete/react).
+func (m *Manager) CommentAction(ctx context.Context, method, id, suffix string, body json.RawMessage) (string, error) {
+	var raw json.RawMessage
+	if err := m.call(ctx, method, "/comments/"+id+suffix, body, &raw); err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
+
 // AdminFlags fetches the moderator duplicate-account review queue.
 func (m *Manager) AdminFlags(ctx context.Context) (string, error) {
 	var raw json.RawMessage

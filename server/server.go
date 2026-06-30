@@ -130,6 +130,11 @@ func New(addr string, d Deps) *Server {
 		r.Delete("/posts/{id}", syncH.PostDelete)
 		r.Post("/posts/{id}/upvote", syncH.PostUpvote)
 		r.Post("/posts/{id}/reactions", syncH.PostReact)
+		r.Get("/posts/{id}/comments", syncH.PostComments)
+		r.Post("/posts/{id}/comments", syncH.CommentAdd)
+		r.Patch("/comments/{id}", syncH.CommentEdit)
+		r.Delete("/comments/{id}", syncH.CommentDelete)
+		r.Post("/comments/{id}/reactions", syncH.CommentReact)
 
 		r.Get("/shop", syncH.Shop)
 		r.Post("/shop/buy", syncH.ShopBuy)

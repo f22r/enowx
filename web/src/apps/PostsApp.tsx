@@ -7,7 +7,7 @@ import { EmojiPicker } from "../components/EmojiPicker";
 import { useProfile } from "../os/useProfile";
 import { useDialog } from "../os/dialog";
 import { useFeed, loadFeed, createPost, upvotePost, reactPost, editPost, deletePost } from "../os/postsBus";
-import { profileApi, type Post, type PublicProfile } from "../lib/api";
+import { profileApi, commentsApi, type Post, type PublicProfile, type Comment } from "../lib/api";
 
 export function PostsApp() {
   const profile = useProfile();
@@ -124,6 +124,7 @@ function PostCard({ p, myUsername }: { p: Post; myUsername?: string }) {
   const canMod = profile.has("chat.moderate");
   const [openUser, setOpenUser] = useState(false);
   const [picker, setPicker] = useState(false);
+  const [showComments, setShowComments] = useState(false);
   const name = p.display_name || p.username;
 
   async function doDelete() {
@@ -192,15 +193,125 @@ function PostCard({ p, myUsername }: { p: Post; myUsername?: string }) {
               </Popover>
             )}
           </div>
-          <span className="ml-1 flex items-center gap-1 text-[11px] text-white/30">
-            <MessageSquare className="h-3 w-3" /> comments soon
-          </span>
+          <button onClick={() => setShowComments((v) => !v)} className="ml-1 flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] text-white/40 hover:bg-white/10 hover:text-white/70">
+            <MessageSquare className="h-3 w-3" /> {p.comment_count ?? 0}
+          </button>
           <div className="ml-auto flex items-center gap-1">
             {mine && <button onClick={doEdit} className="rounded p-1 text-white/40 hover:bg-white/10 hover:text-white"><Pencil className="h-3.5 w-3.5" /></button>}
             {(mine || canMod) && <button onClick={doDelete} className="rounded p-1 text-red-400/70 hover:bg-red-500/15 hover:text-red-300"><Trash2 className="h-3.5 w-3.5" /></button>}
           </div>
         </div>
+
+        {showComments && <CommentThread postId={p.id} myUsername={myUsername} canMod={canMod} />}
       </div>
+    </div>
+  );
+}
+
+function CommentThread({ postId, myUsername, canMod }: { postId: number; myUsername?: string; canMod: boolean }) {
+  const [comments, setComments] = useState<Comment[] | null>(null);
+  const [draft, setDraft] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function load() {
+    try {
+      const r = await commentsApi.list(postId);
+      setComments(r.comments ?? []);
+    } catch {
+      setComments([]);
+    }
+  }
+  useEffect(() => { load(); }, [postId]);
+
+  async function send() {
+    if (!draft.trim() || busy) return;
+    setBusy(true);
+    try {
+      const c = await commentsApi.add(postId, draft.trim());
+      setComments((cs) => [...(cs ?? []), c]);
+      setDraft("");
+    } catch {
+      /* ignore */
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function remove(id: number) {
+    await commentsApi.remove(id).catch(() => {});
+    setComments((cs) => (cs ? cs.filter((c) => c.id !== id) : cs));
+  }
+  async function react(id: number, emoji: string) {
+    const r = await commentsApi.react(id, emoji).catch(() => null);
+    if (r) setComments((cs) => (cs ? cs.map((c) => (c.id === id ? { ...c, reactions: r.reactions } : c)) : cs));
+  }
+
+  return (
+    <div className="mt-3 space-y-2 border-t border-white/5 pt-3">
+      {comments === null ? (
+        <div className="flex justify-center py-2"><Loader2 className="h-4 w-4 animate-spin text-white/30" /></div>
+      ) : comments.length === 0 ? (
+        <p className="text-[11px] text-white/35">No comments yet.</p>
+      ) : (
+        comments.map((c) => {
+          const cmine = !!myUsername && c.username === myUsername;
+          return (
+            <div key={c.id} className="group/c flex gap-2">
+              {c.avatar_url ? (
+                <img src={c.avatar_url} alt="" className="h-6 w-6 shrink-0 rounded-full" />
+              ) : (
+                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/10 text-[10px] font-bold text-white">{(c.display_name || c.username).charAt(0).toUpperCase()}</div>
+              )}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-[11px] font-semibold text-white">{c.display_name || c.username}</span>
+                  <span className="text-[10px] text-white/30">{new Date(c.created_at).toLocaleDateString()}{c.edited_at ? " · edited" : ""}</span>
+                  <div className="ml-auto flex items-center gap-0.5 opacity-0 group-hover/c:opacity-100">
+                    <CommentReact onPick={(e) => react(c.id, e)} />
+                    {(cmine || canMod) && <button onClick={() => remove(c.id)} className="rounded p-0.5 text-red-400/60 hover:bg-red-500/15 hover:text-red-300"><Trash2 className="h-3 w-3" /></button>}
+                  </div>
+                </div>
+                <p className="whitespace-pre-wrap break-words text-xs text-white/75">{c.body}</p>
+                {c.reactions && c.reactions.length > 0 && (
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {c.reactions.map((rx) => (
+                      <button key={rx.emoji} onClick={() => react(c.id, rx.emoji)} className={`flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] ${rx.me ? "border-indigo-400/40 bg-indigo-500/20 text-white" : "border-white/10 bg-white/5 text-white/70 hover:bg-white/10"}`}>
+                        <span>{rx.emoji}</span><span className="tabular-nums">{rx.count}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })
+      )}
+      <div className="flex items-center gap-2 pt-1">
+        <input
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), send())}
+          placeholder="Add a comment…"
+          maxLength={2000}
+          className="min-w-0 flex-1 rounded-lg border border-white/10 bg-black/20 px-2.5 py-1.5 text-xs text-white outline-none focus:border-white/25"
+        />
+        <button onClick={send} disabled={busy || !draft.trim()} className="rounded-lg bg-indigo-500/90 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-50">
+          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Send"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function CommentReact({ onPick }: { onPick: (emoji: string) => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative">
+      <button onClick={() => setOpen((v) => !v)} className="rounded p-0.5 text-white/40 hover:bg-white/10 hover:text-white"><SmilePlus className="h-3 w-3" /></button>
+      {open && (
+        <Popover onClose={() => setOpen(false)} anchor="right" className="w-max">
+          <EmojiPicker onPick={(e) => { setOpen(false); onPick(e); }} />
+        </Popover>
+      )}
     </div>
   );
 }

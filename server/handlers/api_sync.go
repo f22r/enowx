@@ -170,6 +170,39 @@ func proxyJSON(w http.ResponseWriter, raw string, err error) {
 	writeData(w, out)
 }
 
+// PostComments proxies a post's comment list.
+func (h *Sync) PostComments(w http.ResponseWriter, r *http.Request) {
+	out, err := h.mgr.PostComments(r.Context(), chi.URLParam(r, "id"))
+	proxyJSON(w, out, err)
+}
+
+// CommentAdd proxies adding a comment.
+func (h *Sync) CommentAdd(w http.ResponseWriter, r *http.Request) {
+	body, _ := io.ReadAll(io.LimitReader(r.Body, 8192))
+	out, err := h.mgr.CommentAdd(r.Context(), chi.URLParam(r, "id"), body)
+	proxyJSON(w, out, err)
+}
+
+// CommentEdit proxies editing a comment.
+func (h *Sync) CommentEdit(w http.ResponseWriter, r *http.Request) {
+	body, _ := io.ReadAll(io.LimitReader(r.Body, 8192))
+	out, err := h.mgr.CommentAction(r.Context(), http.MethodPatch, chi.URLParam(r, "id"), "", body)
+	proxyJSON(w, out, err)
+}
+
+// CommentDelete proxies deleting a comment.
+func (h *Sync) CommentDelete(w http.ResponseWriter, r *http.Request) {
+	out, err := h.mgr.CommentAction(r.Context(), http.MethodDelete, chi.URLParam(r, "id"), "", nil)
+	proxyJSON(w, out, err)
+}
+
+// CommentReact proxies toggling a comment reaction.
+func (h *Sync) CommentReact(w http.ResponseWriter, r *http.Request) {
+	body, _ := io.ReadAll(io.LimitReader(r.Body, 1024))
+	out, err := h.mgr.CommentAction(r.Context(), http.MethodPost, chi.URLParam(r, "id"), "/reactions", body)
+	proxyJSON(w, out, err)
+}
+
 // AdminFlags proxies the moderator duplicate-account review queue.
 func (h *Sync) AdminFlags(w http.ResponseWriter, r *http.Request) {
 	raw, err := h.mgr.AdminFlags(r.Context())
