@@ -468,7 +468,7 @@ const ReasoningBlock = memo(function ReasoningBlock({ content }: { content: stri
         {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
         <Brain className="h-3.5 w-3.5" /> Thinking
       </button>
-      {open && <div className="whitespace-pre-wrap px-3 pb-2 text-[11px] italic leading-relaxed text-white/40">{content}</div>}
+      {open && <div className="px-3 pb-2 text-[12px] text-white/45 [&_.ai-md]:text-white/45"><AiMarkdown text={content} /></div>}
     </div>
   );
 });
