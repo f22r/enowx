@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2, ChevronUp, Plus, SmilePlus, Pencil, Trash2, MessageSquare, Reply } from "lucide-react";
+import { Loader2, ChevronUp, Plus, SmilePlus, Pencil, Trash2, MessageSquare, Reply, Search, User } from "lucide-react";
 import { AppShell } from "./shell";
 import { Popover } from "../components/Popover";
 import { ProfileCard } from "../components/ProfileCard";
@@ -8,7 +8,7 @@ import { useProfile } from "../os/useProfile";
 import { useDialog } from "../os/dialog";
 import { useFeed, loadFeed, createPost, upvotePost, reactPost, editPost, deletePost } from "../os/postsBus";
 import { openProfile } from "../os/profileViewer";
-import { profileApi, commentsApi, type Post, type PublicProfile, type Comment } from "../lib/api";
+import { profileApi, commentsApi, searchApi, type Post, type PublicProfile, type Comment, type SearchPostHit, type SearchUserHit } from "../lib/api";
 
 export function PostsApp() {
   const profile = useProfile();
@@ -30,9 +30,49 @@ function Feed() {
   const { posts, categories, sort, category, loading } = useFeed();
   const myUsername = useProfile().user?.username;
   const [composing, setComposing] = useState(false);
+  const [q, setQ] = useState("");
+  const [results, setResults] = useState<{ posts: SearchPostHit[]; users: SearchUserHit[] } | null>(null);
+  const [searching, setSearching] = useState(false);
+
+  // Debounced search; clears to show the feed when the box is empty.
+  useEffect(() => {
+    const term = q.trim();
+    if (term.length < 2) {
+      setResults(null);
+      return;
+    }
+    setSearching(true);
+    const t = setTimeout(async () => {
+      try {
+        setResults(await searchApi.query(term));
+      } catch {
+        /* ignore */
+      } finally {
+        setSearching(false);
+      }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [q]);
 
   return (
     <div className="space-y-3">
+      {/* Search */}
+      <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/20 px-3">
+        <Search className="h-4 w-4 text-white/30" />
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Search posts and people…"
+          className="w-full bg-transparent py-2 text-sm text-white outline-none placeholder:text-white/30"
+        />
+        {searching && <Loader2 className="h-4 w-4 animate-spin text-white/30" />}
+        {q && <button onClick={() => setQ("")} className="text-white/40 hover:text-white">✕</button>}
+      </div>
+
+      {results ? (
+        <SearchResults results={results} searching={searching} />
+      ) : (
+      <>
       {/* Controls */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex rounded-lg border border-white/10 p-0.5">
@@ -72,6 +112,60 @@ function Feed() {
         <div className="py-10 text-center text-sm text-white/40">No posts yet — be the first.</div>
       ) : (
         posts.map((p) => <PostCard key={p.id} p={p} myUsername={myUsername} />)
+      )}
+      </>
+      )}
+    </div>
+  );
+}
+
+function SearchResults({ results, searching }: { results: { posts: SearchPostHit[]; users: SearchUserHit[] }; searching: boolean }) {
+  const { posts, users } = results;
+  if (searching && posts.length === 0 && users.length === 0) {
+    return <div className="flex h-24 items-center justify-center"><Loader2 className="h-4 w-4 animate-spin text-white/30" /></div>;
+  }
+  if (posts.length === 0 && users.length === 0) {
+    return <p className="py-8 text-center text-sm text-white/40">No results.</p>;
+  }
+  return (
+    <div className="space-y-5">
+      {users.length > 0 && (
+        <section>
+          <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-white/40">People</h2>
+          <div className="space-y-1.5">
+            {users.map((u) => (
+              <button key={u.id} onClick={() => openProfile(u.id)} className="flex w-full items-center gap-2.5 rounded-lg border border-white/10 bg-white/[0.02] p-2 text-left hover:bg-white/5">
+                {u.avatar_url ? (
+                  <img src={u.avatar_url} alt="" className="h-8 w-8 rounded-full" />
+                ) : (
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10"><User className="h-4 w-4 text-white/50" /></div>
+                )}
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-medium text-white">{u.display_name || u.username}</div>
+                  {u.display_name && <div className="truncate text-[11px] text-white/40">@{u.username}</div>}
+                </div>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+      {posts.length > 0 && (
+        <section>
+          <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-white/40">Posts</h2>
+          <div className="space-y-1.5">
+            {posts.map((p) => (
+              <div key={p.id} className="rounded-lg border border-white/10 bg-white/[0.02] p-2.5">
+                <div className="mb-0.5 flex items-center gap-2 text-[10px] text-white/40">
+                  <span className="rounded-full bg-white/10 px-1.5 py-0.5 uppercase tracking-wide">{p.category}</span>
+                  <span>by {p.username}</span>
+                  <span className="flex items-center gap-0.5"><ChevronUp className="h-3 w-3" />{p.upvotes}</span>
+                </div>
+                <div className="text-sm font-semibold text-white">{p.title}</div>
+                {p.body && <p className="mt-0.5 line-clamp-2 text-xs text-white/55">{p.body}</p>}
+              </div>
+            ))}
+          </div>
+        </section>
       )}
     </div>
   );

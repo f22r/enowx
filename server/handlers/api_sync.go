@@ -209,6 +209,16 @@ func (h *Sync) CommentReact(w http.ResponseWriter, r *http.Request) {
 	proxyJSON(w, out, err)
 }
 
+// Search proxies the community search.
+func (h *Sync) Search(w http.ResponseWriter, r *http.Request) {
+	q := ""
+	if raw := r.URL.RawQuery; raw != "" {
+		q = "?" + raw
+	}
+	out, err := h.mgr.Search(r.Context(), q)
+	proxyJSON(w, out, err)
+}
+
 // Notifications proxies the user's notifications.
 func (h *Sync) Notifications(w http.ResponseWriter, r *http.Request) {
 	out, err := h.mgr.Notifications(r.Context())

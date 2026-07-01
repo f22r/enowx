@@ -500,6 +500,27 @@ export const notifApi = {
   markRead: () => api.post<{ ok: boolean }>("/api/notifications/read"),
 };
 
+export interface SearchPostHit {
+  id: number;
+  category: string;
+  title: string;
+  body: string;
+  username: string;
+  upvotes: number;
+  created_at: string;
+}
+export interface SearchUserHit {
+  id: string;
+  username: string;
+  display_name: string;
+  avatar_url: string;
+  top_role_id: string;
+}
+
+export const searchApi = {
+  query: (q: string) => api.get<{ posts: SearchPostHit[]; users: SearchUserHit[] }>(`/api/search?q=${encodeURIComponent(q)}`),
+};
+
 // PublicProfile is what other members can see (social data only — no secrets).
 export interface PublicProfile {
   id: string;

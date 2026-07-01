@@ -300,6 +300,15 @@ func (m *Manager) CommentAction(ctx context.Context, method, id, suffix string, 
 	return string(raw), nil
 }
 
+// Search runs a text search over posts + users (query appended).
+func (m *Manager) Search(ctx context.Context, query string) (string, error) {
+	var raw json.RawMessage
+	if err := m.call(ctx, http.MethodGet, "/search"+query, nil, &raw); err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
+
 // Notifications fetches the user's notifications + unread count.
 func (m *Manager) Notifications(ctx context.Context) (string, error) {
 	var raw json.RawMessage
