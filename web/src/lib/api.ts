@@ -65,10 +65,21 @@ export interface ProviderModel {
   owned_by?: string;
   enabled?: boolean;
   sort_order?: number;
-  aliases?: string[];
   max_input?: number;
   max_output?: number;
 }
+
+// ModelAlias is a per-user local alias (call `alias` -> routes to `target`).
+export interface ModelAlias {
+  alias: string;
+  target: string;
+}
+
+export const aliasesApi = {
+  list: () => api.get<{ aliases: ModelAlias[] }>("/api/model-aliases"),
+  set: (alias: string, target: string) => api.post<ModelAlias>("/api/model-aliases", { alias, target }),
+  remove: (alias: string) => api.del<{ deleted: string }>(`/api/model-aliases/${encodeURIComponent(alias)}`),
+};
 
 export const accountsApi = {
   list: (provider?: string) =>

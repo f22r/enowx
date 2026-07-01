@@ -33,6 +33,7 @@ type Deps struct {
 	Warmups    store.WarmupStore
 	Music      store.MusicStore
 	SettingsKV store.SettingsStore
+	Aliases    store.AliasStore
 	Tunnel     *tunnel.Manager
 	Sync       *syncpkg.Manager
 	Doer       transport.Doer
@@ -43,8 +44,8 @@ func New(addr string, d Deps) *Server {
 	r := chi.NewRouter()
 	v1 := handlers.NewV1(d.Proxy, d.Route, d.Logs, d.Keys)
 	anthropic := handlers.NewAnthropic(d.Proxy, d.Route, d.Logs, d.Keys)
-	if d.Sync != nil {
-		resolver := proxy.NewAliasResolver(d.Sync, 5*time.Minute)
+	if d.Aliases != nil {
+		resolver := proxy.NewAliasResolver(d.Aliases.Map, 30*time.Second)
 		v1.SetAliasResolver(resolver)
 		anthropic.SetAliasResolver(resolver)
 	}
@@ -59,6 +60,7 @@ func New(addr string, d Deps) *Server {
 	local := handlers.NewLocal(d.Accounts)
 	usage := handlers.NewUsage(d.Registry, d.Accounts)
 	models := handlers.NewModels(d.Registry, d.Accounts, d.Sync)
+	aliases := handlers.NewAliases(d.Aliases)
 	warmup := handlers.NewWarmup(d.Proxy, d.Registry, d.Accounts, d.Warmups, d.Logs)
 	dash := middleware.NewDashboard(d.SettingsKV)
 	term := handlers.NewTerminal(dash)
@@ -88,6 +90,9 @@ func New(addr string, d Deps) *Server {
 		r.Patch("/accounts/{id}/disabled", accounts.SetDisabled)
 		r.Get("/accounts/{id}/usage", usage.Get)
 		r.Get("/accounts/{id}/models", models.Get)
+		r.Get("/model-aliases", aliases.List)
+		r.Post("/model-aliases", aliases.Set)
+		r.Delete("/model-aliases/{alias}", aliases.Delete)
 		r.Post("/accounts/{id}/warmup", warmup.Run)
 		r.Get("/warmup-logs", warmup.List)
 		r.Delete("/warmup-logs", warmup.Clear)

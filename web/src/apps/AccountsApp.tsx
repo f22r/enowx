@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { Search, Trash2, Power, PowerOff, RefreshCw, Zap, Boxes, X, Copy, Check } from "lucide-react";
+import { Search, Trash2, Power, PowerOff, RefreshCw, Zap, Boxes, X, Copy, Check, Plus } from "lucide-react";
 import { AppShell } from "./shell";
 import { ProviderIcon } from "../components/ProviderIcon";
 import { Tooltip } from "../components/Tooltip";
-import { accountsApi, providersApi, type Account, type Provider, type Usage, type ProviderModel } from "../lib/api";
+import { accountsApi, providersApi, aliasesApi, type Account, type Provider, type Usage, type ProviderModel, type ModelAlias } from "../lib/api";
 import { useDialog } from "../os/dialog";
 import { startWarmup, finishWarmup } from "../os/warmupBus";
 
@@ -233,15 +233,31 @@ export function AccountsApp() {
 // AccountModelsPanel is a centered modal listing the models an account can
 // access (fetched live for fetchable providers, or the cloud catalog otherwise).
 function AccountModelsPanel({ account, onClose }: { account: Account; onClose: () => void }) {
+  const dialog = useDialog();
   const [data, setData] = useState<{ source: string; models: ProviderModel[] } | null>(null);
   const [err, setErr] = useState("");
   const [q, setQ] = useState("");
+  const [aliases, setAliases] = useState<ModelAlias[]>([]);
   useEffect(() => {
     accountsApi
       .models(account.id)
       .then((r) => setData({ source: r.source, models: r.models ?? [] }))
       .catch((e) => setErr(e instanceof Error ? e.message : "failed to load models"));
   }, [account.id]);
+  const loadAliases = () => aliasesApi.list().then((r) => setAliases(r.aliases ?? [])).catch(() => setAliases([]));
+  useEffect(() => { loadAliases(); }, []);
+
+  async function addAlias(modelId: string) {
+    const alias = await dialog.prompt({ title: "Add alias", message: `Call ${modelId} by a custom name`, placeholder: "e.g. gpro" });
+    if (!alias || !alias.trim()) return;
+    await aliasesApi.set(alias.trim(), modelId).catch(() => {});
+    loadAliases();
+  }
+  async function removeAlias(alias: string) {
+    await aliasesApi.remove(alias).catch(() => {});
+    loadAliases();
+  }
+  const aliasesFor = (modelId: string) => aliases.filter((a) => a.target === modelId);
   const shown = (data?.models ?? []).filter(
     (m) => !q || m.name.toLowerCase().includes(q.toLowerCase()) || m.model_id.toLowerCase().includes(q.toLowerCase()),
   );
@@ -268,15 +284,16 @@ function AccountModelsPanel({ account, onClose }: { account: Account; onClose: (
           {err && <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">{err}</div>}
           {!data && !err && <div className="h-16 animate-pulse rounded-lg bg-white/5" />}
           {data && shown.length === 0 && <div className="text-[11px] text-white/40">No models found.</div>}
-          {shown.map((m) => <ModelRow key={m.model_id} m={m} />)}
+          {shown.map((m) => <ModelRow key={m.model_id} m={m} aliases={aliasesFor(m.model_id)} onAddAlias={() => addAlias(m.model_id)} onRemoveAlias={removeAlias} />)}
         </div>
       </div>
     </div>
   );
 }
 
-// ModelRow renders one model with context sizes + a copy-id button.
-function ModelRow({ m }: { m: ProviderModel }) {
+// ModelRow renders one model with context sizes, a copy-id button, and the
+// user's LOCAL aliases (add/remove your own custom name for this model).
+function ModelRow({ m, aliases, onAddAlias, onRemoveAlias }: { m: ProviderModel; aliases: ModelAlias[]; onAddAlias: () => void; onRemoveAlias: (alias: string) => void }) {
   const [copied, setCopied] = useState(false);
   const copy = () => {
     navigator.clipboard?.writeText(m.model_id);
@@ -298,11 +315,15 @@ function ModelRow({ m }: { m: ProviderModel }) {
           {inTok && <span>· in {inTok}</span>}
           {outTok && <span>· out {outTok}</span>}
         </div>
-        {m.aliases && m.aliases.length > 0 && (
-          <div className="mt-1 flex flex-wrap gap-1">
-            {m.aliases.map((a) => <span key={a} className="rounded bg-indigo-500/15 px-1.5 py-0.5 font-mono text-[9px] text-indigo-300">{a}</span>)}
-          </div>
-        )}
+        <div className="mt-1 flex flex-wrap items-center gap-1">
+          {aliases.map((a) => (
+            <span key={a.alias} className="group/a flex items-center gap-0.5 rounded bg-indigo-500/15 px-1.5 py-0.5 font-mono text-[9px] text-indigo-300">
+              {a.alias}
+              <button onClick={() => onRemoveAlias(a.alias)} className="opacity-60 hover:opacity-100"><X className="h-2.5 w-2.5" /></button>
+            </span>
+          ))}
+          <button onClick={onAddAlias} className="flex items-center gap-0.5 rounded border border-dashed border-white/15 px-1.5 py-0.5 text-[9px] text-white/40 hover:border-white/30 hover:text-white/70"><Plus className="h-2.5 w-2.5" /> alias</button>
+        </div>
       </div>
       <button onClick={copy} title="Copy model id" className="shrink-0 rounded p-1 text-white/40 opacity-0 transition hover:bg-white/10 hover:text-white group-hover:opacity-100">
         {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}

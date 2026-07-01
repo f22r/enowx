@@ -24,6 +24,7 @@ type DB struct {
 	warmups  *warmupStore
 	music    *musicStore
 	settings *settingsStore
+	aliases  *aliasStore
 }
 
 func Open(path string) (*DB, error) {
@@ -42,6 +43,7 @@ func Open(path string) (*DB, error) {
 	d.warmups = &warmupStore{db: db}
 	d.music = &musicStore{db: db}
 	d.settings = &settingsStore{db: db}
+	d.aliases = &aliasStore{db: db}
 	return d, nil
 }
 
@@ -51,6 +53,7 @@ func (d *DB) Keys() store.KeyStore          { return d.keys }
 func (d *DB) Warmups() store.WarmupStore    { return d.warmups }
 func (d *DB) Music() store.MusicStore       { return d.music }
 func (d *DB) Settings() store.SettingsStore { return d.settings }
+func (d *DB) Aliases() store.AliasStore     { return d.aliases }
 func (d *DB) Close() error                  { return d.db.Close() }
 
 func migrate(db *sql.DB) error {

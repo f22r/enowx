@@ -8,27 +8,26 @@ import (
 	"time"
 )
 
-// AliasFetcher provides the current alias→model_id map (from the cloud).
-type AliasFetcher interface {
-	ModelAliases(ctx context.Context) map[string]string
-}
-
-// AliasResolver caches the cloud alias→model_id map and rewrites request models
-// (and the raw body's "model" field) so a user can call a model by an alias.
+// AliasResolver resolves an aliased model id to its real target using the user's
+// LOCAL alias map (from the enowx SQLite store), and rewrites the raw request
+// body's "model" field so upstream sees the real model. Aliases are per-user and
+// never leave this instance.
 type AliasResolver struct {
-	fetch AliasFetcher
-	ttl   time.Duration
+	source func(ctx context.Context) map[string]string
+	ttl    time.Duration
 
 	mu      sync.RWMutex
 	aliases map[string]string
 	fetched time.Time
 }
 
-func NewAliasResolver(fetch AliasFetcher, ttl time.Duration) *AliasResolver {
+// NewAliasResolver builds a resolver over a local alias-map source (e.g. the
+// SQLite alias store's Map method).
+func NewAliasResolver(source func(ctx context.Context) map[string]string, ttl time.Duration) *AliasResolver {
 	if ttl <= 0 {
-		ttl = 5 * time.Minute
+		ttl = 30 * time.Second
 	}
-	return &AliasResolver{fetch: fetch, ttl: ttl, aliases: map[string]string{}}
+	return &AliasResolver{source: source, ttl: ttl, aliases: map[string]string{}}
 }
 
 // Resolve returns the real model id for a possibly-aliased model. The cached map
@@ -40,7 +39,7 @@ func (r *AliasResolver) Resolve(ctx context.Context, model string) string {
 	r.mu.RUnlock()
 
 	if stale {
-		if m := r.fetch.ModelAliases(ctx); m != nil {
+		if m := r.source(ctx); m != nil {
 			r.mu.Lock()
 			r.aliases = m
 			r.fetched = time.Now()

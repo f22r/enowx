@@ -69,7 +69,22 @@ type Store interface {
 	Warmups() WarmupStore
 	Music() MusicStore
 	Settings() SettingsStore
+	Aliases() AliasStore
 	Close() error
+}
+
+// ModelAlias is a per-user local alias: call `Alias` and it routes to `Target`.
+type ModelAlias struct {
+	Alias  string `json:"alias"`
+	Target string `json:"target"`
+}
+
+// AliasStore holds the user's local model aliases (not synced to the cloud).
+type AliasStore interface {
+	List(ctx context.Context) ([]ModelAlias, error)
+	Set(ctx context.Context, alias, target string) error // upsert
+	Delete(ctx context.Context, alias string) error
+	Map(ctx context.Context) map[string]string // alias→target, for the resolver
 }
 
 // SettingsStore is a tiny key/value store for gateway settings (e.g. the

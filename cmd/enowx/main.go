@@ -72,6 +72,7 @@ func main() {
 		Warmups:    db.Warmups(),
 		Music:      db.Music(),
 		SettingsKV: db.Settings(),
+		Aliases:    db.Aliases(),
 		Tunnel:     tun,
 		Sync:       syncMgr,
 		Doer:       doer,
