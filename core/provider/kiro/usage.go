@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/enowdev/enowx/core/provider"
 )
@@ -124,10 +125,16 @@ func (p *Provider) Email(acc provider.Account) string {
 
 func parseKiroUsage(body []byte) (*provider.Usage, error) {
 	var payload struct {
-		PlanType           string `json:"planType"`
+		PlanType         string `json:"planType"`
+		SubscriptionInfo struct {
+			SubscriptionTitle string `json:"subscriptionTitle"`
+			Type              string `json:"type"`
+		} `json:"subscriptionInfo"`
 		UsageBreakdownList []struct {
-			UsageLimit   float64 `json:"usageLimit"`
-			CurrentUsage float64 `json:"currentUsage"`
+			UsageLimit           float64 `json:"usageLimit"`
+			UsageLimitWithPrec   float64 `json:"usageLimitWithPrecision"`
+			CurrentUsage         float64 `json:"currentUsage"`
+			CurrentUsageWithPrec float64 `json:"currentUsageWithPrecision"`
 		} `json:"usageBreakdownList"`
 	}
 	if err := json.Unmarshal(body, &payload); err != nil {
@@ -135,12 +142,45 @@ func parseKiroUsage(body []byte) (*provider.Usage, error) {
 	}
 	var limit, used float64
 	for _, b := range payload.UsageBreakdownList {
-		limit += b.UsageLimit
-		used += b.CurrentUsage
+		l := b.UsageLimitWithPrec
+		if l == 0 {
+			l = b.UsageLimit
+		}
+		u := b.CurrentUsageWithPrec
+		if u == 0 {
+			u = b.CurrentUsage
+		}
+		limit += l
+		used += u
 	}
-	u := &provider.Usage{Limit: limit, Used: used, Remaining: limit - used, Plan: payload.PlanType}
+	plan := normalizeKiroPlan(payload.SubscriptionInfo.SubscriptionTitle, payload.SubscriptionInfo.Type, payload.PlanType)
+	u := &provider.Usage{Limit: limit, Used: used, Remaining: limit - used, Plan: plan}
 	if limit == 0 {
 		u.Message = "no quota data"
 	}
 	return u, nil
+}
+
+// normalizeKiroPlan maps Kiro's subscription title/type to a short tier label:
+// free / pro / pro+ / power / enterprise. First non-empty match wins.
+func normalizeKiroPlan(values ...string) string {
+	for _, v := range values {
+		s := strings.ToLower(strings.TrimSpace(v))
+		if s == "" {
+			continue
+		}
+		switch {
+		case strings.Contains(s, "free"), strings.Contains(s, "trial"):
+			return "free"
+		case strings.Contains(s, "pro+"), strings.Contains(s, "pro plus"), strings.Contains(s, "pro_plus"):
+			return "pro+"
+		case strings.Contains(s, "power"):
+			return "power"
+		case strings.Contains(s, "enterprise"), strings.Contains(s, "business"):
+			return "enterprise"
+		case strings.Contains(s, "pro"), strings.Contains(s, "plus"), strings.Contains(s, "paid"), strings.Contains(s, "premium"):
+			return "pro"
+		}
+	}
+	return "free"
 }
