@@ -327,13 +327,15 @@ export const profileApi = {
   uploadBanner: (file: File) => uploadFile<{ banner_url: string }>("/api/profile/banner", file),
 };
 
-// uploadFile posts a single file as multipart/form-data.
+// uploadFile posts a single file as multipart/form-data. The server wraps
+// responses in { data, error }, so unwrap like req() does.
 async function uploadFile<T>(path: string, file: File): Promise<T> {
   const fd = new FormData();
   fd.append("file", file);
   const res = await fetch(path, { method: "POST", body: fd });
-  if (!res.ok) throw new Error((await res.text()) || `upload failed (${res.status})`);
-  return res.json() as Promise<T>;
+  const body = (await res.json().catch(() => ({}))) as { data?: T; error?: string };
+  if (!res.ok) throw new Error(body.error || `upload failed (${res.status})`);
+  return body.data as T;
 }
 
 // imageApi uploads a chat/post image and returns its CDN URL.
