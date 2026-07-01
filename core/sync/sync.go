@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	stdsync "sync"
 	"strings"
@@ -241,6 +242,15 @@ func (m *Manager) PublicProfile(ctx context.Context, id string) (string, error) 
 func (m *Manager) UserByName(ctx context.Context, name string) (string, error) {
 	var raw json.RawMessage
 	if err := m.call(ctx, http.MethodGet, "/users/by-name/"+name, nil, &raw); err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
+
+// MentionUsers returns @mention autocomplete candidates (empty q = default list).
+func (m *Manager) MentionUsers(ctx context.Context, q string) (string, error) {
+	var raw json.RawMessage
+	if err := m.call(ctx, http.MethodGet, "/users/mention?q="+url.QueryEscape(q), nil, &raw); err != nil {
 		return "", err
 	}
 	return string(raw), nil

@@ -13,6 +13,7 @@ import { useImageAttach } from "../os/useImageAttach";
 import { Markdown } from "../components/Markdown";
 import { ImageGrid } from "../components/ImageGrid";
 import { MentionDropdown } from "../components/MentionDropdown";
+import { MentionInput } from "../components/MentionInput";
 import { useMention } from "../os/useMention";
 import { profileApi, commentsApi, searchApi, type Post, type PublicProfile, type Comment, type SearchPostHit, type SearchUserHit } from "../lib/api";
 
@@ -462,19 +463,19 @@ function CommentThread({ postId, myUsername, canMod }: { postId: number; myUsern
         </div>
       )}
       <div className="flex items-center gap-2 pt-1">
-        <div className="relative min-w-0 flex-1">
+        <div className="relative min-w-0 flex-1 rounded-lg border border-white/10 bg-black/20 focus-within:border-white/25">
           <MentionDropdown items={mention.items} active={mention.active} onPick={mention.pick} />
-          <input
+          <MentionInput
             ref={inputRef}
             value={draft}
-            onChange={(e) => setDraft(e.target.value)}
+            onChange={setDraft}
             onKeyDown={(e) => {
               if (mention.onKeyDown(e)) return;
               if (e.key === "Enter") { e.preventDefault(); send(); }
             }}
             placeholder={replyTo ? `Reply to ${replyTo.display_name || replyTo.username}…` : "Add a comment…"}
             maxLength={2000}
-            className="w-full rounded-lg border border-white/10 bg-black/20 px-2.5 py-1.5 text-xs text-white outline-none focus:border-white/25"
+            className="px-2.5 py-1.5 text-xs text-white outline-none"
           />
         </div>
         <button onClick={send} disabled={busy || !draft.trim()} className="rounded-lg bg-indigo-500/90 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-indigo-500 disabled:opacity-50">

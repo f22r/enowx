@@ -128,6 +128,7 @@ func New(addr string, d Deps) *Server {
 		r.Post("/upload/image", syncH.UploadImage)
 		r.Get("/users/{id}/profile", syncH.PublicProfile)
 		r.Get("/users/by-name/{name}", syncH.UserByName)
+		r.Get("/users/mention", syncH.MentionUsers)
 		r.Get("/users/{id}/posts", syncH.UserPosts)
 		r.Get("/posts", syncH.PostsList)
 		r.Post("/posts", syncH.PostCreate)

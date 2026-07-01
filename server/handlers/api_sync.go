@@ -134,6 +134,20 @@ func (h *Sync) UserByName(w http.ResponseWriter, r *http.Request) {
 	writeData(w, out)
 }
 
+// MentionUsers proxies @mention autocomplete candidates.
+func (h *Sync) MentionUsers(w http.ResponseWriter, r *http.Request) {
+	raw, err := h.mgr.MentionUsers(r.Context(), r.URL.Query().Get("q"))
+	if err != nil {
+		writeAPIErr(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	var out any
+	if raw != "" {
+		_ = json.Unmarshal([]byte(raw), &out)
+	}
+	writeData(w, out)
+}
+
 // UploadAvatar / UploadBanner proxy a multipart image upload to the cloud.
 func (h *Sync) UploadAvatar(w http.ResponseWriter, r *http.Request) { h.uploadMedia(w, r, "/me/avatar") }
 func (h *Sync) UploadBanner(w http.ResponseWriter, r *http.Request) { h.uploadMedia(w, r, "/me/banner") }

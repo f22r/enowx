@@ -28,8 +28,9 @@ export function useMention(value: string, setValue: (v: string) => void, inputRe
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(async () => {
       try {
-        const r = await searchApi.query(q.length ? q : "a"); // seed with a char when just "@"
-        setItems((r.users ?? []).slice(0, 6));
+        // Empty q returns a default list, so a bare "@" shows suggestions.
+        const r = await searchApi.mention(q);
+        setItems((r.users ?? []).slice(0, 8));
         setActive(0);
         setOpen(true);
       } catch {

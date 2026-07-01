@@ -583,6 +583,8 @@ export interface SearchUserHit {
 
 export const searchApi = {
   query: (q: string) => api.get<{ posts: SearchPostHit[]; users: SearchUserHit[] }>(`/api/search?q=${encodeURIComponent(q)}`),
+  // Mention autocomplete: empty q returns a default user list.
+  mention: (q: string) => api.get<{ users: SearchUserHit[] }>(`/api/users/mention?q=${encodeURIComponent(q)}`),
 };
 
 // PublicProfile is what other members can see (social data only — no secrets).
