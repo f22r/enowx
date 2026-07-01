@@ -168,7 +168,14 @@ export function AccountsApp() {
                   key={a.id}
                   className="group flex items-start gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-3 transition-colors hover:bg-white/[0.05]"
                 >
-                  <ProviderIcon icon={iconFor(a.provider)} label={a.provider} size={40} />
+                  <div className="relative shrink-0">
+                    <ProviderIcon icon={iconFor(a.provider)} label={a.provider} size={40} />
+                    {usage[a.id]?.plan && (
+                      <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-full bg-indigo-500 px-1.5 py-[1px] text-[8px] font-bold uppercase leading-none tracking-wide text-white shadow ring-1 ring-[var(--window-bg)]" title={`Plan: ${usage[a.id].plan}`}>
+                        {usage[a.id].plan}
+                      </span>
+                    )}
+                  </div>
 
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
@@ -189,12 +196,6 @@ export function AccountsApp() {
                       <span className="capitalize">{a.provider}</span>
                       <span className="text-white/20">·</span>
                       <span>{a.created_at}</span>
-                      {usage[a.id]?.plan && (
-                        <>
-                          <span className="text-white/20">·</span>
-                          <span className="capitalize">{usage[a.id].plan}</span>
-                        </>
-                      )}
                     </div>
                     {usage[a.id] && <CreditMeter u={usage[a.id]} />}
                   </div>
@@ -366,17 +367,19 @@ function CreditMeter({ u }: { u: Usage }) {
   // Window-based providers (e.g. Codex 5h + weekly) show a bar per window.
   if (u.windows && u.windows.length > 0) {
     return (
-      <div className="mt-1.5 max-w-[240px] space-y-1">
+      <div className="mt-2 max-w-[220px] space-y-1.5">
         {u.windows.map((w, i) => {
           const pct = Math.min(100, Math.round(w.used_percent));
           const tone = pct >= 90 ? "bg-red-400" : pct >= 70 ? "bg-amber-400" : "bg-emerald-400";
           return (
-            <div key={i} className="flex items-center gap-2 text-[10px] text-white/40">
-              <span className="w-10 shrink-0">{w.label}</span>
-              <div className="h-1 flex-1 overflow-hidden rounded-full bg-white/10">
+            <div key={i}>
+              <div className="mb-0.5 flex items-center justify-between text-[10px] text-white/40">
+                <span>{w.label}</span>
+                <span className="tabular-nums">{pct}%{w.reset_in_secs ? ` · ${fmtReset(w.reset_in_secs)}` : ""}</span>
+              </div>
+              <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
                 <div className={`h-full rounded-full ${tone}`} style={{ width: `${pct}%` }} />
               </div>
-              <span className="w-16 shrink-0 text-right tabular-nums">{pct}%{w.reset_in_secs ? ` · ${fmtReset(w.reset_in_secs)}` : ""}</span>
             </div>
           );
         })}
