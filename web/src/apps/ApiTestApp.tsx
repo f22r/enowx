@@ -10,6 +10,7 @@ import {
   type KV,
 } from "../lib/api";
 import { useDialog } from "../os/dialog";
+import { useContextMenu } from "../os/contextmenu";
 
 type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 const METHODS: Method[] = ["GET", "POST", "PUT", "PATCH", "DELETE"];
@@ -72,6 +73,7 @@ export function ApiTestApp() {
   const [apiKey, setApiKey] = useState("");
 
   const dialog = useDialog();
+  const ctx = useContextMenu();
   const [draft, setDraft] = useState<Draft>(blankDraft);
   const [reqTab, setReqTab] = useState<"params" | "auth" | "headers" | "body">("body");
   const [sidebarTab, setSidebarTab] = useState<"collections" | "history">("collections");
@@ -148,6 +150,28 @@ export function ApiTestApp() {
       reload();
     }
   }
+
+  async function duplicateRequest(r: ApiSavedRequest) {
+    await apitestApi.saveRequest({
+      collection_id: r.collection_id, name: `${r.name} copy`, method: r.method, url: r.url,
+      headers: r.headers, query: r.query, body: r.body, body_type: r.body_type, auth: r.auth,
+    });
+    reload();
+  }
+
+  // Right-click menus.
+  const collectionMenu = (c: ApiCollection) => [
+    { label: "New request", onClick: () => newRequest(c.id) },
+    { label: "Rename", onClick: () => renameCollection(c) },
+    { separator: true },
+    { label: "Delete collection", danger: true, onClick: () => apitestApi.deleteCollection(c.id).then(reload) },
+  ];
+  const requestMenu = (r: ApiSavedRequest) => [
+    { label: "Open", onClick: () => loadSaved(r) },
+    { label: "Duplicate", onClick: () => duplicateRequest(r) },
+    { separator: true },
+    { label: "Delete", danger: true, onClick: () => apitestApi.deleteRequest(r.id).then(reload) },
+  ];
 
   // Build the final URL with query params appended + env interpolation.
   function buildURL(): string {
@@ -277,12 +301,17 @@ export function ApiTestApp() {
           <button onClick={() => setSidebarTab("collections")} className={`flex-1 rounded px-2 py-1 ${sidebarTab === "collections" ? "bg-white/10 text-white" : "text-white/45"}`}>Collections</button>
           <button onClick={() => setSidebarTab("history")} className={`flex-1 rounded px-2 py-1 ${sidebarTab === "history" ? "bg-white/10 text-white" : "text-white/45"}`}>History</button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-1.5">
+        <div
+          className="min-h-0 flex-1 overflow-y-auto p-1.5"
+          onContextMenu={(e) => {
+            if (sidebarTab === "collections") ctx.show(e, [{ label: "New collection", onClick: () => apitestApi.addCollection("New collection").then(reload) }]);
+          }}
+        >
           {sidebarTab === "collections" ? (
             <>
               {collections.map((c) => (
                 <div key={c.id}>
-                  <div className="group flex items-center gap-1 rounded px-1 py-1 hover:bg-white/5">
+                  <div onContextMenu={(e) => ctx.show(e, collectionMenu(c))} className="group flex items-center gap-1 rounded px-1 py-1 hover:bg-white/5">
                     <button onClick={() => setOpenCols((p) => ({ ...p, [c.id]: !p[c.id] }))} className="text-white/40">
                       {openCols[c.id] ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
                     </button>
@@ -293,7 +322,7 @@ export function ApiTestApp() {
                   </div>
                   {openCols[c.id] &&
                     saved.filter((r) => r.collection_id === c.id).map((r) => (
-                      <div key={r.id} className="group ml-4 flex items-center gap-1 rounded px-1.5 py-1 hover:bg-white/5">
+                      <div key={r.id} onContextMenu={(e) => ctx.show(e, requestMenu(r))} className="group ml-4 flex items-center gap-1 rounded px-1.5 py-1 hover:bg-white/5">
                         <button onClick={() => loadSaved(r)} className="flex min-w-0 flex-1 items-center gap-1.5 text-left">
                           <span className={`shrink-0 font-mono text-[9px] ${methodColor(r.method)}`}>{r.method}</span>
                           <span className="truncate text-[11px] text-white/70">{r.name}</span>
