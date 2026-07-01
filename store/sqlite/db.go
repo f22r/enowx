@@ -65,11 +65,15 @@ func seedApiTest(db *sql.DB) {
 	chatBody := `{
   "model": "cb/gemini-3.1-pro",
   "stream": false,
-  "messages": [{ "role": "user", "content": "hi" }]
+  "messages": [
+    { "role": "system", "content": "You are a helpful assistant." },
+    { "role": "user", "content": "hi" }
+  ]
 }`
 	anthBody := `{
   "model": "cb/claude-sonnet-4.5",
   "max_tokens": 64,
+  "system": "You are a helpful assistant.",
   "messages": [{ "role": "user", "content": "hi" }]
 }`
 	stmt := `INSERT INTO apitest_requests (collection_id, name, method, url, body, body_type, sort) VALUES (?,?,?,?,?,?,?)`
