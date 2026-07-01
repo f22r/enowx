@@ -1,7 +1,7 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { Send, Trash2, Loader2, Bot, ChevronDown, ChevronRight, FolderOpen, Shield, Check, X, Terminal, FileEdit, FileText, FilePlus, Globe, Wrench, Folder, CornerLeftUp, Settings2, Plus } from "lucide-react";
 import { accountsApi, keysApi, filesApi, type ProviderModel, type DirListing } from "../lib/api";
-import { Markdown } from "../components/Markdown";
+import { AiMarkdown } from "../components/AiMarkdown";
 import { TOOL_SCHEMAS, TOOL_META, GROUPABLE_TOOLS, GROUP_VERB, lineDiff, runTool, needsApproval, type PermLevel, type ToolName, type ToolResult } from "./agent/tools";
 
 const DEFAULT_SYSTEM = `You are a helpful coding assistant running inside the enowx dashboard.
@@ -445,7 +445,7 @@ function buildItems(msgs: ChatMsg[]): RenderItem[] {
 // on every streaming frame — only the block whose content actually changed
 // re-renders. This is the main guard against the "Aw, Snap" crash on long chats.
 const TextBlock = memo(function TextBlock({ content }: { content: string }) {
-  return <div className="min-w-0 text-sm text-white/90"><Markdown text={content} /></div>;
+  return <div className="min-w-0"><AiMarkdown text={content} /></div>;
 });
 
 function Conversation({ msgs }: { msgs: ChatMsg[] }) {
