@@ -5,8 +5,12 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
+	"io"
 	"net/http"
 	"runtime"
+	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -93,8 +97,71 @@ func (p *Provider) Classify(status int, _ []byte) provider.Outcome {
 	}
 }
 
-func (p *Provider) Models(_ provider.Account) ([]provider.Model, error) {
-	return catalog(), nil
+// Models fetches the account's available models live from CloudCode
+// (fetchAvailableModels), filtering out internal/editor-only entries. Falls back
+// to the hardcoded catalog on any failure.
+func (p *Provider) Models(acc provider.Account) ([]provider.Model, error) {
+	am := p.manager(acc)
+	token, err := am.token()
+	if err != nil {
+		return catalog(), nil
+	}
+	body, _ := json.Marshal(map[string]any{"project": am.projectID()})
+	req, err := http.NewRequest(http.MethodPost, inferenceHost+":fetchAvailableModels", bytes.NewReader(body))
+	if err != nil {
+		return catalog(), nil
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("User-Agent", userAgentBase+" "+goPlatform())
+	resp, err := p.doer.Do(req)
+	if err != nil {
+		return catalog(), nil
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if resp.StatusCode >= 300 {
+		return catalog(), nil
+	}
+	var out struct {
+		Models map[string]struct {
+			DisplayName    string `json:"displayName"`
+			IsInternal     bool   `json:"isInternal"`
+			ModelProvider  string `json:"modelProvider"`
+		} `json:"models"`
+	}
+	if json.Unmarshal(raw, &out) != nil || len(out.Models) == 0 {
+		return catalog(), nil
+	}
+	models := []provider.Model{}
+	for id, m := range out.Models {
+		// Skip internal + editor-only (no display name) models.
+		if m.IsInternal || m.DisplayName == "" {
+			continue
+		}
+		typ := "chat"
+		// The image-generation model outputs images (vision models stay chat).
+		if strings.Contains(id, "-image") {
+			typ = "image"
+		}
+		models = append(models, provider.Model{ID: id, Name: m.DisplayName, Type: typ, OwnedBy: ownerFromProvider(m.ModelProvider)})
+	}
+	if len(models) == 0 {
+		return catalog(), nil
+	}
+	sort.Slice(models, func(i, j int) bool { return models[i].ID < models[j].ID })
+	return models, nil
+}
+
+func ownerFromProvider(p string) string {
+	switch {
+	case strings.Contains(p, "ANTHROPIC"):
+		return "anthropic"
+	case strings.Contains(p, "OPENAI"):
+		return "openai"
+	default:
+		return "google"
+	}
 }
 
 func (p *Provider) Email(acc provider.Account) string {
