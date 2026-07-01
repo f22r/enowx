@@ -40,6 +40,10 @@ const load = <T,>(key: string, fallback: T): T => {
   try { const v = localStorage.getItem(key); return v == null ? fallback : (JSON.parse(v) as T); } catch { return fallback; }
 };
 
+// clip caps a string for display/history so a huge file can't bloat the DOM or
+// the request body (which crashed the tab on big reads).
+const clip = (s: string, max: number) => (s.length > max ? s.slice(0, max) + `\n…(+${s.length - max} more chars)` : s);
+
 export function AiChatApp() {
   const [models, setModels] = useState<ProviderModel[]>([]);
   const [model, setModel] = useState(() => load<string>(LS.model, ""));
@@ -226,9 +230,13 @@ export function AiChatApp() {
             try { args = JSON.parse(call.args || "{}"); } catch { /* bad args */ }
             result = await runTool(cwd, toolName, args);
           }
-          assistant.results![call.id] = result;
+          // Store a display-capped copy in the UI/persisted state (the full
+          // output only ever needs to reach the model, capped just below).
+          assistant.results![call.id] = { ...result, output: clip(result.output, 8000) };
           setMsgs((p) => p.map((m) => (m === assistant ? { ...assistant } : m)));
-          history = [...history, { role: "tool", tool_call_id: call.id, name: call.name, content: result.output }];
+          // Cap the tool output fed back to the model so a big file read can't
+          // balloon the request body every subsequent turn.
+          history = [...history, { role: "tool", tool_call_id: call.id, name: call.name, content: clip(result.output, 24000) }];
         }
       }
     } catch (e) {
@@ -542,7 +550,7 @@ const ToolCard = memo(function ToolCard({ call, result }: { call: ToolCall; resu
               ))}
             </div>
           ) : (
-            <pre className="max-h-60 overflow-auto whitespace-pre-wrap break-words px-2.5 py-1.5 font-mono text-[10px] text-white/70">{result?.output ?? ""}</pre>
+            <pre className="max-h-60 overflow-auto whitespace-pre-wrap break-words px-2.5 py-1.5 font-mono text-[10px] text-white/70">{clip(result?.output ?? "", 8000)}</pre>
           )}
         </div>
       )}

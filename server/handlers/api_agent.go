@@ -59,7 +59,9 @@ func resolveInCwd(cwd, path string) (string, bool) {
 	return clean, true
 }
 
-const agentMaxRead = 1 << 20 // 1 MB tool read cap
+// Tool reads are capped so a huge file can't bloat the chat history sent back to
+// the model or the DOM. 128 KB is plenty for source files.
+const agentMaxRead = 128 * 1024
 
 // POST /api/agent/fs/read  {cwd, path}
 func (h *Agent) FSRead(w http.ResponseWriter, r *http.Request) {
