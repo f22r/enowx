@@ -57,8 +57,13 @@ function shareTrackToChat(t: Track, dialog: Dialog) {
 }
 
 function sharePlaylistToChat(p: { name: string; count?: number; tracks?: Track[] }, dialog: Dialog) {
-  const count = p.count ?? p.tracks?.length ?? 0;
-  shareToChat({ kind: "playlist", title: p.name, subtitle: `${count} track${count === 1 ? "" : "s"}` }, dialog);
+  const tracks = p.tracks ?? [];
+  const count = p.count ?? tracks.length;
+  // Embed the tracks so a viewer can add the playlist to their own library.
+  shareToChat(
+    { kind: "playlist", title: p.name, subtitle: `${count} track${count === 1 ? "" : "s"}`, ref: JSON.stringify({ name: p.name, tracks }) },
+    dialog,
+  );
 }
 
 export function MusicApp() {

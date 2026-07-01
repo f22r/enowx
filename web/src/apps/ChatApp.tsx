@@ -18,6 +18,36 @@ import { useMention } from "../os/useMention";
 import { mentionsMe } from "../os/mentions";
 import { MusicCard } from "../components/MusicCard";
 import { openMusicShare } from "../os/musicBus";
+import { mergePlaylist } from "../os/musicPlaylists";
+import type { MusicShare, Track } from "../lib/api";
+
+// handleMusicClick: a shared track plays; a shared playlist offers to add itself
+// to the viewer's library (merging into a same-named playlist if one exists).
+async function handleMusicClick(m: MusicShare, dialog: ReturnType<typeof useDialog>) {
+  if (m.kind === "track") {
+    openMusicShare(m);
+    return;
+  }
+  if (!m.ref) return;
+  let data: { name: string; tracks: Track[] };
+  try {
+    data = JSON.parse(m.ref);
+  } catch {
+    return;
+  }
+  const ok = await dialog.confirm({
+    title: `Add "${data.name}" to your playlists?`,
+    message: `${data.tracks?.length ?? 0} tracks. If you already have a playlist named "${data.name}", they'll be merged into it.`,
+    confirmLabel: "Add",
+  });
+  if (!ok) return;
+  try {
+    const { added } = await mergePlaylist(data.name, data.tracks ?? []);
+    await dialog.alert({ title: "Added to your playlists", message: `${added} new track${added === 1 ? "" : "s"} added.` });
+  } catch (e) {
+    await dialog.alert({ title: "Couldn't add playlist", message: e instanceof Error ? e.message : "" });
+  }
+}
 import { profileApi, modApi, type ChatMessage, type PublicProfile, type TopRole } from "../lib/api";
 
 interface ReplyTarget {
@@ -348,7 +378,7 @@ function MessageRow({
               </div>
             )}
             {m.images && m.images.length > 0 && <ImageGrid images={m.images} />}
-            {m.music && <MusicCard m={m.music} onOpen={() => m.music && openMusicShare(m.music)} />}
+            {m.music && <MusicCard m={m.music} onOpen={() => m.music && handleMusicClick(m.music, dialog)} />}
           </>
         )}
         {m.reactions && m.reactions.length > 0 && (

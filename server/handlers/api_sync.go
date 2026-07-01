@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/url"
 
 	"github.com/go-chi/chi/v5"
 
@@ -411,9 +412,18 @@ func (h *Sync) ShopEquip(w http.ResponseWriter, r *http.Request) {
 
 // ChatList proxies a page of community chat messages.
 func (h *Sync) ChatList(w http.ResponseWriter, r *http.Request) {
-	query := ""
+	// Forward the channel + before params so the cloud filters by channel (not
+	// just the default).
+	q := url.Values{}
+	if ch := r.URL.Query().Get("channel"); ch != "" {
+		q.Set("channel", ch)
+	}
 	if before := r.URL.Query().Get("before"); before != "" {
-		query = "?before=" + before
+		q.Set("before", before)
+	}
+	query := ""
+	if len(q) > 0 {
+		query = "?" + q.Encode()
 	}
 	raw, err := h.mgr.ChatList(r.Context(), query)
 	if err != nil {
