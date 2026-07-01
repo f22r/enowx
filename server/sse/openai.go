@@ -47,12 +47,29 @@ func emit(w io.Writer, fl http.Flusher, v any) {
 }
 
 func chunk(ev model.Event) map[string]any {
+	delta := map[string]any{"content": ev.Text}
+	if len(ev.ToolCalls) > 0 {
+		calls := make([]map[string]any, 0, len(ev.ToolCalls))
+		for _, t := range ev.ToolCalls {
+			c := map[string]any{
+				"index":    t.Index,
+				"function": map[string]any{"name": t.Name, "arguments": t.ArgsDelta},
+			}
+			if t.ID != "" {
+				c["id"] = t.ID
+				c["type"] = "function"
+			}
+			calls = append(calls, c)
+		}
+		delta["tool_calls"] = calls
+	}
+	choice := map[string]any{"index": 0, "delta": delta}
+	if ev.FinishReason != "" {
+		choice["finish_reason"] = ev.FinishReason
+	}
 	return map[string]any{
-		"object": "chat.completion.chunk",
-		"model":  ev.Model,
-		"choices": []map[string]any{{
-			"index": 0,
-			"delta": map[string]any{"content": ev.Text},
-		}},
+		"object":  "chat.completion.chunk",
+		"model":   ev.Model,
+		"choices": []map[string]any{choice},
 	}
 }

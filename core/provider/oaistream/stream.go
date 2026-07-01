@@ -80,9 +80,11 @@ func (s *sseStream) Recv() (model.Event, error) {
 		}
 		txt := chunk.delta()
 		usage := chunk.usage()
+		tools := chunk.toolCalls()
+		finish := chunk.finishReason()
 		// The final chunk often carries usage with empty choices; surface it.
-		if txt != "" || usage != nil {
-			return model.Event{Type: model.EventDelta, Text: txt, Model: chunk.Model, Usage: usage}, nil
+		if txt != "" || usage != nil || len(tools) > 0 || finish != "" {
+			return model.Event{Type: model.EventDelta, Text: txt, Model: chunk.Model, Usage: usage, ToolCalls: tools, FinishReason: finish}, nil
 		}
 	}
 	if err := s.sc.Err(); err != nil {
@@ -108,7 +110,7 @@ func newJSON(resp *http.Response) (*jsonStream, error) {
 	}
 	var parsed chatResponse
 	_ = json.Unmarshal(b, &parsed)
-	return &jsonStream{ev: model.Event{Type: model.EventDelta, Text: parsed.text(), Model: parsed.Model}}, nil
+	return &jsonStream{ev: model.Event{Type: model.EventDelta, Text: parsed.text(), Model: parsed.Model, ToolCalls: parsed.toolCalls(), FinishReason: parsed.finishReason()}}, nil
 }
 
 func (s *jsonStream) Recv() (model.Event, error) {

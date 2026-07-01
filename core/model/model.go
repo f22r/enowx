@@ -70,11 +70,22 @@ const (
 )
 
 type Event struct {
-	Type  EventType `json:"type"`
-	Text  string    `json:"text,omitempty"`
-	Model string    `json:"model,omitempty"`
-	Usage *Usage    `json:"usage,omitempty"`
-	Err   string    `json:"error,omitempty"`
+	Type         EventType       `json:"type"`
+	Text         string          `json:"text,omitempty"`
+	Model        string          `json:"model,omitempty"`
+	Usage        *Usage          `json:"usage,omitempty"`
+	Err          string          `json:"error,omitempty"`
+	ToolCalls    []ToolCallDelta `json:"tool_calls,omitempty"`    // streamed function-call fragments
+	FinishReason string          `json:"finish_reason,omitempty"` // e.g. "stop", "tool_calls"
+}
+
+// ToolCallDelta is one streamed fragment of an OpenAI tool (function) call. The
+// name/id arrive once; arguments stream in as ArgsDelta fragments keyed by Index.
+type ToolCallDelta struct {
+	Index     int    `json:"index"`
+	ID        string `json:"id,omitempty"`
+	Name      string `json:"name,omitempty"`
+	ArgsDelta string `json:"args_delta,omitempty"`
 }
 
 // Stream yields normalized events; Recv returns one EventDone then io.EOF.

@@ -71,6 +71,7 @@ func New(addr string, d Deps) *Server {
 	dash := middleware.NewDashboard(d.SettingsKV)
 	term := handlers.NewTerminal(dash)
 	files := handlers.NewFiles(dash)
+	agent := handlers.NewAgent(dash, d.Doer)
 	music := handlers.NewMusic(d.Music)
 	tun := handlers.NewTunnel(d.Tunnel, d.Keys)
 	syncH := handlers.NewSync(d.Sync)
@@ -141,6 +142,13 @@ func New(addr string, d Deps) *Server {
 		r.Get("/files", files.List)
 		r.Get("/files/read", files.Read)
 		r.Get("/files/raw", files.Raw)
+
+		r.Post("/agent/fs/read", agent.FSRead)
+		r.Post("/agent/fs/list", agent.FSList)
+		r.Post("/agent/fs/write", agent.FSWrite)
+		r.Post("/agent/fs/edit", agent.FSEdit)
+		r.Post("/agent/exec", agent.Exec)
+		r.Post("/agent/http", agent.HTTP)
 
 		r.Get("/auth/status", authH.Status)
 		r.Post("/auth/setup", authH.Setup)

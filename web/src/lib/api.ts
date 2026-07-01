@@ -270,6 +270,16 @@ export const apitestApi = {
   clearHistory: () => api.del<{ ok: boolean }>("/api/apitest/history"),
 };
 
+// --- Coding agent tools (local) ---
+export const agentApi = {
+  fsRead: (cwd: string, path: string) => api.post<{ path: string; content: string; truncated: boolean }>("/api/agent/fs/read", { cwd, path }),
+  fsList: (cwd: string, path: string) => api.post<{ path: string; entries: { name: string; is_dir: boolean; size: number; mod: string }[] }>("/api/agent/fs/list", { cwd, path }),
+  fsWrite: (cwd: string, path: string, content: string) => api.post<{ path: string; old: string; new: string; created: boolean }>("/api/agent/fs/write", { cwd, path, content }),
+  fsEdit: (cwd: string, path: string, oldStr: string, newStr: string) => api.post<{ path: string; old: string; new: string }>("/api/agent/fs/edit", { cwd, path, old: oldStr, new: newStr }),
+  exec: (cwd: string, command: string, timeout_ms?: number) => api.post<{ stdout: string; stderr: string; exit_code: number; timed_out: boolean }>("/api/agent/exec", { cwd, command, timeout_ms }),
+  http: (method: string, url: string, headers?: Record<string, string>, body?: string) => api.post<{ status: number; headers: Record<string, string>; body: string }>("/api/agent/http", { method, url, headers, body }),
+};
+
 export const keysApi = {
   list: () => api.get<ApiKey[]>("/api/keys"),
   add: (k: NewApiKey = {}) => api.post<{ id: number; secret: string }>("/api/keys", k),

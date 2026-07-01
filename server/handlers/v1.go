@@ -87,7 +87,13 @@ func (h *V1) log(provider, modelID, status string, start time.Time, usage model.
 }
 
 func writeJSON(w http.ResponseWriter, s interface{ Recv() (model.Event, error) }) {
-	var text, modelID string
+	var text, modelID, finish string
+	// Reassemble streamed tool-call fragments (by index) into whole calls.
+	type acc struct {
+		id, name, args string
+	}
+	calls := map[int]*acc{}
+	var order []int
 	for {
 		ev, err := s.Recv()
 		if err != nil || ev.Type == model.EventDone {
@@ -97,6 +103,42 @@ func writeJSON(w http.ResponseWriter, s interface{ Recv() (model.Event, error) }
 		if ev.Model != "" {
 			modelID = ev.Model
 		}
+		if ev.FinishReason != "" {
+			finish = ev.FinishReason
+		}
+		for _, t := range ev.ToolCalls {
+			a := calls[t.Index]
+			if a == nil {
+				a = &acc{}
+				calls[t.Index] = a
+				order = append(order, t.Index)
+			}
+			if t.ID != "" {
+				a.id = t.ID
+			}
+			if t.Name != "" {
+				a.name = t.Name
+			}
+			a.args += t.ArgsDelta
+		}
+	}
+	msg := map[string]any{"role": "assistant", "content": text}
+	if len(order) > 0 {
+		tc := make([]map[string]any, 0, len(order))
+		for _, i := range order {
+			a := calls[i]
+			tc = append(tc, map[string]any{
+				"id": a.id, "type": "function",
+				"function": map[string]any{"name": a.name, "arguments": a.args},
+			})
+		}
+		msg["tool_calls"] = tc
+		if finish == "" {
+			finish = "tool_calls"
+		}
+	}
+	if finish == "" {
+		finish = "stop"
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]any{
@@ -104,8 +146,8 @@ func writeJSON(w http.ResponseWriter, s interface{ Recv() (model.Event, error) }
 		"model":  modelID,
 		"choices": []map[string]any{{
 			"index":         0,
-			"message":       map[string]any{"role": "assistant", "content": text},
-			"finish_reason": "stop",
+			"message":       msg,
+			"finish_reason": finish,
 		}},
 	})
 }
