@@ -83,9 +83,13 @@ export function AiChatApp() {
 
   const loadModels = () =>
     accountsApi.allModels().then((r) => {
-      const list = (r.models ?? []).filter((m) => m.type !== "image");
+      // Only chat-capable models are pickable; image/music models are used via
+      // tools (generate_music) or the image endpoint, not as the chat model.
+      const list = (r.models ?? []).filter((m) => m.type !== "image" && m.type !== "music");
       setModels(list);
-      setModel((cur) => cur || (list[0]?.model_id ?? ""));
+      // Keep the current model only if it's still a valid chat model; otherwise
+      // fall back to the first (avoids a stale music/image pick breaking chat).
+      setModel((cur) => (cur && list.some((m) => m.model_id === cur) ? cur : (list[0]?.model_id ?? "")));
     }).catch(() => {});
 
   useEffect(() => {
