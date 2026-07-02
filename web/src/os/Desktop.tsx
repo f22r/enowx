@@ -145,7 +145,7 @@ export function Desktop() {
           break;
         }
         case "chat":
-          setView("chat");
+          openApp("chat"); // community chat app (the center "chat" view is AI chat)
           break;
         case "rekber":
           setView("marketplace");
