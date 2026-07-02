@@ -85,7 +85,9 @@ export function PluginsApp() {
         <div className="space-y-2">
           {plugins.map((p) => (
             <div key={p.id} className="group flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.02] p-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/5 text-white/60"><Puzzle className="h-4 w-4" /></div>
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white/5 text-white/60">
+                {p.has_icon ? <img src={pluginsApi.iconUrl(p.id)} alt="" className="h-full w-full object-cover" /> : <Puzzle className="h-4 w-4" />}
+              </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5">
                   <span className="truncate text-sm font-medium text-white">{p.name}</span>
@@ -127,8 +129,15 @@ function CreateModal({ runtimes, onClose, onCreated }: { runtimes: PluginRuntime
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<{ id: string; path: string } | null>(null);
+  const [icon, setIcon] = useState<File | null>(null);
+  const [iconPreview, setIconPreview] = useState("");
   const id = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48);
   const available = (r: string) => r === "static" || runtimes.find((x) => x.id === r)?.available;
+
+  const pickIcon = (f: File | null) => {
+    setIcon(f);
+    setIconPreview(f ? URL.createObjectURL(f) : "");
+  };
 
   const submit = async () => {
     if (!id) { setErr("Enter a name"); return; }
@@ -136,6 +145,7 @@ function CreateModal({ runtimes, onClose, onCreated }: { runtimes: PluginRuntime
     setBusy(true);
     try {
       const r = await pluginsApi.create(id, name.trim(), runtime, starter);
+      if (icon) await pluginsApi.uploadIcon(id, icon).catch(() => {});
       setDone({ id, path: r.path });
     } catch (e) {
       setErr(e instanceof Error ? e.message : "failed");
@@ -178,6 +188,14 @@ function CreateModal({ runtimes, onClose, onCreated }: { runtimes: PluginRuntime
               {r.label}{!available(r.id) && r.id !== "static" ? " (missing)" : ""}
             </button>
           ))}
+        </div>
+        <label className="mb-1 block text-[11px] text-white/50">Icon (optional)</label>
+        <div className="mb-3 flex items-center gap-2.5">
+          <label className="flex h-12 w-12 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-xl border border-dashed border-white/15 bg-white/[0.03] hover:border-white/30">
+            {iconPreview ? <img src={iconPreview} alt="" className="h-full w-full object-cover" /> : <Plus className="h-4 w-4 text-white/40" />}
+            <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" className="hidden" onChange={(e) => pickIcon(e.target.files?.[0] ?? null)} />
+          </label>
+          <span className="text-[11px] text-white/40">PNG/JPG/WebP/SVG. It's auto-fit to the app icon.{icon && <button onClick={() => pickIcon(null)} className="ml-2 text-white/50 underline">remove</button>}</span>
         </div>
         <label className="mb-3 flex cursor-pointer items-center gap-2 text-xs text-white/60">
           <input type="checkbox" checked={starter} onChange={(e) => setStarter(e.target.checked)} className="accent-indigo-500" />

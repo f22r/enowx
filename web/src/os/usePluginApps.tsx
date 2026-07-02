@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Loader2, AlertTriangle, Puzzle } from "lucide-react";
 import { pluginsApi, type PluginManifest } from "../lib/api";
+// pluginsApi.iconUrl builds the icon image URL for a plugin.
 import type { DesktopApp } from "./types";
 
 // PLUGIN_PREFIX namespaces plugin app ids so they never collide with built-ins.
@@ -71,7 +72,13 @@ export function usePluginApps(): DesktopApp[] {
   return plugins.map((p) => ({
     id: PLUGIN_PREFIX + p.id,
     label: p.name,
-    icon: <Puzzle />,
+    // Custom icon image (auto-fit to the icon box) when the plugin has one; else
+    // the default puzzle glyph.
+    icon: p.has_icon ? (
+      <img src={pluginsApi.iconUrl(p.id)} alt="" className="!h-full !w-full rounded-xl object-cover" />
+    ) : (
+      <Puzzle />
+    ),
     accent: "from-violet-500 to-purple-600",
     home: "drawer" as const,
     badge: "plugin",

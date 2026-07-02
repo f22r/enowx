@@ -160,6 +160,7 @@ export interface PluginManifest {
   running?: boolean;
   port?: number;
   error?: string;
+  has_icon?: boolean;
 }
 export interface PluginRuntime { id: string; available: boolean; version?: string }
 
@@ -172,6 +173,15 @@ export const pluginsApi = {
   reveal: (id: string) => api.post<{ ok: boolean; path: string }>(`/api/plugins/${id}/reveal`),
   remove: (id: string) => api.del<{ ok: boolean }>(`/api/plugins/${id}`),
   logs: (id: string) => api.get<{ lines: string[] }>(`/api/plugins/${id}/logs`),
+  iconUrl: (id: string) => `/api/plugins/${id}/icon`,
+  uploadIcon: (id: string, file: File) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    return fetch(`/api/plugins/${id}/icon`, { method: "POST", body: fd, credentials: "same-origin" }).then((r) => {
+      if (!r.ok) throw new Error("upload failed");
+      return r.json();
+    });
+  },
 };
 
 export const leonardoApi = {

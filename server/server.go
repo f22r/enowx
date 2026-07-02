@@ -269,6 +269,8 @@ func New(addr string, d Deps) *Server {
 		r.Post("/{id}/start", pluginsH.Start)
 		r.Post("/{id}/stop", pluginsH.Stop)
 		r.Post("/{id}/reveal", pluginsH.Reveal)
+		r.Get("/{id}/icon", pluginsH.Icon)
+		r.Post("/{id}/icon", pluginsH.UploadIcon)
 		r.Get("/{id}/logs", pluginsH.Logs)
 		r.Delete("/{id}", pluginsH.Delete)
 	})

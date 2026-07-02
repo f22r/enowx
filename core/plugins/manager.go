@@ -21,6 +21,7 @@ type Plugin struct {
 	Running bool   `json:"running"`
 	Port    int    `json:"port,omitempty"`
 	Error   string `json:"error,omitempty"`
+	HasIcon bool   `json:"has_icon"`
 }
 
 type proc struct {
@@ -60,7 +61,7 @@ func (m *Manager) List() []Plugin {
 		if err != nil {
 			continue // skip folders without a valid manifest
 		}
-		p := Plugin{Manifest: *man}
+		p := Plugin{Manifest: *man, HasIcon: m.HasIcon(man.ID)}
 		m.mu.Lock()
 		if pr := m.procs[man.ID]; pr != nil {
 			p.Running, p.Port, p.Error = pr.running, pr.port, pr.err
