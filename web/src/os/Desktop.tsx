@@ -13,7 +13,12 @@ import { Tooltip } from "../components/Tooltip";
 import { ProfileViewer } from "../apps/ProfileViewer";
 import { Lightbox } from "../components/Lightbox";
 import { NotifBanner } from "./NotifBanner";
-import { useMarketplaceNav, hasPendingThread } from "./marketplaceNav";
+import { openMarketplaceThread } from "./marketplaceNav";
+import { useNotifNav, consumeNotifNav } from "./notifNav";
+import { openProfile } from "./profileViewer";
+import { openPost } from "./postViewer";
+import { findPost } from "./postsBus";
+import { postsApi } from "../lib/api";
 import { useProfile } from "./useProfile";
 import { DocsApp } from "../apps/DocsApp";
 import { AdminApp } from "../apps/AdminApp";
@@ -118,12 +123,43 @@ export function Desktop() {
     if (appShortcuts[k]) openApp(appShortcuts[k]);
   });
 
-  // Clicking a rekber notification requests a marketplace thread → switch to the
-  // marketplace view; MarketplaceApp consumes the pending thread id.
-  const mktNav = useMarketplaceNav();
+  // Clicking a notification routes to its context. Desktop owns view/app state,
+  // so it dispatches by ref_type: post/comment → open the post; chat → chat view;
+  // rekber → marketplace deal thread; order → orders; else the actor's profile.
+  const notifNav = useNotifNav();
   useEffect(() => {
-    if (hasPendingThread()) setView("marketplace");
-  }, [mktNav]);
+    const n = consumeNotifNav();
+    if (!n) return;
+    (async () => {
+      switch (n.ref_type) {
+        case "post":
+        case "comment": {
+          const existing = findPost(n.ref_id);
+          if (existing) { openPost(existing); break; }
+          try {
+            const list = await postsApi.list();
+            const p = list.posts.find((x) => x.id === n.ref_id);
+            if (p) { openPost(p); break; }
+          } catch { /* ignore */ }
+          openApp("posts");
+          break;
+        }
+        case "chat":
+          setView("chat");
+          break;
+        case "rekber":
+          setView("marketplace");
+          if (n.ref_id) openMarketplaceThread(n.ref_id);
+          break;
+        case "order":
+          setView("marketplace");
+          break;
+        default:
+          if (n.actor_id) openProfile(n.actor_id);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notifNav]);
 
   const renderPanel = (side: Side) => {
     const openT = openTermOn(side);

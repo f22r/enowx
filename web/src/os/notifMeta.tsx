@@ -1,7 +1,6 @@
 import { Bell, MessageSquare, ChevronUp, Smile, AtSign, Handshake, ShieldCheck, Truck, ShoppingCart, CircleDollarSign } from "lucide-react";
 import type { Notification } from "../lib/api";
-import { openProfile } from "./profileViewer";
-import { openMarketplaceThread } from "./marketplaceNav";
+import { navigateToNotif } from "./notifNav";
 
 // Shared icon/verb maps + click routing for notifications, used by both the
 // top-bar bell and the macOS-style banner so they stay in sync.
@@ -29,14 +28,10 @@ export const NOTIF_VERB: Record<string, string> = {
   released: "released the funds",
 };
 
-// Rekber/marketplace notifications carry the thread id in ref_id.
-const REKBER_TYPES = new Set(["deal", "middleman", "shipped", "released"]);
-
-// routeNotif opens the right context for a notification click.
+// routeNotif opens the right context for a notification click. It hands off to
+// the desktop via notifNav (which owns view/app state); routing is by ref_type:
+// post/comment → open the post, chat → chat view, rekber → marketplace deal,
+// order → orders. Desktop does the actual switch.
 export function routeNotif(n: Notification) {
-  if (REKBER_TYPES.has(n.type) && n.ref_id) {
-    openMarketplaceThread(n.ref_id);
-    return;
-  }
-  if (n.actor_id) openProfile(n.actor_id);
+  navigateToNotif(n);
 }

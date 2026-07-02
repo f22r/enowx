@@ -77,6 +77,11 @@ function ensureStream() {
   };
 }
 
+// findPost returns an already-loaded post by id (for notification routing).
+export function findPost(id: number): Post | undefined {
+  return posts.find((p) => p.id === id);
+}
+
 export async function createPost(cat: string, title: string, body: string, images?: string[]) {
   const p = await postsApi.create(cat, title, body, images);
   if (p && !posts.some((x) => x.id === p.id)) {
