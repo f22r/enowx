@@ -56,6 +56,14 @@ function renderLines(text: string): ReactNode[] {
     }
     flushList(`ul-${i}`);
 
+    // Headings (#, ##, ###) — common in release notes / changelogs.
+    const hm = line.match(/^(#{1,3})\s+(.*)$/);
+    if (hm) {
+      const size = hm[1].length === 1 ? "text-sm font-bold" : hm[1].length === 2 ? "text-[13px] font-semibold" : "text-xs font-semibold text-white/70";
+      out.push(<div key={`h-${i}`} className={`mb-0.5 mt-1.5 ${size} text-white`}>{renderInline(hm[2])}</div>);
+      return;
+    }
+
     if (line.startsWith("> ")) {
       out.push(
         <blockquote key={`q-${i}`} className="my-0.5 border-l-2 border-white/25 pl-2 text-white/70">

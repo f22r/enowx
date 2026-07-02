@@ -1,14 +1,14 @@
 import { useState } from "react";
-import { Sparkles, Loader2, Download, X } from "lucide-react";
+import { Sparkles, Loader2, Download, X, RefreshCw } from "lucide-react";
 import { Popover } from "../components/Popover";
 import { Markdown } from "../components/Markdown";
-import { useUpdate, applyUpdate } from "./updateBus";
+import { useUpdate, applyUpdate, checkNow } from "./updateBus";
 
 // ChangelogButton sits in the top bar (left of the bell). It shows a red dot when
 // a newer GitHub release exists, and opens a changelog popover with an update
 // button.
 export function ChangelogButton() {
-  const { info, updating } = useUpdate();
+  const { info, updating, checking } = useUpdate();
   const [open, setOpen] = useState(false);
   const [err, setErr] = useState("");
 
@@ -32,7 +32,12 @@ export function ChangelogButton() {
           <div className="max-h-[70vh] overflow-hidden rounded-xl border border-white/10 bg-[#0e1016] shadow-2xl">
             <div className="flex items-center justify-between border-b border-white/5 px-3 py-2">
               <span className="text-[11px] font-semibold uppercase tracking-wide text-white/40">What's new</span>
-              <button onClick={() => setOpen(false)} className="rounded p-0.5 text-white/40 hover:bg-white/10 hover:text-white"><X className="h-3.5 w-3.5" /></button>
+              <div className="flex items-center gap-1">
+                <button onClick={checkNow} disabled={checking} title="Check for updates" className="rounded p-0.5 text-white/40 hover:bg-white/10 hover:text-white disabled:opacity-50">
+                  <RefreshCw className={`h-3.5 w-3.5 ${checking ? "animate-spin" : ""}`} />
+                </button>
+                <button onClick={() => setOpen(false)} className="rounded p-0.5 text-white/40 hover:bg-white/10 hover:text-white"><X className="h-3.5 w-3.5" /></button>
+              </div>
             </div>
             <div className="max-h-[60vh] space-y-2 overflow-auto p-3">
               <div className="flex items-center gap-2 text-xs">
@@ -48,7 +53,7 @@ export function ChangelogButton() {
               {info.update_available ? (
                 <>
                   <div className="rounded-lg border border-rose-500/25 bg-rose-500/10 px-2.5 py-1.5 text-[11px] text-rose-200">A new update is available.</div>
-                  {info.notes && <div className="prose-invert text-xs text-white/70"><Markdown text={info.notes} /></div>}
+                  {info.notes && <div className="text-xs leading-relaxed text-white/70"><Markdown text={info.notes} /></div>}
                   {err && <div className="text-[11px] text-red-300">{err}</div>}
                   <button onClick={doUpdate} disabled={updating} className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-2 text-xs font-medium text-white hover:bg-emerald-400 disabled:opacity-60">
                     {updating ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Updating… will restart</> : <><Download className="h-3.5 w-3.5" /> Update now</>}

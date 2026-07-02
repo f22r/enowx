@@ -44,7 +44,13 @@ type releaseInfo struct {
 }
 
 // Get returns { current, latest, update_available, notes, published_at, asset_url }.
+// ?fresh=1 bypasses the cache (the manual "Check now" button).
 func (h *Version) Get(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Query().Get("fresh") == "1" {
+		h.mu.Lock()
+		h.cached = nil
+		h.mu.Unlock()
+	}
 	rel, err := h.latest(r.Context())
 	out := map[string]any{"current": h.current, "update_available": false}
 	if err != nil || rel == nil {

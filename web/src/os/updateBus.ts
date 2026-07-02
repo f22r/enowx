@@ -12,6 +12,8 @@ function emit() {
   listeners.forEach((l) => l());
 }
 
+let checking = false;
+
 async function refresh() {
   try {
     info = await versionApi.get();
@@ -20,6 +22,20 @@ async function refresh() {
   } catch {
     /* offline / rate-limited — keep last */
   }
+}
+
+// checkNow forces a fresh (cache-bypassing) version check.
+export async function checkNow() {
+  checking = true;
+  emit();
+  try {
+    info = await versionApi.get(true);
+    loaded = true;
+  } catch {
+    /* ignore */
+  }
+  checking = false;
+  emit();
 }
 
 // applyUpdate triggers the self-update, then polls /api/version until the new
@@ -59,6 +75,7 @@ export async function applyUpdate(): Promise<void> {
 export interface UpdateState {
   info: VersionInfo;
   updating: boolean;
+  checking: boolean;
   loaded: boolean;
 }
 
@@ -74,5 +91,5 @@ export function useUpdate(): UpdateState {
       clearInterval(iv);
     };
   }, []);
-  return { info, updating, loaded };
+  return { info, updating, checking, loaded };
 }

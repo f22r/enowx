@@ -446,7 +446,7 @@ export interface VersionInfo {
   asset_url?: string;
 }
 export const versionApi = {
-  get: () => api.get<VersionInfo>("/api/version"),
+  get: (fresh = false) => api.get<VersionInfo>(`/api/version${fresh ? "?fresh=1" : ""}`),
   update: () => api.post<{ started: boolean }>("/api/update"),
 };
 
