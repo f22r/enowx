@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { Search, Trash2, Power, PowerOff, RefreshCw, Zap, Boxes, X, Copy, Check, Plus, Play, Loader2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Search, Trash2, Power, PowerOff, RefreshCw, Zap, Boxes, X, Copy, Check, Plus, Play, Loader2, MoreVertical, Download } from "lucide-react";
 import { AppShell } from "./shell";
 import { ProviderIcon } from "../components/ProviderIcon";
 import { Tooltip } from "../components/Tooltip";
@@ -23,6 +23,7 @@ export function AccountsApp() {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<string>("all");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState<number | null>(null);
   const [warming, setWarming] = useState<number | null>(null);
   const [usage, setUsage] = useState<Record<number, Usage>>({});
@@ -113,6 +114,26 @@ export function AccountsApp() {
     }
   }
 
+  useEffect(() => {
+    if (!notice) return;
+    const t = setTimeout(() => setNotice(""), 4000);
+    return () => clearTimeout(t);
+  }, [notice]);
+
+  async function apply(a: Account, target: "desktop" | "cli") {
+    setError("");
+    setBusy(a.id);
+    try {
+      const r = await accountsApi.apply(a.id, target);
+      setNotice(r.message);
+      if (r.launch_error) setError(`${a.label || a.provider}: ${r.launch_error}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "apply failed");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <AppShell title="Accounts" subtitle="The credential pool across providers">
       <div className="flex h-full flex-col">
@@ -149,6 +170,7 @@ export function AccountsApp() {
         </div>
 
         {error && <div className="mb-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">{error}</div>}
+        {notice && <div className="mb-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300">{notice}</div>}
 
         <div className="min-h-0 flex-1 overflow-auto">
           {accounts === null ? (
@@ -200,25 +222,25 @@ export function AccountsApp() {
                     {usage[a.id] && <CreditMeter u={usage[a.id]} />}
                   </div>
 
-                  <div className="flex shrink-0 items-center gap-1 opacity-60 transition-opacity group-hover:opacity-100">
-                    <ActionBtn title="View accessible models" disabled={busy === a.id} onClick={() => setModelsFor(a)}>
-                      <Boxes className="h-3.5 w-3.5" />
-                    </ActionBtn>
-                    <ActionBtn title="Warm up (test request + credit)" disabled={busy === a.id || warming === a.id} onClick={() => warmup(a)}>
-                      <Zap className={`h-3.5 w-3.5 ${warming === a.id ? "animate-pulse text-amber-300" : ""}`} />
-                    </ActionBtn>
-                    {a.disabled ? (
-                      <ActionBtn title="Enable account" disabled={busy === a.id} onClick={() => setDisabled(a, false)}>
-                        <Power className="h-3.5 w-3.5" />
-                      </ActionBtn>
-                    ) : (
-                      <ActionBtn title="Disable account" disabled={busy === a.id} onClick={() => setDisabled(a, true)}>
-                        <PowerOff className="h-3.5 w-3.5" />
-                      </ActionBtn>
-                    )}
-                    <ActionBtn title="Delete account" danger disabled={busy === a.id} onClick={() => remove(a)}>
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </ActionBtn>
+                  <div className="flex shrink-0 items-center gap-1">
+                    {warming === a.id && <Zap className="h-3.5 w-3.5 animate-pulse text-amber-300" />}
+                    <Tooltip label="View accessible models">
+                      <button
+                        onClick={() => setModelsFor(a)}
+                        disabled={busy === a.id}
+                        className="rounded-lg border border-white/10 bg-white/[0.03] p-1.5 text-white/55 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-40"
+                      >
+                        <Boxes className="h-3.5 w-3.5" />
+                      </button>
+                    </Tooltip>
+                    <AccountMenu
+                      account={a}
+                      busy={busy === a.id}
+                      onWarmup={() => warmup(a)}
+                      onApply={(t) => apply(a, t)}
+                      onToggle={() => setDisabled(a, !a.disabled)}
+                      onDelete={() => remove(a)}
+                    />
                   </div>
                 </div>
               ))}
@@ -416,30 +438,86 @@ function fmtReset(secs: number): string {
   return `${secs}s`;
 }
 
-function ActionBtn({
-  title,
-  onClick,
-  disabled,
-  danger,
-  children,
+// AccountMenu is the per-account 3-dot dropdown of actions. Apply items only
+// show when the account's creds can be written to a local IDE/CLI.
+function AccountMenu({
+  account,
+  busy,
+  onWarmup,
+  onApply,
+  onToggle,
+  onDelete,
 }: {
-  title: string;
-  onClick: () => void;
-  disabled?: boolean;
-  danger?: boolean;
-  children: React.ReactNode;
+  account: Account;
+  busy: boolean;
+  onWarmup: () => void;
+  onApply: (target: "desktop" | "cli") => void;
+  onToggle: () => void;
+  onDelete: () => void;
 }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onEsc = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onEsc);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onEsc);
+    };
+  }, [open]);
+
+  const run = (fn: () => void) => () => {
+    setOpen(false);
+    fn();
+  };
+  const item = "flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-white/75 hover:bg-white/10 disabled:opacity-40";
+  const canApply = account.can_apply;
+  const isKiro = account.provider === "kiro";
+
   return (
-    <Tooltip label={title}>
+    <div ref={ref} className="relative">
       <button
-        onClick={onClick}
-        disabled={disabled}
-        className={`rounded-lg border border-white/10 bg-white/[0.03] p-1.5 text-white/55 transition-colors disabled:opacity-40 ${
-          danger ? "hover:bg-red-500/30 hover:text-red-200" : "hover:bg-white/10 hover:text-white"
-        }`}
+        onClick={() => setOpen((v) => !v)}
+        disabled={busy}
+        className="rounded-lg border border-white/10 bg-white/[0.03] p-1.5 text-white/55 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-40"
+        title="Actions"
       >
-        {children}
+        <MoreVertical className="h-3.5 w-3.5" />
       </button>
-    </Tooltip>
+      {open && (
+        <div className="absolute right-0 z-30 mt-1 w-44 overflow-hidden rounded-lg border border-white/10 bg-[#14161d] py-1 shadow-xl">
+          <button className={item} onClick={run(onWarmup)}>
+            <Zap className="h-3.5 w-3.5" /> Warm up
+          </button>
+          {canApply && (
+            <>
+              <div className="my-1 border-t border-white/5" />
+              <button className={item} onClick={run(() => onApply("desktop"))}>
+                <Download className="h-3.5 w-3.5" /> Apply to {isKiro ? "IDE" : "app"}
+              </button>
+              {isKiro && (
+                <button className={item} onClick={run(() => onApply("cli"))}>
+                  <Download className="h-3.5 w-3.5" /> Apply to CLI
+                </button>
+              )}
+            </>
+          )}
+          <div className="my-1 border-t border-white/5" />
+          <button className={item} onClick={run(onToggle)}>
+            {account.disabled ? <Power className="h-3.5 w-3.5" /> : <PowerOff className="h-3.5 w-3.5" />}
+            {account.disabled ? "Enable" : "Disable"}
+          </button>
+          <button className={`${item} text-red-300 hover:bg-red-500/20`} onClick={run(onDelete)}>
+            <Trash2 className="h-3.5 w-3.5" /> Delete
+          </button>
+        </div>
+      )}
+    </div>
   );
 }

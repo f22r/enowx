@@ -32,6 +32,7 @@ export interface Account {
   status: string;
   disabled: boolean;
   has: string[];
+  can_apply?: boolean;
   created_at: string;
 }
 
@@ -104,6 +105,11 @@ export const accountsApi = {
   warmup: (id: number) =>
     api.post<{ ok: boolean; status: string; error?: string; usage_supported?: boolean; usage?: Usage }>(
       `/api/accounts/${id}/warmup`,
+    ),
+  apply: (id: number, target: "desktop" | "cli" = "desktop", launch = true) =>
+    api.post<{ applied: boolean; action: string; message: string; target_path: string; launch_error?: string }>(
+      `/api/accounts/${id}/apply`,
+      { target, launch },
     ),
 };
 

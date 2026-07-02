@@ -66,6 +66,7 @@ func New(addr string, d Deps) *Server {
 	aliases := handlers.NewAliases(d.Aliases)
 	apitest := handlers.NewApiTest(d.ApiTest)
 	warmup := handlers.NewWarmup(d.Proxy, d.Registry, d.Accounts, d.Warmups, d.Logs)
+	apply := handlers.NewApply(d.Accounts)
 	// Auto-warm newly-added accounts (credit check + test request) before pool.
 	accounts.SetWarmer(warmup)
 	kiro.SetWarmer(warmup)
@@ -120,6 +121,7 @@ func New(addr string, d Deps) *Server {
 		r.Delete("/apitest/history", apitest.ClearHistory)
 		r.Post("/accounts/{id}/warmup", warmup.Run)
 		r.Post("/accounts/{id}/test-model", warmup.TestModel)
+		r.Post("/accounts/{id}/apply", apply.Apply)
 		r.Get("/warmup-logs", warmup.List)
 		r.Delete("/warmup-logs", warmup.Clear)
 		r.Delete("/accounts/{id}", accounts.Delete)

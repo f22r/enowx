@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/enowdev/enowx/core/localcreds"
 	"github.com/enowdev/enowx/store"
 )
 
@@ -29,6 +30,7 @@ type accountDTO struct {
 	Status    string   `json:"status"`
 	Disabled  bool     `json:"disabled"`
 	Has       []string `json:"has"` // credential keys present (never the values)
+	CanApply  bool     `json:"can_apply"` // creds can be written to a local IDE/CLI
 	CreatedAt string   `json:"created_at"`
 }
 
@@ -47,6 +49,7 @@ func toDTO(a store.Account) accountDTO {
 		Status:    a.Status,
 		Disabled:  a.Disabled,
 		Has:       has,
+		CanApply:  localcreds.SupportsApply(a.Provider) && len(a.Creds) > 0,
 		CreatedAt: a.CreatedAt.Format("2006-01-02 15:04"),
 	}
 }
