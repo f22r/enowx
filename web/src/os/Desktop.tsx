@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { AnimatePresence } from "framer-motion";
-import { LayoutGrid, SquareTerminal, BookOpen, Grid3x3, Bot, FlaskConical, ShieldCheck } from "lucide-react";
+import { LayoutGrid, SquareTerminal, BookOpen, Grid3x3, Bot, FlaskConical, ShieldCheck, Store } from "lucide-react";
 import { buildApps } from "../apps";
 import { SideDock } from "./SideDock";
 import { SidePanel } from "./SidePanel";
@@ -15,6 +15,7 @@ import { Lightbox } from "../components/Lightbox";
 import { useProfile } from "./useProfile";
 import { DocsApp } from "../apps/DocsApp";
 import { AdminApp } from "../apps/AdminApp";
+import { MarketplaceApp } from "../apps/MarketplaceApp";
 import { AiChatApp } from "../apps/AiChatApp";
 import { ApiTestApp } from "../apps/ApiTestApp";
 import { usePanels } from "./usePanels";
@@ -25,7 +26,7 @@ import { useTerminals, type TermLocation } from "./useTerminals";
 import { usePluginApps } from "./usePluginApps";
 import type { AppId, Location, Side } from "./types";
 
-type CenterView = "widget" | "terminal" | "chat" | "apitest" | "apps" | "admin" | "docs";
+type CenterView = "widget" | "terminal" | "chat" | "apitest" | "apps" | "marketplace" | "admin" | "docs";
 
 export function Desktop() {
   const profile = useProfile();
@@ -83,7 +84,7 @@ export function Desktop() {
     c: "profile",
   };
   const leaderActive = useShortcuts((k) => {
-    const v: Record<string, CenterView> = { "1": "widget", "2": "terminal", "3": "chat", "4": "apitest", "5": "apps", "6": "docs", "7": "admin" };
+    const v: Record<string, CenterView> = { "1": "widget", "2": "terminal", "3": "chat", "4": "apitest", "5": "apps", "6": "docs", "7": "admin", "8": "marketplace" };
     if (v[k]) {
       setView(v[k]);
       return;
@@ -134,6 +135,9 @@ export function Desktop() {
             </div>
             <div className={`absolute inset-0 ${view === "apps" ? "" : "hidden"}`}>
               <AppsDrawer apps={drawerApps} onOpen={openApp} onDropToDrawer={(id) => move(id, "drawer")} />
+            </div>
+            <div className={`absolute inset-0 overflow-hidden rounded-2xl border border-white/10 bg-[var(--window-bg)]/80 ${view === "marketplace" ? "" : "hidden"}`}>
+              <MarketplaceApp />
             </div>
             {isMod && (
               <div className={`absolute inset-0 overflow-hidden rounded-2xl border border-white/10 bg-[var(--window-bg)]/80 ${view === "admin" ? "" : "hidden"}`}>
@@ -202,6 +206,7 @@ function CenterNav({ view, onView, isMod }: { view: CenterView; onView: (v: Cent
     { id: "chat", label: "Chat", icon: Bot, key: "3" },
     { id: "apitest", label: "API Test", icon: FlaskConical, key: "4" },
     { id: "apps", label: "Apps", icon: Grid3x3, key: "5" },
+    { id: "marketplace", label: "Market", icon: Store, key: "8" },
     ...(isMod ? [{ id: "admin" as const, label: "Admin", icon: ShieldCheck, key: "7" }] : []),
     { id: "docs", label: "Docs", icon: BookOpen, key: "6" },
   ];

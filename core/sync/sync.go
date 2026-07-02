@@ -524,6 +524,44 @@ func (m *Manager) PostAction(ctx context.Context, method, id, suffix string, bod
 	return string(raw), nil
 }
 
+// --- marketplace ---
+
+// MarketplaceList browses listings (query string like "?kind=community&q=...").
+func (m *Manager) MarketplaceList(ctx context.Context, query string) (string, error) {
+	var raw json.RawMessage
+	if err := m.call(ctx, http.MethodGet, "/marketplace/listings"+query, nil, &raw); err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
+
+// MarketplaceGet fetches one listing.
+func (m *Manager) MarketplaceGet(ctx context.Context, id string) (string, error) {
+	var raw json.RawMessage
+	if err := m.call(ctx, http.MethodGet, "/marketplace/listings/"+id, nil, &raw); err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
+
+// MarketplaceCreate creates a listing.
+func (m *Manager) MarketplaceCreate(ctx context.Context, body json.RawMessage) (string, error) {
+	var raw json.RawMessage
+	if err := m.call(ctx, http.MethodPost, "/marketplace/listings", body, &raw); err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
+
+// MarketplaceAction proxies a listing sub-action: PATCH/DELETE on /marketplace/listings/{id}.
+func (m *Manager) MarketplaceAction(ctx context.Context, method, id string, body json.RawMessage) (string, error) {
+	var raw json.RawMessage
+	if err := m.call(ctx, method, "/marketplace/listings/"+id, body, &raw); err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
+
 // PostComments fetches a post's comments.
 func (m *Manager) PostComments(ctx context.Context, postID string) (string, error) {
 	var raw json.RawMessage

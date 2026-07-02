@@ -724,6 +724,59 @@ export const postsApi = {
   react: (id: number, emoji: string) => api.post<{ id: number; reactions: Reaction[] }>(`/api/posts/${id}/reactions`, { emoji }),
 };
 
+// Marketplace listing (author snapshot baked in).
+export interface Listing {
+  id: number;
+  user_id: string;
+  kind: "official" | "community";
+  category: string;
+  title: string;
+  description: string;
+  images: string[];
+  price_amount: number;
+  currency: string;
+  status: string;
+  stock: number;
+  warranty: string;
+  created_at: string;
+  updated_at: string;
+  username: string;
+  display_name: string;
+  avatar_url: string;
+  top_role_id: string;
+  wears_tag: boolean;
+  guild_tag: string;
+}
+export interface ListingCategory { key: string; label: string }
+export interface ListingInput {
+  kind: "official" | "community";
+  category: string;
+  title: string;
+  description: string;
+  images: string[];
+  price_amount: number;
+  currency?: string;
+  status?: string;
+  stock: number;
+  warranty?: string;
+}
+
+export const marketplaceApi = {
+  list: (opts?: { kind?: string; category?: string; q?: string; before?: number }) => {
+    const p = new URLSearchParams();
+    if (opts?.kind) p.set("kind", opts.kind);
+    if (opts?.category) p.set("category", opts.category);
+    if (opts?.q) p.set("q", opts.q);
+    if (opts?.before) p.set("before", String(opts.before));
+    const s = p.toString();
+    return api.get<{ listings: Listing[]; categories: ListingCategory[] }>(`/api/marketplace/listings${s ? `?${s}` : ""}`);
+  },
+  get: (id: number) => api.get<Listing>(`/api/marketplace/listings/${id}`),
+  create: (in_: ListingInput) => api.post<Listing>("/api/marketplace/listings", in_),
+  update: (id: number, in_: Partial<ListingInput>) => api.patch<Listing>(`/api/marketplace/listings/${id}`, in_),
+  remove: (id: number) => api.del<{ ok: boolean }>(`/api/marketplace/listings/${id}`),
+};
+
 // ChatMessage carries the message + a snapshot of the author's identity.
 export interface ChatMessage {
   id: number;
