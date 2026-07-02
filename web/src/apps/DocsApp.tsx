@@ -170,6 +170,40 @@ function PluginSDK() {
 enowx.self("api/x")     // call your OWN endpoint
 enowx.api("models")     // call the enowx dashboard API (/api/models)`}</Code>
       </section>
+
+      <section>
+        <h3 className="mb-1 text-sm font-semibold text-white">Custom icon</h3>
+        <p>Drop an <code className="rounded bg-white/10 px-1">icon.png</code> (or webp/jpg/svg) in the plugin folder, or set one when creating the plugin. It's shown on the app tile and auto-fits (cover). Otherwise a default puzzle icon is used.</p>
+      </section>
+
+      <section>
+        <h3 className="mb-1 text-sm font-semibold text-white">Publish to the marketplace</h3>
+        <p>Hit <span className="text-white/80">Publish</span> on your plugin (Plugins app) to share it. enowx zips the folder — excluding <code className="rounded bg-white/10 px-1">_deps/</code>, <code className="rounded bg-white/10 px-1">node_modules/</code>, <code className="rounded bg-white/10 px-1">.git/</code> (deps are re-installed on the installer's machine) — uploads it, and runs a security scan. The outcome is one of:</p>
+        <ul className="mt-1.5 ml-4 list-disc space-y-1 text-white/55">
+          <li><span className="text-emerald-300">approved</span> — listed publicly right away.</li>
+          <li><span className="text-red-300">rejected</span> — not listed; you get the reason. A moderator can still override a false positive.</li>
+          <li><span className="text-amber-300">pending</span> — the AI reviewer was momentarily unavailable; a moderator reviews it manually before it goes live.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h3 className="mb-1 text-sm font-semibold text-white">What the scan rejects</h3>
+        <p>Two layers run on every publish. Write plain, readable source and you'll pass.</p>
+        <ul className="mt-1.5 ml-4 list-disc space-y-1 text-white/55">
+          <li><span className="text-white/80">Heuristics</span> — binaries/executables (<code className="rounded bg-white/10 px-1">.so/.dll/.exe</code>, ELF/Mach-O/PE), obfuscated or <span className="text-white/80">encrypted</span> scripts (<code className="rounded bg-white/10 px-1">exec/eval</code> of base64/marshal, PyArmor, packed <code className="rounded bg-white/10 px-1">_0x</code> JS, big high-entropy blobs), and disguised network addresses (hex-escaped, <code className="rounded bg-white/10 px-1">chr()</code>-built, split-string URLs).</li>
+          <li><span className="text-white/80">AI review</span> — judges intent: reverse shells/backdoors, credential/data exfiltration, keyloggers, crypto miners, and downloading-and-running remote code are rejected.</li>
+        </ul>
+        <p className="mt-1.5 text-white/45">Outbound network calls are <span className="text-white/70">allowed</span> — plugins can talk to <code className="rounded bg-white/10 px-1">ENOWX_API</code> and to third-party APIs your plugin legitimately needs. The scan flags egress so the reviewer can confirm the destination fits your plugin's purpose; sending user data (tokens, files, keystrokes) to an unrelated host is what gets rejected, no matter how reputable the domain looks.</p>
+      </section>
+
+      <section>
+        <h3 className="mb-1 text-sm font-semibold text-white">Install from the marketplace</h3>
+        <p>Open the <span className="text-white/80">Marketplace</span> tab in the Plugins app, search, and hit <span className="text-white/80">Install</span>. enowx downloads the bundle and extracts it into <code className="rounded bg-white/10 px-1">~/.enowx/plugins/&lt;id&gt;/</code>; it then appears as an app (with a <span className="text-amber-300">plugin</span> badge) and its dependencies install on first run.</p>
+      </section>
+
+      <section className="rounded-lg border border-amber-500/20 bg-amber-500/[0.06] p-3 text-[11px] text-amber-200/90">
+        Plugins run on your machine with full access. The scan blocks obvious malware, but only install plugins you trust.
+      </section>
     </div>
   );
 }

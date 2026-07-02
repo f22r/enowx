@@ -43,8 +43,8 @@ func (h *Docs) Get(w http.ResponseWriter, _ *http.Request) {
 			"envelope":       "Management /api responses are wrapped as {\"data\": ...} on success or {\"error\": \"...\"} on failure.",
 		},
 		"plugins": map[string]any{
-			"summary":   "Plugins extend enowx via the documented HTTP API. A plugin discovers capabilities from GET /api/docs and calls the listed endpoints. A plugin marketplace (upload/install) is planned; this catalog is the contract plugins build against.",
-			"discovery": "GET /api/docs returns this catalog; treat method+path as the stable interface.",
+			"summary":   "Plugins are mini-apps you build and run locally, and can share via the marketplace. A plugin runs as a sidecar, serves its own UI, and calls the documented enowx HTTP API. Publish sends your plugin through a security scan (heuristics + AI); install pulls a published plugin onto your machine.",
+			"discovery": "GET /api/docs returns this catalog; treat method+path as the stable interface. Build reference: the Plugins tab below.",
 		},
 		"shortcuts": map[string]any{
 			"summary": "Hold Ctrl or Alt (left or right) — a hint appears; while held, press a key to switch instantly. Release to dismiss. On macOS this uses Ctrl (not Cmd), so it won't fight Cmd-based browser shortcuts.",
