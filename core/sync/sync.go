@@ -435,6 +435,42 @@ func (m *Manager) ReviewDetail(ctx context.Context, id string) (string, error) {
 	return string(raw), nil
 }
 
+// AdminPlugins lists plugins of a status for moderators (approve/reject queue).
+func (m *Manager) AdminPlugins(ctx context.Context, query string) (string, error) {
+	var raw json.RawMessage
+	if err := m.call(ctx, http.MethodGet, "/admin/plugins"+query, nil, &raw); err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
+
+// PluginSource fetches a plugin's full source (moderator inspection).
+func (m *Manager) PluginSource(ctx context.Context, id string) (string, error) {
+	var raw json.RawMessage
+	if err := m.call(ctx, http.MethodGet, "/admin/plugins/"+id+"/source", nil, &raw); err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
+
+// SetPluginStatus approves/rejects a plugin (moderator override). action = approve|reject.
+func (m *Manager) SetPluginStatus(ctx context.Context, id, action string, body json.RawMessage) (string, error) {
+	var raw json.RawMessage
+	if err := m.call(ctx, http.MethodPost, "/admin/plugins/"+id+"/"+action, body, &raw); err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
+
+// TakedownPlugin removes a plugin from the marketplace (moderator).
+func (m *Manager) TakedownPlugin(ctx context.Context, id string) (string, error) {
+	var raw json.RawMessage
+	if err := m.call(ctx, http.MethodDelete, "/admin/plugins/"+id, nil, &raw); err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
+
 // AdminSettings gets the admin settings (endpoint + has_key, never the key).
 func (m *Manager) AdminSettings(ctx context.Context) (string, error) {
 	var raw json.RawMessage

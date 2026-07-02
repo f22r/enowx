@@ -616,7 +616,29 @@ export const adminApi = {
     api.put<{ ok: boolean }>("/api/admin/plugin-scan", s),
   pluginReviews: (verdict = "") => api.get<{ reviews: PluginReview[] }>(`/api/admin/plugin-reviews${verdict ? `?verdict=${verdict}` : ""}`),
   pluginReview: (id: number) => api.get<PluginReviewDetail>(`/api/admin/plugin-reviews/${id}`),
+  // Marketplace moderation
+  marketPlugins: (status = "") => api.get<{ plugins: AdminMarketPlugin[] }>(`/api/admin/marketplace${status ? `?status=${status}` : ""}`),
+  marketSource: (id: number) => api.get<{ id: number; name: string; slug: string; runtime: string; sources: { path: string; content: string }[] }>(`/api/admin/marketplace/${id}/source`),
+  marketApprove: (id: number, reason = "") => api.post<{ ok: boolean }>(`/api/admin/marketplace/${id}/approve`, { reason }),
+  marketReject: (id: number, reason: string) => api.post<{ ok: boolean }>(`/api/admin/marketplace/${id}/reject`, { reason }),
+  marketTakedown: (id: number) => api.del<{ ok: boolean }>(`/api/admin/marketplace/${id}`),
 };
+
+export interface AdminMarketPlugin {
+  id: number;
+  slug: string;
+  name: string;
+  description: string;
+  runtime: string;
+  icon_url: string;
+  version: string;
+  install_count: number;
+  status: string; // approved | rejected | pending
+  review_reason: string;
+  created_at: string;
+  username: string;
+  display_name: string;
+}
 
 export interface PluginReview {
   id: number;

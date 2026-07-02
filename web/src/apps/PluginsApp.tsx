@@ -65,6 +65,8 @@ export function PluginsApp() {
       const r = await marketApi.publish(p.id);
       if (r.status === "approved") {
         await dialog.alert({ title: "Published 🎉", message: `${p.name} passed the scan and is now in the marketplace.` });
+      } else if (r.status === "pending") {
+        await dialog.alert({ title: "Pending review ⏳", message: r.reason || `${p.name} is queued for manual moderator review and will be listed once approved.` });
       } else {
         await dialog.alert({ title: "Rejected", message: r.reason ? `${r.reason}${r.file ? ` (${r.file})` : ""}` : "The security scan rejected this plugin." });
       }

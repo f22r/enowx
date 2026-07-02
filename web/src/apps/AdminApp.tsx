@@ -3,10 +3,11 @@ import { Loader2, Users, Copy, ScrollText, BarChart3, ShieldCheck, ShieldOff, Se
 import { openProfile } from "../os/profileViewer";
 import { useAdminEvents } from "../os/adminBus";
 import { useDialog } from "../os/dialog";
-import { FileSearch, X } from "lucide-react";
-import { adminApi, modApi, searchApi, type FlaggedLink, type ModAction, type AdminStats, type ProviderModel, type PluginReview, type PluginReviewDetail } from "../lib/api";
+import { FileSearch, X, Store, Check, Puzzle } from "lucide-react";
+import { Tooltip } from "../components/Tooltip";
+import { adminApi, modApi, searchApi, type FlaggedLink, type ModAction, type AdminStats, type ProviderModel, type PluginReview, type PluginReviewDetail, type AdminMarketPlugin } from "../lib/api";
 
-type Tab = "stats" | "flags" | "users" | "models" | "scan" | "reviews" | "log";
+type Tab = "stats" | "flags" | "users" | "models" | "market" | "scan" | "reviews" | "log";
 
 // AdminApp is the moderator-only Admin Tools app. It only appears in the dock
 // for moderators (see apps registry), and every endpoint it calls is role-gated
@@ -19,6 +20,7 @@ export function AdminApp() {
     { id: "flags", label: "Duplicates", icon: Copy },
     { id: "users", label: "Users", icon: Users },
     { id: "models", label: "Models", icon: Boxes },
+    { id: "market", label: "Marketplace", icon: Store },
     { id: "scan", label: "Plugin scan", icon: ShieldCheck },
     { id: "reviews", label: "Review log", icon: FileSearch },
     { id: "log", label: "Mod log", icon: ScrollText },
@@ -55,6 +57,7 @@ export function AdminApp() {
         {tab === "flags" && <FlagsTab />}
         {tab === "users" && <UsersTab />}
         {tab === "models" && <ModelsTab />}
+        {tab === "market" && <MarketplaceTab />}
         {tab === "scan" && <PluginScanTab />}
         {tab === "reviews" && <ReviewLogTab />}
         {tab === "log" && <LogTab />}
@@ -604,6 +607,111 @@ function ReviewDetailModal({ r, onClose }: { r: PluginReviewDetail; onClose: () 
               </div>
             ))
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// MarketplaceTab moderates published/pending/rejected plugins: view full source,
+// approve (incl. a rejected false positive), reject, or take down.
+function MarketplaceTab() {
+  const [items, setItems] = useState<AdminMarketPlugin[] | null>(null);
+  const [status, setStatus] = useState<"pending" | "approved" | "rejected" | "">("pending");
+  const [busy, setBusy] = useState(0);
+  const [source, setSource] = useState<{ name: string; sources: { path: string; content: string }[] } | null>(null);
+  const [err, setErr] = useState("");
+  const dialog = useDialog();
+
+  const load = useCallback((s: string) => {
+    adminApi.marketPlugins(s).then((r) => { setItems(r.plugins ?? []); setErr(""); }).catch((e) => setErr(e instanceof Error ? e.message : "failed"));
+  }, []);
+  useEffect(() => load(status), [load, status]);
+
+  const act = async (fn: () => Promise<unknown>, id: number) => {
+    setBusy(id); setErr("");
+    try { await fn(); load(status); } catch (e) { setErr(e instanceof Error ? e.message : "action failed"); } finally { setBusy(0); }
+  };
+
+  const approve = (p: AdminMarketPlugin) => act(() => adminApi.marketApprove(p.id), p.id);
+  const reject = async (p: AdminMarketPlugin) => {
+    const reason = await dialog.prompt({ title: `Reject ${p.name}?`, message: "Reason (shown to the author):", placeholder: "e.g. contains data exfiltration" });
+    if (reason) act(() => adminApi.marketReject(p.id, reason), p.id);
+  };
+  const takedown = async (p: AdminMarketPlugin) => {
+    const ok = await dialog.confirm({ title: `Take down ${p.name}?`, message: "Removes it from the marketplace and deletes its bundle.", confirmLabel: "Take down", danger: true });
+    if (ok) act(() => adminApi.marketTakedown(p.id), p.id);
+  };
+  const viewSource = async (p: AdminMarketPlugin) => {
+    try { const r = await adminApi.marketSource(p.id); setSource({ name: r.name, sources: r.sources ?? [] }); }
+    catch (e) { setErr(e instanceof Error ? e.message : "could not load source"); }
+  };
+
+  const badge = (s: string) => s === "approved" ? "bg-emerald-500/20 text-emerald-300" : s === "rejected" ? "bg-red-500/20 text-red-300" : "bg-amber-500/20 text-amber-300";
+
+  return (
+    <div>
+      <div className="mb-3 flex items-center gap-1">
+        {(["pending", "approved", "rejected", ""] as const).map((s) => (
+          <button key={s || "all"} onClick={() => setStatus(s)} className={`rounded-lg px-2.5 py-1 text-xs ${status === s ? "bg-white/12 text-white" : "text-white/45 hover:text-white/80"}`}>
+            {s === "" ? "All" : s[0].toUpperCase() + s.slice(1)}
+          </button>
+        ))}
+      </div>
+      {err && <div className="mb-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">{err}</div>}
+      {!items ? (
+        <div className="h-10 animate-pulse rounded-lg bg-white/5" />
+      ) : items.length === 0 ? (
+        <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3 text-xs text-white/40">No {status || ""} plugins.</div>
+      ) : (
+        <div className="space-y-2">
+          {items.map((p) => (
+            <div key={p.id} className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.02] p-2.5">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white/5 text-white/60">
+                {p.icon_url ? <img src={p.icon_url} alt="" className="h-full w-full object-cover" /> : <Puzzle className="h-4 w-4" />}
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="truncate text-sm font-medium text-white">{p.name}</span>
+                  <span className={`rounded px-1.5 py-0.5 text-[9px] font-bold uppercase ${badge(p.status)}`}>{p.status}</span>
+                  <span className="rounded bg-white/10 px-1 text-[9px] uppercase text-white/50">{p.runtime}</span>
+                </div>
+                {p.review_reason && <div className="mt-0.5 truncate text-[11px] text-white/50">{p.review_reason}</div>}
+                <div className="mt-0.5 text-[10px] text-white/30">by {p.display_name || p.username} · {p.install_count} installs</div>
+              </div>
+              <div className="flex shrink-0 items-center gap-1">
+                <Tooltip label="View full source"><button onClick={() => viewSource(p)} className="rounded-lg border border-white/10 bg-white/[0.03] p-1.5 text-white/55 hover:bg-white/10 hover:text-white"><FileSearch className="h-3.5 w-3.5" /></button></Tooltip>
+                {p.status !== "approved" && <Tooltip label="Approve"><button onClick={() => approve(p)} disabled={busy === p.id} className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-1.5 text-emerald-300 hover:bg-emerald-500/20 disabled:opacity-40"><Check className="h-3.5 w-3.5" /></button></Tooltip>}
+                {p.status !== "rejected" && <Tooltip label="Reject"><button onClick={() => reject(p)} disabled={busy === p.id} className="rounded-lg border border-white/10 bg-white/[0.03] p-1.5 text-white/55 hover:bg-red-500/20 hover:text-red-200 disabled:opacity-40"><Ban className="h-3.5 w-3.5" /></button></Tooltip>}
+                <Tooltip label="Take down"><button onClick={() => takedown(p)} disabled={busy === p.id} className="rounded-lg border border-white/10 bg-white/[0.03] p-1.5 text-white/55 hover:bg-red-500/30 hover:text-red-200 disabled:opacity-40"><Trash2 className="h-3.5 w-3.5" /></button></Tooltip>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {source && <SourceModal name={source.name} sources={source.sources} onClose={() => setSource(null)} />}
+    </div>
+  );
+}
+
+function SourceModal({ name, sources, onClose }: { name: string; sources: { path: string; content: string }[]; onClose: () => void }) {
+  return (
+    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div className="flex h-[85%] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#11131a] shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-2 border-b border-white/5 px-4 py-3">
+          <FileSearch className="h-4 w-4 text-white/50" />
+          <div className="min-w-0 flex-1 truncate text-sm font-semibold text-white">{name} — full source ({sources.length} files)</div>
+          <button onClick={onClose} className="rounded p-1 text-white/40 hover:bg-white/10 hover:text-white"><X className="h-4 w-4" /></button>
+        </div>
+        <div className="min-h-0 flex-1 space-y-3 overflow-auto p-3">
+          {sources.length === 0 ? (
+            <div className="text-xs text-white/40">No source files (binary or empty bundle).</div>
+          ) : sources.map((f, i) => (
+            <div key={i} className="overflow-hidden rounded-lg border border-white/10">
+              <div className="border-b border-white/5 bg-white/[0.03] px-3 py-1.5 font-mono text-[11px] text-white/60">{f.path}</div>
+              <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words px-3 py-2 font-mono text-[10px] leading-relaxed text-white/75">{f.content}</pre>
+            </div>
+          ))}
         </div>
       </div>
     </div>

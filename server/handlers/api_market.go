@@ -119,6 +119,68 @@ func (h *Market) Install(w http.ResponseWriter, r *http.Request) {
 	writeData(w, map[string]any{"installed": true, "id": meta.Slug})
 }
 
+// GET /api/admin/marketplace?status= — moderator plugin list (approve/reject queue).
+func (h *Market) AdminPlugins(w http.ResponseWriter, r *http.Request) {
+	if !h.guard(w, r) {
+		return
+	}
+	q := ""
+	if v := strings.TrimSpace(r.URL.Query().Get("status")); v != "" {
+		q = "?status=" + v
+	}
+	raw, err := h.sync.AdminPlugins(r.Context(), q)
+	if err != nil {
+		writeAPIErr(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	h.rawJSON(w, raw)
+}
+
+// GET /api/admin/marketplace/{id}/source — full source of a plugin.
+func (h *Market) PluginSource(w http.ResponseWriter, r *http.Request) {
+	if !h.guard(w, r) {
+		return
+	}
+	raw, err := h.sync.PluginSource(r.Context(), chi.URLParam(r, "id"))
+	if err != nil {
+		writeAPIErr(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	h.rawJSON(w, raw)
+}
+
+// POST /api/admin/marketplace/{id}/{action} — approve|reject.
+func (h *Market) SetStatus(w http.ResponseWriter, r *http.Request) {
+	if !h.guard(w, r) {
+		return
+	}
+	action := chi.URLParam(r, "action")
+	if action != "approve" && action != "reject" {
+		writeAPIErr(w, http.StatusBadRequest, "bad action")
+		return
+	}
+	body, _ := io.ReadAll(r.Body)
+	raw, err := h.sync.SetPluginStatus(r.Context(), chi.URLParam(r, "id"), action, body)
+	if err != nil {
+		writeAPIErr(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	h.rawJSON(w, raw)
+}
+
+// DELETE /api/admin/marketplace/{id} — takedown.
+func (h *Market) Takedown(w http.ResponseWriter, r *http.Request) {
+	if !h.guard(w, r) {
+		return
+	}
+	raw, err := h.sync.TakedownPlugin(r.Context(), chi.URLParam(r, "id"))
+	if err != nil {
+		writeAPIErr(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	h.rawJSON(w, raw)
+}
+
 // GET /api/admin/plugin-reviews — the review audit log (proxied).
 func (h *Market) Reviews(w http.ResponseWriter, r *http.Request) {
 	if !h.guard(w, r) {
