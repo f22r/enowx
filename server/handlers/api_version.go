@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/enowdev/enowx/core/transport"
+	"github.com/enowdev/enowx/core/updater"
 	"github.com/enowdev/enowx/server/middleware"
 )
 
@@ -57,6 +58,36 @@ func (h *Version) Get(w http.ResponseWriter, r *http.Request) {
 	out["asset_url"] = rel.AssetURL
 	out["update_available"] = h.current != "dev" && semverNewer(rel.Tag, h.current)
 	writeData(w, out)
+}
+
+// Update performs the self-update: download the latest asset, verify, hand off to
+// a detached updater that swaps the binary + restarts. Dashboard-gated; refuses
+// on dev builds.
+func (h *Version) Update(w http.ResponseWriter, r *http.Request) {
+	if !h.dash.Authorized(r) {
+		writeAPIErr(w, http.StatusForbidden, "requires the dashboard login when accessed remotely")
+		return
+	}
+	if h.current == "dev" {
+		writeAPIErr(w, http.StatusBadRequest, "development builds don't self-update")
+		return
+	}
+	rel, err := h.latest(r.Context())
+	if err != nil || rel == nil || rel.AssetURL == "" {
+		writeAPIErr(w, http.StatusBadGateway, "couldn't resolve the update download")
+		return
+	}
+	if !semverNewer(rel.Tag, h.current) {
+		writeAPIErr(w, http.StatusBadRequest, "already up to date")
+		return
+	}
+	if err := updater.Apply(h.doer, rel.AssetURL, rel.AssetSHA); err != nil {
+		writeAPIErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeData(w, map[string]any{"started": true})
+	// Exit shortly so the detached updater can replace the binary + restart.
+	updater.ExitSoon()
 }
 
 // latest fetches (and ~30-min caches) the newest release for THIS platform.

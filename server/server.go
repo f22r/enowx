@@ -152,6 +152,7 @@ func New(addr string, d Deps) *Server {
 		r.Delete("/keys/{id}", keys.Delete)
 		r.Get("/settings", settings.Get)
 		r.Get("/version", versionH.Get)
+		r.Post("/update", versionH.Update)
 		r.Get("/debug", dbg.Get)
 		r.Get("/docs", docs.Get)
 
