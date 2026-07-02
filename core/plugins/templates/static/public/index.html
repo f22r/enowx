@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>My Plugin</title>
+  <link rel="stylesheet" href="/plugin-kit/kit.css" />
+  <script src="/plugin-kit/kit.js" defer></script>
+</head>
+<body class="ex">
+  <div class="ex-card">
+    <h1 class="ex-title">Hello 👋</h1>
+    <p class="ex-muted">This is a static plugin — just HTML/CSS/JS. Edit <code>public/index.html</code>.</p>
+    <button id="go" class="ex-btn">Click me</button>
+    <pre id="out" class="ex-out"></pre>
+  </div>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      let n = 0;
+      document.getElementById("go").onclick = () => {
+        document.getElementById("out").textContent = "Clicked " + (++n) + " times";
+      };
+    });
+  </script>
+</body>
+</html>

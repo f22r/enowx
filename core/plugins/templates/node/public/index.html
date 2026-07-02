@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>My Plugin</title>
+  <link rel="stylesheet" href="/plugin-kit/kit.css" />
+  <script src="/plugin-kit/kit.js" defer></script>
+</head>
+<body class="ex">
+  <div class="ex-card">
+    <h1 class="ex-title">Hello 👋</h1>
+    <p class="ex-muted">This is your plugin. Edit <code>index.js</code> and <code>public/index.html</code>.</p>
+    <div class="ex-row">
+      <input id="name" class="ex-input" placeholder="Your name" />
+      <button id="go" class="ex-btn">Say hello</button>
+    </div>
+    <pre id="out" class="ex-out"></pre>
+  </div>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      document.getElementById("go").onclick = async () => {
+        // Call this plugin's own endpoint (served by index.js).
+        const r = await fetch("api/hello");
+        const j = await r.json();
+        const name = document.getElementById("name").value || "friend";
+        document.getElementById("out").textContent = j.message + "\n(hi, " + name + ")";
+      };
+    });
+  </script>
+</body>
+</html>

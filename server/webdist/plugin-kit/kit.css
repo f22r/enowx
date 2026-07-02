@@ -1,0 +1,96 @@
+/* enowx plugin UI kit — a small, reusable stylesheet so plugin UIs match the
+   dashboard look. Include with:
+   <link rel="stylesheet" href="/plugin-kit/kit.css"> */
+:root {
+  --ex-bg: #0b0d12;
+  --ex-panel: #14161d;
+  --ex-border: rgba(255, 255, 255, 0.1);
+  --ex-text: #e6e8ee;
+  --ex-muted: rgba(230, 232, 238, 0.5);
+  --ex-accent: #6366f1;
+  --ex-accent-hover: #4f46e5;
+  --ex-radius: 10px;
+}
+
+* { box-sizing: border-box; }
+
+body.ex {
+  margin: 0;
+  padding: 20px;
+  min-height: 100vh;
+  background: var(--ex-bg);
+  color: var(--ex-text);
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+}
+
+.ex-card {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 20px;
+  background: var(--ex-panel);
+  border: 1px solid var(--ex-border);
+  border-radius: 16px;
+}
+
+.ex-title { margin: 0 0 6px; font-size: 18px; font-weight: 600; }
+.ex-muted { color: var(--ex-muted); font-size: 13px; }
+.ex-row { display: flex; gap: 8px; align-items: center; margin: 14px 0; flex-wrap: wrap; }
+.ex-stack { display: flex; flex-direction: column; gap: 10px; }
+
+.ex-btn {
+  appearance: none;
+  border: none;
+  border-radius: var(--ex-radius);
+  padding: 8px 14px;
+  font: inherit;
+  font-weight: 500;
+  color: #fff;
+  background: var(--ex-accent);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.ex-btn:hover { background: var(--ex-accent-hover); }
+.ex-btn:disabled { opacity: 0.5; cursor: default; }
+.ex-btn.ex-ghost { background: transparent; color: var(--ex-text); border: 1px solid var(--ex-border); }
+.ex-btn.ex-ghost:hover { background: rgba(255, 255, 255, 0.06); }
+.ex-btn.ex-danger { background: #dc2626; }
+.ex-btn.ex-danger:hover { background: #b91c1c; }
+
+.ex-input, .ex-textarea, .ex-select {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--ex-border);
+  border-radius: var(--ex-radius);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--ex-text);
+  font: inherit;
+  outline: none;
+}
+.ex-input:focus, .ex-textarea:focus, .ex-select:focus { border-color: rgba(255, 255, 255, 0.25); }
+.ex-textarea { resize: vertical; min-height: 90px; }
+
+.ex-label { display: block; margin-bottom: 4px; font-size: 12px; color: var(--ex-muted); }
+
+.ex-out {
+  margin: 14px 0 0;
+  padding: 12px;
+  border-radius: var(--ex-radius);
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--ex-border);
+  color: var(--ex-muted);
+  font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+  min-height: 20px;
+}
+
+.ex-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  background: rgba(99, 102, 241, 0.2);
+  color: #a5b4fc;
+}
+code { background: rgba(255, 255, 255, 0.08); padding: 1px 5px; border-radius: 5px; font-size: 0.9em; }

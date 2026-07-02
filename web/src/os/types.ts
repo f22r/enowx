@@ -10,6 +10,7 @@ export type AppId =
   | "warmup-logs"
   | "api-keys"
   | "music"
+  | "plugins"
   | "tunnel"
   | "profile"
   | "chat"

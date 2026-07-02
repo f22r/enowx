@@ -104,11 +104,73 @@ function Overview({ docs }: { docs: Docs }) {
 
 function Plugins({ docs }: { docs: Docs }) {
   return (
-    <section className="rounded-xl border border-emerald-500/15 bg-emerald-500/[0.04] p-3.5">
-      <h2 className="text-sm font-semibold text-emerald-200">Plugins</h2>
-      <p className="mt-1 text-xs leading-relaxed text-white/55">{docs.plugins.summary}</p>
-      <p className="mt-1.5 text-[11px] leading-relaxed text-white/40">{docs.plugins.discovery}</p>
-    </section>
+    <div className="space-y-4">
+      <section className="rounded-xl border border-emerald-500/15 bg-emerald-500/[0.04] p-3.5">
+        <h2 className="text-sm font-semibold text-emerald-200">Plugins</h2>
+        <p className="mt-1 text-xs leading-relaxed text-white/55">{docs.plugins.summary}</p>
+        <p className="mt-1.5 text-[11px] leading-relaxed text-white/40">{docs.plugins.discovery}</p>
+      </section>
+      <PluginSDK />
+    </div>
+  );
+}
+
+function Code({ children }: { children: string }) {
+  return <pre className="overflow-auto rounded-lg border border-white/10 bg-black/40 p-3 font-mono text-[11px] leading-relaxed text-white/80">{children}</pre>;
+}
+
+// PluginSDK documents the plugin-builder: manifest, folder layout, the UI kit,
+// and the JS bridge — so authors have a stable reference (not "ngawur").
+function PluginSDK() {
+  return (
+    <div className="space-y-3 text-xs leading-relaxed text-white/60">
+      <section>
+        <h3 className="mb-1 text-sm font-semibold text-white">Build your own plugin</h3>
+        <p>Create a plugin from the <span className="text-white/80">Plugins</span> app (pick a runtime — Python, Node, Go, or a static HTML app). It scaffolds a folder under <code className="rounded bg-white/10 px-1">~/.enowx/plugins/&lt;id&gt;/</code> you can edit. A non-static plugin runs as a sidecar process; enowx gives it a free <code className="rounded bg-white/10 px-1">PORT</code> and proxies its UI at <code className="rounded bg-white/10 px-1">/plugins/&lt;id&gt;/</code>.</p>
+      </section>
+
+      <section>
+        <h3 className="mb-1 text-sm font-semibold text-white">plugin.json</h3>
+        <Code>{`{
+  "id": "my-plugin",
+  "name": "My Plugin",
+  "description": "What it does",
+  "icon": "puzzle",
+  "runtime": "python",      // go | python | node | static
+  "entry": "main.py",       // launched with env PORT set (ignored for static)
+  "ui": "public/index.html"
+}`}</Code>
+      </section>
+
+      <section>
+        <h3 className="mb-1 text-sm font-semibold text-white">Serve your UI on $PORT</h3>
+        <p>Your entry starts an HTTP server on <code className="rounded bg-white/10 px-1">process.env.PORT</code> / <code className="rounded bg-white/10 px-1">os.environ["PORT"]</code>, serves your <code className="rounded bg-white/10 px-1">public/</code> UI, and exposes any endpoints your UI calls. Static plugins skip this — enowx serves the folder directly.</p>
+      </section>
+
+      <section>
+        <h3 className="mb-1 text-sm font-semibold text-white">UI kit</h3>
+        <p>For a consistent look, include the enowx kit and use its classes:</p>
+        <Code>{`<link rel="stylesheet" href="/plugin-kit/kit.css">
+<script src="/plugin-kit/kit.js" defer></script>
+
+<div class="ex-card">
+  <h1 class="ex-title">Hello</h1>
+  <div class="ex-row">
+    <input class="ex-input" id="name" placeholder="Name">
+    <button class="ex-btn" id="go">Run</button>
+  </div>
+  <pre class="ex-out" id="out"></pre>
+</div>`}</Code>
+        <p className="text-white/45">Classes: <code className="rounded bg-white/10 px-1">ex-card</code>, <code className="rounded bg-white/10 px-1">ex-title</code>, <code className="rounded bg-white/10 px-1">ex-muted</code>, <code className="rounded bg-white/10 px-1">ex-row</code>, <code className="rounded bg-white/10 px-1">ex-stack</code>, <code className="rounded bg-white/10 px-1">ex-btn</code> (+ <code className="rounded bg-white/10 px-1">ex-ghost</code>/<code className="rounded bg-white/10 px-1">ex-danger</code>), <code className="rounded bg-white/10 px-1">ex-input</code>, <code className="rounded bg-white/10 px-1">ex-textarea</code>, <code className="rounded bg-white/10 px-1">ex-select</code>, <code className="rounded bg-white/10 px-1">ex-out</code>, <code className="rounded bg-white/10 px-1">ex-badge</code>.</p>
+      </section>
+
+      <section>
+        <h3 className="mb-1 text-sm font-semibold text-white">JS bridge</h3>
+        <Code>{`enowx.pluginId          // your plugin id
+enowx.self("api/x")     // call your OWN endpoint
+enowx.api("models")     // call the enowx dashboard API (/api/models)`}</Code>
+      </section>
+    </div>
   );
 }
 

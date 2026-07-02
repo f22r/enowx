@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/enowdev/enowx/config"
+	"github.com/enowdev/enowx/core/plugins"
 	"github.com/enowdev/enowx/core/pool"
 	"github.com/enowdev/enowx/core/provider"
 	"github.com/enowdev/enowx/core/provider/antigravity"
@@ -64,6 +65,7 @@ func main() {
 
 	px := proxy.New(reg, pool.New(db.Accounts()), doer)
 	tun := tunnel.New(cfg.RuntimeDir, cfg.Port)
+	pluginMgr := plugins.New(cfg.PluginsDir())
 	syncMgr := syncpkg.New(db.Settings(), db.Music(), db.Logs())
 	// Maintain the live channel (pull side) and the automatic push side. Both
 	// are no-ops until logged in; auto-push also obeys the global toggle.
@@ -83,6 +85,7 @@ func main() {
 		Aliases:    db.Aliases(),
 		ApiTest:    db.ApiTest(),
 		Tunnel:     tun,
+		Plugins:    pluginMgr,
 		Sync:       syncMgr,
 		Doer:       doer,
 		Settings: handlers.SettingsInfo{

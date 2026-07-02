@@ -51,5 +51,6 @@ func Load() (Config, error) {
 	return c, nil
 }
 
-func (c Config) DBPath() string { return filepath.Join(c.RuntimeDir, "enowx.db") }
-func (c Config) Addr() string   { return c.Host + ":" + strconv.Itoa(c.Port) }
+func (c Config) DBPath() string     { return filepath.Join(c.RuntimeDir, "enowx.db") }
+func (c Config) PluginsDir() string { return filepath.Join(c.RuntimeDir, "plugins") }
+func (c Config) Addr() string       { return c.Host + ":" + strconv.Itoa(c.Port) }

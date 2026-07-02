@@ -9,6 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/enowdev/enowx/core/provider"
+	"github.com/enowdev/enowx/core/plugins"
 	"github.com/enowdev/enowx/core/proxy"
 	"github.com/enowdev/enowx/core/suno"
 	syncpkg "github.com/enowdev/enowx/core/sync"
@@ -37,6 +38,7 @@ type Deps struct {
 	Aliases    store.AliasStore
 	ApiTest    store.ApiTestStore
 	Tunnel     *tunnel.Manager
+	Plugins    *plugins.Manager
 	Sync       *syncpkg.Manager
 	Doer       transport.Doer
 	Settings   handlers.SettingsInfo
@@ -80,6 +82,7 @@ func New(addr string, d Deps) *Server {
 	term := handlers.NewTerminal(dash)
 	files := handlers.NewFiles(dash)
 	agent := handlers.NewAgent(dash, d.Doer)
+	pluginsH := handlers.NewPlugins(dash, d.Plugins)
 	music := handlers.NewMusic(d.Music)
 	sunoMusic := handlers.NewSuno(d.Accounts, d.Proxy, suno.New(d.Doer))
 	tun := handlers.NewTunnel(d.Tunnel, d.Keys)
@@ -258,6 +261,18 @@ func New(addr string, d Deps) *Server {
 
 	// Real PTY shell over WebSocket — loopback-only (guarded in the handler).
 	r.Get("/api/terminal", term.WS)
+
+	// Plugin management (dashboard-gated).
+	r.Route("/api/plugins", func(r chi.Router) {
+		r.Get("/", pluginsH.List)
+		r.Post("/", pluginsH.Create)
+		r.Post("/{id}/start", pluginsH.Start)
+		r.Post("/{id}/stop", pluginsH.Stop)
+		r.Get("/{id}/logs", pluginsH.Logs)
+		r.Delete("/{id}", pluginsH.Delete)
+	})
+	// Plugin UIs, reverse-proxied to their sidecar (gated in the handler).
+	r.Handle("/plugins/*", pluginsH.PluginProxy())
 
 	// WebOS SPA on the same port (everything not matched above).
 	r.Handle("/*", spaHandler())

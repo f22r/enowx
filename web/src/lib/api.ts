@@ -149,6 +149,30 @@ export const codexApi = {
     api.post<{ id: number }>("/api/accounts/codex/manual", { json, label }),
 };
 
+export interface PluginManifest {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  runtime: string; // go | python | node | static
+  entry: string;
+  ui: string;
+  running?: boolean;
+  port?: number;
+  error?: string;
+}
+export interface PluginRuntime { id: string; available: boolean; version?: string }
+
+export const pluginsApi = {
+  list: () => api.get<{ plugins: PluginManifest[]; runtimes: PluginRuntime[] }>("/api/plugins"),
+  create: (id: string, name: string, runtime: string) =>
+    api.post<PluginManifest>("/api/plugins", { id, name, runtime }),
+  start: (id: string) => api.post<{ ok: boolean }>(`/api/plugins/${id}/start`),
+  stop: (id: string) => api.post<{ ok: boolean }>(`/api/plugins/${id}/stop`),
+  remove: (id: string) => api.del<{ ok: boolean }>(`/api/plugins/${id}`),
+  logs: (id: string) => api.get<{ lines: string[] }>(`/api/plugins/${id}/logs`),
+};
+
 export const leonardoApi = {
   fromCookie: (cookie: string, label?: string) =>
     api.post<{ id: number; email: string }>("/api/accounts/leonardo/cookie", { cookie, label }),
