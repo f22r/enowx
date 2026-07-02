@@ -12,8 +12,52 @@ let loadingOlder = false;
 let hasMore = true;
 let es: EventSource | null = null;
 let connected = false;
+// firstUnreadId is the id of the first message the user hasn't read for the
+// current channel — the "New" divider is drawn above it. Snapshotted on channel
+// load so it stays put while the user reads (only reset on the next open).
+let firstUnreadId = 0;
 const PAGE = 50; // matches the server's chatPageSize
 const listeners = new Set<() => void>();
+
+// --- unread tracking (localStorage, per channel) ---
+const LAST_READ_KEY = "enowx-chat-lastread";
+
+function lastReadMap(): Record<string, number> {
+  try {
+    return JSON.parse(localStorage.getItem(LAST_READ_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+function getLastRead(ch: string): number {
+  return lastReadMap()[ch] ?? 0;
+}
+function setLastRead(ch: string, id: number) {
+  const m = lastReadMap();
+  if ((m[ch] ?? 0) >= id) return;
+  m[ch] = id;
+  try {
+    localStorage.setItem(LAST_READ_KEY, JSON.stringify(m));
+  } catch {
+    /* quota */
+  }
+}
+
+// markRead advances the current channel's last-read to the newest message and
+// clears the divider (called when the user is at the bottom / channel focused).
+export function markRead() {
+  if (messages.length === 0) return;
+  const newest = messages[messages.length - 1].id;
+  setLastRead(channel, newest);
+  if (firstUnreadId !== 0) {
+    firstUnreadId = 0;
+    emit();
+  }
+}
+
+export function unreadDividerId(): number {
+  return firstUnreadId;
+}
 
 function emit() {
   listeners.forEach((l) => l());
@@ -34,6 +78,16 @@ export async function loadChannel(ch?: string) {
     messages = page;
     hasMore = (r.messages?.length ?? 0) >= PAGE;
     if (r.channels) channels = r.channels;
+    // Compute the "New" divider: the first loaded message newer than last-read.
+    // Skip if the newest is already read (nothing new) or nothing was read yet.
+    const lastRead = getLastRead(channel);
+    const newest = page.length ? page[page.length - 1].id : 0;
+    if (lastRead > 0 && newest > lastRead) {
+      const firstNew = page.find((m) => m.id > lastRead);
+      firstUnreadId = firstNew ? firstNew.id : 0;
+    } else {
+      firstUnreadId = 0;
+    }
   } catch {
     /* leave as-is */
   } finally {
@@ -151,6 +205,7 @@ export interface ChatState {
   loadingOlder: boolean;
   hasMore: boolean;
   connected: boolean;
+  firstUnreadId: number;
 }
 
 let everLoaded = false;
@@ -169,5 +224,5 @@ export function useChat(): ChatState {
       listeners.delete(l);
     };
   }, []);
-  return { messages, channels, channel, loading, loadingOlder, hasMore, connected };
+  return { messages, channels, channel, loading, loadingOlder, hasMore, connected, firstUnreadId };
 }

@@ -16,8 +16,11 @@ export function useReverseScroll(opts: {
   loading: boolean;
   loadOlder: () => void;
   threshold?: number; // px from top that triggers a load (default 120)
+  // On first load, scroll this element into view instead of the bottom (e.g. the
+  // "New messages" divider). Falls back to bottom when null.
+  initialAnchor?: () => HTMLElement | null;
 }) {
-  const { ref, count, hasMore, loading, loadOlder, threshold = 120 } = opts;
+  const { ref, count, hasMore, loading, loadOlder, threshold = 120, initialAnchor } = opts;
 
   const atBottomRef = useRef(true);
   const prevCount = useRef(count);
@@ -56,8 +59,16 @@ export function useReverseScroll(opts: {
     if (!didInitial.current && count > 0) {
       didInitial.current = true;
       prevCount.current = count;
-      el.scrollTop = el.scrollHeight; // open at the newest
-      atBottomRef.current = true;
+      const anchor = initialAnchor?.();
+      if (anchor) {
+        // Open at the unread divider so the user reads down into new messages.
+        anchor.scrollIntoView({ block: "start" });
+        el.scrollTop -= 60; // leave a little context above the divider
+        atBottomRef.current = isAtBottom(el);
+      } else {
+        el.scrollTop = el.scrollHeight; // open at the newest
+        atBottomRef.current = true;
+      }
       return;
     }
 

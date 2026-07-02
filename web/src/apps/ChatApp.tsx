@@ -6,7 +6,7 @@ import { ProfileCard } from "../components/ProfileCard";
 import { EmojiPicker } from "../components/EmojiPicker";
 import { Tooltip } from "../components/Tooltip";
 import { useProfile } from "../os/useProfile";
-import { useChat, sendChat, editChat, deleteChat, reactChat, loadChannel, loadOlderMessages } from "../os/chatBus";
+import { useChat, sendChat, editChat, deleteChat, reactChat, loadChannel, loadOlderMessages, markRead } from "../os/chatBus";
 import { useReverseScroll } from "../os/useReverseScroll";
 import { MessageSkeleton } from "../components/Skeleton";
 import { useDialog } from "../os/dialog";
@@ -80,7 +80,7 @@ export function ChatApp() {
 }
 
 function ChatRoom() {
-  const { messages, channels, channel, loading, loadingOlder, hasMore, connected } = useChat();
+  const { messages, channels, channel, loading, loadingOlder, hasMore, connected, firstUnreadId } = useChat();
   const readOnly = channels.find((c) => c.key === channel)?.read_only ?? false;
   const profile = useProfile();
   const [draft, setDraft] = useState("");
@@ -90,22 +90,37 @@ function ChatRoom() {
   const img = useImageAttach();
   const fileRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const dividerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const mention = useMention(draft, setDraft, inputRef);
 
-  // Discord-style: open at the newest message, lazy-load older on scroll-up,
-  // preserve position across prepends, and only follow new messages when at bottom.
-  const { reset, scrollToBottom } = useReverseScroll({
+  // Discord-style: open at the unread divider (or newest), lazy-load older on
+  // scroll-up, preserve position across prepends, follow new messages only at
+  // bottom, and mark read once the newest is in view.
+  const { reset, scrollToBottom, atBottom } = useReverseScroll({
     ref: scrollRef,
     count: messages.length,
     hasMore,
     loading: loadingOlder,
     loadOlder: loadOlderMessages,
+    initialAnchor: () => dividerRef.current,
   });
   // Reset pagination state when switching channels.
   useEffect(() => {
     reset();
   }, [channel, reset]);
+
+  // Mark read when the newest message is visible (at the bottom) + on focus.
+  useEffect(() => {
+    if (messages.length && atBottom()) markRead();
+  }, [messages.length, atBottom]);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const onScroll = () => { if (atBottom()) markRead(); };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [atBottom]);
 
   // Focus the composer whenever a reply target is set, so hitting Reply lands
   // the cursor in the textbox without a second click.
@@ -169,17 +184,25 @@ function ChatRoom() {
             {/* Top skeleton while older history loads. */}
             {loadingOlder && <MessageSkeleton />}
             {messages.map((m) => (
-            <MessageRow
-              key={m.id}
-              m={m}
-              mine={!!myUsername && m.username === myUsername}
-              pingsMe={mentionsMe(m.content, myUsername, myDisplayName)}
-              canModerate={canModerate}
-              onOpenUser={() => setOpenUser(m.id)}
-              open={openUser === m.id}
-              onClose={() => setOpenUser(null)}
-              onReply={() => startReply(m)}
-            />
+              <div key={m.id}>
+                {firstUnreadId === m.id && (
+                  <div ref={dividerRef} className="my-1 flex items-center gap-2 px-2">
+                    <div className="h-px flex-1 bg-rose-500/50" />
+                    <span className="rounded-full bg-rose-500/90 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">New</span>
+                    <div className="h-px flex-1 bg-rose-500/50" />
+                  </div>
+                )}
+                <MessageRow
+                  m={m}
+                  mine={!!myUsername && m.username === myUsername}
+                  pingsMe={mentionsMe(m.content, myUsername, myDisplayName)}
+                  canModerate={canModerate}
+                  onOpenUser={() => setOpenUser(m.id)}
+                  open={openUser === m.id}
+                  onClose={() => setOpenUser(null)}
+                  onReply={() => startReply(m)}
+                />
+              </div>
             ))}
           </>
         )}
