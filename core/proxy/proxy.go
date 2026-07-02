@@ -16,6 +16,7 @@ import (
 	"github.com/enowdev/enowx/core/pool"
 	"github.com/enowdev/enowx/core/provider"
 	"github.com/enowdev/enowx/core/provider/oaistream"
+	"github.com/enowdev/enowx/core/sanitize"
 	"github.com/enowdev/enowx/core/transport"
 )
 
@@ -38,6 +39,20 @@ func (p *Proxy) Forward(ctx context.Context, providerName string, req *model.Req
 	prov, err := p.reg.Get(providerName)
 	if err != nil {
 		return nil, err
+	}
+	// Content filters: rewrite blocked words before sending, restore them in the
+	// reply. No-op when no rules are configured.
+	deobfuscate := false
+	if sanitize.Active() {
+		for i := range req.Messages {
+			for j := range req.Messages[i].Parts {
+				if t := req.Messages[i].Parts[j].Text; t != "" {
+					req.Messages[i].Parts[j].Text = sanitize.Obfuscate(t)
+				}
+			}
+		}
+		req.Raw = nil // force re-encode from the filtered messages (drop passthrough)
+		deobfuscate = true
 	}
 	tried := map[int64]bool{}
 	var lastErr error
@@ -71,10 +86,30 @@ func (p *Proxy) Forward(ctx context.Context, providerName string, req *model.Req
 			}
 			return nil, herr
 		}
-		return prov.ParseResponse(resp, req)
+		stream, err := prov.ParseResponse(resp, req)
+		if err != nil || !deobfuscate || stream == nil {
+			return stream, err
+		}
+		return &deobfuscateStream{inner: stream}, nil
 	}
 	return nil, lastErr
 }
+
+// deobfuscateStream restores filtered words in the streamed reply text.
+type deobfuscateStream struct{ inner model.Stream }
+
+func (s *deobfuscateStream) Recv() (model.Event, error) {
+	ev, err := s.inner.Recv()
+	if ev.Text != "" {
+		ev.Text = sanitize.Deobfuscate(ev.Text)
+	}
+	if ev.Reasoning != "" {
+		ev.Reasoning = sanitize.Deobfuscate(ev.Reasoning)
+	}
+	return ev, err
+}
+
+func (s *deobfuscateStream) Close() error { return s.inner.Close() }
 
 // GenerateImage runs a text-to-image request against the named provider (which
 // must implement ImageGenerator), rotating accounts on account-level failures.

@@ -61,6 +61,20 @@ export const providersApi = {
   list: () => api.get<Provider[]>("/api/providers"),
 };
 
+export interface ContentFilter {
+  id: number;
+  pattern: string;
+  replacement: string;
+  is_regex: boolean;
+  is_active: boolean;
+}
+export const filterApi = {
+  list: () => api.get<{ filters: ContentFilter[] }>("/api/filters"),
+  add: (f: Omit<ContentFilter, "id">) => api.post<{ id: number }>("/api/filters", f),
+  update: (id: number, f: Omit<ContentFilter, "id">) => api.patch<{ ok: boolean }>(`/api/filters/${id}`, f),
+  remove: (id: number) => api.del<{ ok: boolean }>(`/api/filters/${id}`),
+};
+
 export const customProviderApi = {
   list: () => api.get<{ providers: CustomProvider[] }>("/api/custom-providers"),
   create: (p: Omit<CustomProvider, "id"> & { api_key?: string }) => api.post<{ id: number }>("/api/custom-providers", p),

@@ -13,6 +13,7 @@ export type KnownAppId =
   | "api-keys"
   | "music"
   | "plugins"
+  | "filters"
   | "tunnel"
   | "profile"
   | "chat"

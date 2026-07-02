@@ -27,6 +27,7 @@ type DB struct {
 	aliases  *aliasStore
 	apitest  *apiTestStore
 	custom   *customProviderStore
+	filters  *filterStore
 }
 
 func Open(path string) (*DB, error) {
@@ -48,6 +49,7 @@ func Open(path string) (*DB, error) {
 	d.aliases = &aliasStore{db: db}
 	d.apitest = &apiTestStore{db: db}
 	d.custom = &customProviderStore{db: db}
+	d.filters = &filterStore{db: db}
 	seedApiTest(db)
 	return d, nil
 }
@@ -120,6 +122,7 @@ func (d *DB) Settings() store.SettingsStore { return d.settings }
 func (d *DB) Aliases() store.AliasStore     { return d.aliases }
 func (d *DB) ApiTest() store.ApiTestStore   { return d.apitest }
 func (d *DB) CustomProviders() store.CustomProviderStore { return d.custom }
+func (d *DB) Filters() store.FilterStore                 { return d.filters }
 func (d *DB) Close() error                  { return d.db.Close() }
 
 func migrate(db *sql.DB) error {

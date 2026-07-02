@@ -42,6 +42,7 @@ type Deps struct {
 	Plugins    *plugins.Manager
 	Sync       *syncpkg.Manager
 	CustomProv *custommgr.Manager
+	Filters    store.FilterStore
 	Doer       transport.Doer
 	Settings   handlers.SettingsInfo
 }
@@ -88,6 +89,7 @@ func New(addr string, d Deps) *Server {
 	pluginsH := handlers.NewPlugins(dash, d.Plugins)
 	market := handlers.NewMarket(dash, d.Sync, d.Plugins)
 	customProv := handlers.NewCustomProviders(dash, d.CustomProv, d.Accounts)
+	filters := handlers.NewFilters(dash, d.Filters)
 	music := handlers.NewMusic(d.Music)
 	sunoMusic := handlers.NewSuno(d.Accounts, d.Proxy, suno.New(d.Doer))
 	tun := handlers.NewTunnel(d.Tunnel, d.Keys)
@@ -109,6 +111,10 @@ func New(addr string, d Deps) *Server {
 
 	r.Route("/api", func(r chi.Router) {
 		r.Get("/providers", providers.List)
+		r.Get("/filters", filters.List)
+		r.Post("/filters", filters.Add)
+		r.Patch("/filters/{id}", filters.Update)
+		r.Delete("/filters/{id}", filters.Delete)
 		r.Get("/custom-providers", customProv.List)
 		r.Post("/custom-providers", customProv.Create)
 		r.Post("/custom-providers/probe", customProv.Probe)

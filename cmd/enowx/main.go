@@ -105,6 +105,7 @@ func main() {
 		Plugins:    pluginMgr,
 		Sync:       syncMgr,
 		CustomProv: customMgr,
+		Filters:    db.Filters(),
 		Doer:       doer,
 		Settings: handlers.SettingsInfo{
 			Version:    version,

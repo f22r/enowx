@@ -171,6 +171,23 @@ type CustomProvider struct {
 	Models       []CustomModel `json:"models"`
 }
 
+// ContentFilter is one pattern→replacement rule.
+type ContentFilter struct {
+	ID          int64  `json:"id"`
+	Pattern     string `json:"pattern"`
+	Replacement string `json:"replacement"`
+	IsRegex     bool   `json:"is_regex"`
+	IsActive    bool   `json:"is_active"`
+}
+
+// FilterStore persists content-filter rules (local only).
+type FilterStore interface {
+	List(ctx context.Context) ([]ContentFilter, error)
+	Add(ctx context.Context, f ContentFilter) (int64, error)
+	Update(ctx context.Context, f ContentFilter) error
+	Delete(ctx context.Context, id int64) error
+}
+
 // CustomProviderStore persists user-defined providers (local only).
 type CustomProviderStore interface {
 	List(ctx context.Context) ([]CustomProvider, error)
