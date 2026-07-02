@@ -36,3 +36,15 @@ func (p *Provider) Classify(status int, _ []byte) provider.Outcome {
 	}
 	return provider.OutcomeTransient
 }
+
+// Models returns the Suno model versions available for generation. Suno has no
+// live models endpoint, so this is a static catalog.
+func (p *Provider) Models(provider.Account) ([]provider.Model, error) {
+	return []provider.Model{
+		{ID: "V5_5", Name: "Suno v5.5", Type: "music", OwnedBy: "suno"},
+		{ID: "V5", Name: "Suno v5", Type: "music", OwnedBy: "suno"},
+		{ID: "V4_5PLUS", Name: "Suno v4.5+", Type: "music", OwnedBy: "suno"},
+		{ID: "V4_5", Name: "Suno v4.5", Type: "music", OwnedBy: "suno"},
+		{ID: "V4", Name: "Suno v4", Type: "music", OwnedBy: "suno"},
+	}, nil
+}

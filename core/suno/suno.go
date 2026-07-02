@@ -59,6 +59,10 @@ func New(doer transport.Doer) *Client { return &Client{doer: doer} }
 // Generate creates a music-generation task and returns its id.
 func (c *Client) Generate(key string, req GenerateRequest) (string, error) {
 	model := strings.TrimSpace(req.Model)
+	// Accept a prefixed id (sn/V5) and strip to the bare Suno version.
+	if i := strings.LastIndex(model, "/"); i >= 0 {
+		model = model[i+1:]
+	}
 	if model == "" {
 		model = "V4_5"
 	}

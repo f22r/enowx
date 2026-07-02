@@ -346,6 +346,7 @@ function ModelRow({ m, accountId, aliases, onAddAlias, onRemoveAlias }: { m: Pro
           <div className="flex items-center gap-1.5">
             <span className="truncate text-sm text-white">{m.name}</span>
             {m.type === "image" && <span className="rounded bg-fuchsia-500/20 px-1 text-[9px] text-fuchsia-300">IMG</span>}
+            {m.type === "music" && <span className="rounded bg-violet-500/20 px-1 text-[9px] text-violet-300">MUSIC</span>}
           </div>
           <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[10px] text-white/35">
             <span className="font-mono">{m.model_id}</span>
@@ -364,9 +365,11 @@ function ModelRow({ m, accountId, aliases, onAddAlias, onRemoveAlias }: { m: Pro
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition group-hover:opacity-100">
-          <button onClick={test} disabled={testing} title="Test model" className="rounded p-1 text-white/40 hover:bg-white/10 hover:text-white disabled:opacity-50">
-            {testing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
-          </button>
+          {m.type !== "music" && (
+            <button onClick={test} disabled={testing} title="Test model" className="rounded p-1 text-white/40 hover:bg-white/10 hover:text-white disabled:opacity-50">
+              {testing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
+            </button>
+          )}
           <button onClick={copy} title="Copy model id" className="rounded p-1 text-white/40 hover:bg-white/10 hover:text-white">
             {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
           </button>

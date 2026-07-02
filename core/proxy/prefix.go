@@ -14,6 +14,8 @@ var providerByPrefix = map[string]string{
 	"codex":       "codex",
 	"ag":          "antigravity",
 	"antigravity": "antigravity",
+	"sn":          "suno",
+	"suno":        "suno",
 }
 
 // prefixByProvider is the canonical short prefix shown in model ids.
@@ -22,6 +24,7 @@ var prefixByProvider = map[string]string{
 	"codebuddy":   "cb",
 	"codex":       "cx",
 	"antigravity": "ag",
+	"suno":        "sn",
 }
 
 // ProviderPrefix returns the short display prefix for a provider ("kr", "cb"),
