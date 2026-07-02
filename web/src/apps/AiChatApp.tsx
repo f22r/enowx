@@ -1,6 +1,6 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { Send, Trash2, Loader2, Bot, ChevronDown, ChevronRight, FolderOpen, Shield, Check, X, Terminal, FileEdit, FileText, FilePlus, Globe, Wrench, Folder, CornerLeftUp, Settings2, Plus, Brain, Music } from "lucide-react";
-import { accountsApi, keysApi, filesApi, type ProviderModel, type DirListing } from "../lib/api";
+import { accountsApi, keysApi, filesApi, sunoApi, type ProviderModel, type DirListing } from "../lib/api";
 import { AiMarkdown } from "../components/AiMarkdown";
 import { ALWAYS_ON_TOOLS, AGENT_TOOLS, TOOL_META, GROUPABLE_TOOLS, GROUP_VERB, lineDiff, runTool, needsApproval, type PermLevel, type ToolName, type ToolResult } from "./agent/tools";
 
@@ -26,6 +26,7 @@ interface ChatMsg {
   name?: string; // tool result → tool name
   // UI-only: rich result of each executed tool call, keyed by call id.
   results?: Record<string, ToolResult>;
+  suno?: { title: string; audio_url: string; image_url: string; duration: number }[]; // generated songs
 }
 
 const PERM_LABELS: Record<PermLevel, string> = { need: "Ask every time", medium: "Confirm writes", bypass: "Auto (bypass)" };
@@ -52,6 +53,17 @@ const clip = (s: string, max: number) => (s.length > max ? s.slice(0, max) + `\n
 // returns 11101). Tools are omitted for these models.
 const NO_TOOLS_PREFIXES = ["cb/"];
 const supportsTools = (model: string) => !NO_TOOLS_PREFIXES.some((p) => model.startsWith(p));
+
+// musicStatusText maps a Suno task status to a short progress line.
+function musicStatusText(status: string, tracks: { title: string }[]): string {
+  switch (status) {
+    case "PENDING": return "Composing…";
+    case "TEXT_SUCCESS": return `Lyrics ready${tracks[0]?.title ? ` — "${tracks[0].title}"` : ""}, rendering audio…`;
+    case "FIRST_SUCCESS": return "First track ready, finishing…";
+    case "SUCCESS": return "Done";
+    default: return status ? `Working (${status})…` : "Working…";
+  }
+}
 
 export function AiChatApp() {
   const [models, setModels] = useState<ProviderModel[]>([]);
@@ -91,9 +103,9 @@ export function AiChatApp() {
 
   const loadModels = () =>
     accountsApi.allModels().then((r) => {
-      // Only chat-capable models are pickable; image/music models are used via
-      // tools (generate_music) or the image endpoint, not as the chat model.
-      const list = (r.models ?? []).filter((m) => m.type !== "image" && m.type !== "music");
+      // Chat, image, and music models are all pickable — image/music models route
+      // to their own generation endpoints in send() instead of chat completions.
+      const list = r.models ?? [];
       setModels(list);
       // Keep the current model only if it's still a valid chat model; otherwise
       // fall back to the first (avoids a stale music/image pick breaking chat).
@@ -252,6 +264,38 @@ export function AiChatApp() {
     setBusy(true);
     let history: ChatMsg[] = [...msgs, { role: "user", content: text, images: imgs.length ? imgs : undefined }];
     setMsgs(history);
+
+    // Music models generate directly (no LLM/tool): call the Suno endpoint, poll
+    // with live status, and render an audio player when done.
+    if (current?.type === "music") {
+      const placeholder: ChatMsg = { role: "assistant", content: "🎵 Starting…" };
+      setMsgs((p) => [...p, placeholder]);
+      const setStatus = (t: string) => setMsgs((p) => p.map((m) => (m === placeholder ? { ...placeholder, content: t } : m)));
+      try {
+        const { task_id } = await sunoApi.generate({ prompt: text, model: current.model_id });
+        setStatus("🎵 Composing…");
+        const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+        let done = false;
+        for (let i = 0; i < 48 && !done; i++) {
+          await sleep(5000);
+          if (ac.signal.aborted) return;
+          const s = await sunoApi.status(task_id);
+          setStatus(`🎵 ${musicStatusText(s.status, s.tracks)}`);
+          if (s.failed) { setStatus(`Music generation failed (${s.status}).`); break; }
+          if (s.done && s.tracks.length > 0) {
+            setMsgs((p) => p.map((m) => (m === placeholder ? { role: "assistant", content: "", suno: s.tracks } : m)));
+            done = true;
+          }
+        }
+        if (!done) setStatus("Still processing — try again in a moment.");
+      } catch (e) {
+        if ((e as Error).name !== "AbortError") { const msg = e instanceof Error ? e.message : "failed"; setStatus(`Error: ${msg}`); }
+      } finally {
+        setBusy(false);
+        abortRef.current = null;
+      }
+      return;
+    }
 
     // Image-generation models use a different endpoint + render the result inline.
     if (current?.type === "image") {
@@ -457,6 +501,7 @@ type RenderItem =
   | { kind: "user"; content: string; images?: string[]; key: string }
   | { kind: "reasoning"; content: string; key: string }
   | { kind: "aimages"; images: string[]; key: string }
+  | { kind: "songs"; tracks: { title: string; audio_url: string; image_url: string; duration: number }[]; key: string }
   | { kind: "text"; content: string; key: string }
   | { kind: "spinner"; key: string }
   | { kind: "tool"; call: ToolCall; result?: ToolResult; key: string }
@@ -481,6 +526,7 @@ function buildItems(msgs: ChatMsg[]): RenderItem[] {
     // assistant
     if (m.reasoning) { flushRun(); items.push({ kind: "reasoning", content: m.reasoning, key: `r_${i}` }); }
     if (m.images?.length) { flushRun(); items.push({ kind: "aimages", images: m.images, key: `ai_${i}` }); }
+    if (m.suno?.length) { flushRun(); items.push({ kind: "songs", tracks: m.suno, key: `sn_${i}` }); }
     if (m.content) { flushRun(); items.push({ kind: "text", content: m.content, key: `a_${i}` }); }
     else if (!m.reasoning && !m.images?.length && !m.tool_calls?.length) { flushRun(); items.push({ kind: "spinner", key: `s_${i}` }); }
     for (const c of m.tool_calls ?? []) {
@@ -542,6 +588,20 @@ function Conversation({ msgs, progress }: { msgs: ChatMsg[]; progress: Record<st
                   <a key={k} href={src} target="_blank" rel="noreferrer">
                     <img src={src} alt="" className="max-h-72 rounded-lg border border-white/10 object-contain" />
                   </a>
+                ))}
+              </div>
+            );
+          case "songs":
+            return (
+              <div key={it.key} className="space-y-2">
+                {it.tracks.map((t, k) => (
+                  <div key={k} className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/[0.03] p-2.5">
+                    {t.image_url && <img src={t.image_url} alt="" className="h-12 w-12 shrink-0 rounded object-cover" />}
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-medium text-white/90">{t.title || "Untitled"}</div>
+                      <audio controls src={t.audio_url} className="mt-1 h-9 w-full" />
+                    </div>
+                  </div>
                 ))}
               </div>
             );
