@@ -1,5 +1,34 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
+// scrollParent walks up to the nearest ancestor that clips overflow (auto/scroll/
+// hidden), which bounds where a popover can show. Falls back to the viewport.
+function scrollParent(el: HTMLElement | null): HTMLElement | null {
+  let p = el?.parentElement ?? null;
+  while (p) {
+    const oy = getComputedStyle(p).overflowY;
+    if (oy === "auto" || oy === "scroll" || oy === "hidden") return p;
+    p = p.parentElement;
+  }
+  return null;
+}
+export function clipBottom(el: HTMLElement): number {
+  const p = scrollParent(el);
+  return p ? Math.min(p.getBoundingClientRect().bottom, window.innerHeight) : window.innerHeight;
+}
+export function clipTop(el: HTMLElement): number {
+  const p = scrollParent(el);
+  return p ? Math.max(p.getBoundingClientRect().top, 0) : 0;
+}
+
+// shouldFlipUp reports whether a down-anchored panel of height `h` at rect `r`
+// should open upward given its clipping container. Shared by Popover + menus.
+export function shouldFlipUp(el: HTMLElement): boolean {
+  const r = el.getBoundingClientRect();
+  const spaceBelow = clipBottom(el) - r.top;
+  const spaceAbove = r.top - clipTop(el);
+  return spaceBelow < el.offsetHeight + 8 && spaceAbove > spaceBelow;
+}
+
 // Reusable popover panel with click-away + Escape to dismiss. Render it
 // conditionally (when open) as a sibling of its anchor inside a `relative`
 // container; pass `anchor` to position it. The transparent backdrop catches any
@@ -45,13 +74,10 @@ export function Popover({
     }
     const el = ref.current;
     if (!el) return;
-    const r = el.getBoundingClientRect();
-    const margin = 12;
-    const spaceBelow = window.innerHeight - r.top;
-    const needed = el.offsetHeight + margin;
-    // r.top is where the down-anchored panel starts; if the panel doesn't fit
-    // below and there is more room above the anchor, flip up.
-    setUp(spaceBelow < needed && r.top > window.innerHeight - r.top);
+    // Clip against the nearest scrollable/overflow ancestor (e.g. the chat panel,
+    // whose composer sits below it) — not just the window — so the panel flips
+    // up when it would be hidden by that container's edge, not only the screen.
+    setUp(shouldFlipUp(el));
   }, [valign, children]);
 
   const pos =

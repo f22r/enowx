@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { shouldFlipUp } from "../components/Popover";
 import { Search, Trash2, Power, PowerOff, RefreshCw, Zap, Boxes, X, Copy, Check, Plus, Play, Loader2, MoreVertical, Download } from "lucide-react";
 import { AppShell } from "./shell";
 import { ProviderIcon } from "../components/ProviderIcon";
@@ -495,8 +496,7 @@ function AccountMenu({
   // Flip the menu upward when it would be clipped by the bottom of the viewport.
   useLayoutEffect(() => {
     if (!open || !menuRef.current) return;
-    const r = menuRef.current.getBoundingClientRect();
-    setUp(r.bottom > window.innerHeight - 8 && r.top - menuRef.current.offsetHeight > 8);
+    setUp(shouldFlipUp(menuRef.current));
   }, [open]);
 
   useEffect(() => {
