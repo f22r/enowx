@@ -86,7 +86,7 @@ func New(addr string, d Deps) *Server {
 	agent := handlers.NewAgent(dash, d.Doer)
 	pluginsH := handlers.NewPlugins(dash, d.Plugins)
 	market := handlers.NewMarket(dash, d.Sync, d.Plugins)
-	customProv := handlers.NewCustomProviders(dash, d.CustomProv)
+	customProv := handlers.NewCustomProviders(dash, d.CustomProv, d.Accounts)
 	music := handlers.NewMusic(d.Music)
 	sunoMusic := handlers.NewSuno(d.Accounts, d.Proxy, suno.New(d.Doer))
 	tun := handlers.NewTunnel(d.Tunnel, d.Keys)

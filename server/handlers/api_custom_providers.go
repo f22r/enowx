@@ -19,10 +19,11 @@ import (
 type CustomProviders struct {
 	dash *middleware.Dashboard
 	mgr  *custommgr.Manager
+	acct store.AccountStore
 }
 
-func NewCustomProviders(dash *middleware.Dashboard, mgr *custommgr.Manager) *CustomProviders {
-	return &CustomProviders{dash: dash, mgr: mgr}
+func NewCustomProviders(dash *middleware.Dashboard, mgr *custommgr.Manager, acct store.AccountStore) *CustomProviders {
+	return &CustomProviders{dash: dash, mgr: mgr, acct: acct}
 }
 
 func (h *CustomProviders) guard(w http.ResponseWriter, r *http.Request) bool {
@@ -42,6 +43,7 @@ type customProviderBody struct {
 	BaseURL      string              `json:"base_url"`
 	DefaultModel string              `json:"default_model"`
 	Models       []store.CustomModel `json:"models"`
+	APIKey       string              `json:"api_key"` // becomes the provider's first account
 }
 
 func (b customProviderBody) toStore() store.CustomProvider {
@@ -97,6 +99,15 @@ func (h *CustomProviders) Create(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeAPIErr(w, http.StatusInternalServerError, err.Error())
 		return
+	}
+	// The api key entered when adding the provider becomes its first account.
+	if key := strings.TrimSpace(body.APIKey); key != "" && h.acct != nil {
+		_, _ = h.acct.Add(r.Context(), store.Account{
+			Provider: p.Name,
+			Label:    p.Name + " key",
+			Creds:    map[string]string{"api_key": key},
+			Status:   "active",
+		})
 	}
 	writeData(w, map[string]any{"id": id})
 }

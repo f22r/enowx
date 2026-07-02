@@ -63,7 +63,7 @@ export const providersApi = {
 
 export const customProviderApi = {
   list: () => api.get<{ providers: CustomProvider[] }>("/api/custom-providers"),
-  create: (p: Omit<CustomProvider, "id">) => api.post<{ id: number }>("/api/custom-providers", p),
+  create: (p: Omit<CustomProvider, "id"> & { api_key?: string }) => api.post<{ id: number }>("/api/custom-providers", p),
   update: (id: number, p: Omit<CustomProvider, "id">) => api.patch<{ ok: boolean }>(`/api/custom-providers/${id}`, p),
   remove: (id: number) => api.del<{ ok: boolean }>(`/api/custom-providers/${id}`),
   probe: (base_url: string, format: string, api_key: string) => api.post<{ models: CustomModel[] }>("/api/custom-providers/probe", { base_url, format, api_key }),

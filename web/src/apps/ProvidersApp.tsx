@@ -239,7 +239,7 @@ function AddProviderModal({ onClose, onSaved }: { onClose: () => void; onSaved: 
     if (models.length === 0) { setErr("Add at least one model (fetch or manual)."); return; }
     setSaving(true); setErr("");
     try {
-      await customProviderApi.create({ name: name.trim(), prefix: prefix.trim().toLowerCase(), format, base_url: baseURL.trim(), default_model: defaultModel || models[0].id, models });
+      await customProviderApi.create({ name: name.trim(), prefix: prefix.trim().toLowerCase(), format, base_url: baseURL.trim(), default_model: defaultModel || models[0].id, models, api_key: apiKey.trim() });
       onSaved();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "failed to create");
@@ -268,7 +268,7 @@ function AddProviderModal({ onClose, onSaved }: { onClose: () => void; onSaved: 
             </div>
           </div>
           <div><label className="mb-1 block text-[11px] text-white/50">Base URL</label><input value={baseURL} onChange={(e) => setBaseURL(e.target.value)} placeholder="https://api.example.com/v1" className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 font-mono text-sm text-white outline-none focus:border-white/25" /></div>
-          <div><label className="mb-1 block text-[11px] text-white/50">API key (for fetching models; accounts add their own)</label><input value={apiKey} onChange={(e) => setApiKey(e.target.value)} type="password" placeholder="sk-…" className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-white/25" /></div>
+          <div><label className="mb-1 block text-[11px] text-white/50">API key (becomes the first account; also used to fetch models)</label><input value={apiKey} onChange={(e) => setApiKey(e.target.value)} type="password" placeholder="sk-…" className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-white/25" /></div>
 
           <div className="rounded-lg border border-white/10 bg-white/[0.02] p-2.5">
             <div className="mb-2 flex items-center justify-between">
