@@ -90,13 +90,13 @@ export const filterApi = {
 
 export interface CommunityTemplate {
   id: number;
-  author_id: string;
   name: string;
   description: string;
   install_count: number;
   username: string;
   display_name: string;
   avatar_url: string;
+  is_owner: boolean;
 }
 
 export const customProviderApi = {

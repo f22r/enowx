@@ -47,7 +47,7 @@ export function FiltersApp() {
       </div>
 
       {tab === "community" ? (
-        <CommunitySection localCount={rows?.length ?? 0} onInstalled={load} />
+        <CommunitySection onInstalled={load} />
       ) : (
       <>
       {/* Add — stacked Search / Replace with, plus templates. */}
@@ -60,6 +60,7 @@ export function FiltersApp() {
           {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />} Add
         </button>
         <TemplatesMenu templates={templates} rows={rows ?? []} onChange={() => { load(); loadTemplates(); }} />
+        <PublishMenu localCount={rows?.length ?? 0} />
       </div>
       <p className="mb-2 text-[10px] text-white/30">Tip: use <code className="text-white/45">*</code> or <code className="text-white/45">[ ]</code> for wildcards — patterns with regex symbols are auto-detected.</p>
       {err && <div className="mb-2 text-[11px] text-red-300">{err}</div>}
@@ -93,16 +94,61 @@ export function FiltersApp() {
   );
 }
 
-// CommunitySection browses cloud templates, installs (merge to local), and publishes.
-function CommunitySection({ localCount, onInstalled }: { localCount: number; onInstalled: () => void }) {
+// PublishMenu publishes the current local filter set to the community (My Filters).
+function PublishMenu({ localCount }: { localCount: number }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [desc, setDesc] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [open]);
+
+  const publish = async () => {
+    if (!name.trim()) return;
+    setBusy(true); setMsg("");
+    try {
+      await filterApi.publish(name.trim(), desc.trim());
+      setName(""); setDesc(""); setMsg("Published to the community.");
+      setTimeout(() => setOpen(false), 900);
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "publish failed");
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <div ref={ref} className="relative shrink-0">
+      <button onClick={() => setOpen((v) => !v)} disabled={localCount === 0} title={localCount === 0 ? "Add filters first" : "Publish your filters to the community"} className="flex items-center gap-0.5 rounded-md border border-white/10 bg-white/[0.03] px-1.5 py-1.5 text-[10px] text-white/60 hover:text-white disabled:opacity-40">
+        <Upload className="h-3.5 w-3.5" /><ChevronDown className="h-3 w-3" />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full z-50 mt-1 w-60 space-y-1.5 rounded-lg border border-white/10 bg-[#0e1016] p-2 shadow-2xl">
+          <div className="text-[10px] text-white/40">Publish your {localCount} filter{localCount === 1 ? "" : "s"} to the community.</div>
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Template name" className="w-full rounded border border-white/10 bg-black/30 px-2 py-1 text-[11px] text-white outline-none focus:border-white/25" />
+          <input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="Description (optional)" className="w-full rounded border border-white/10 bg-black/30 px-2 py-1 text-[11px] text-white outline-none focus:border-white/25" />
+          <button onClick={publish} disabled={busy || !name.trim()} className="flex w-full items-center justify-center gap-1 rounded bg-white px-2 py-1.5 text-[11px] font-medium text-black hover:opacity-90 disabled:opacity-50">
+            {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />} Publish
+          </button>
+          {msg && <div className="text-[10px] text-emerald-300/80">{msg}</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// CommunitySection browses cloud templates and installs (merge to local). Owners
+// can delete their own published templates here.
+function CommunitySection({ onInstalled }: { onInstalled: () => void }) {
   const [items, setItems] = useState<CommunityTemplate[] | null>(null);
   const [q, setQ] = useState("");
   const [installing, setInstalling] = useState<number | null>(null);
   const [msg, setMsg] = useState("");
-  const [pubOpen, setPubOpen] = useState(false);
-  const [pubName, setPubName] = useState("");
-  const [pubDesc, setPubDesc] = useState("");
-  const [pubBusy, setPubBusy] = useState(false);
 
   const browse = (query = "") => filterApi.community(query).then((r) => setItems(r.templates ?? [])).catch(() => setItems([]));
   useEffect(() => { browse(); }, []);
@@ -119,47 +165,23 @@ function CommunitySection({ localCount, onInstalled }: { localCount: number; onI
     } finally { setInstalling(null); }
   };
 
-  const publish = async () => {
-    if (!pubName.trim()) return;
-    setPubBusy(true); setMsg("");
-    try {
-      await filterApi.publish(pubName.trim(), pubDesc.trim());
-      setPubOpen(false); setPubName(""); setPubDesc("");
-      setMsg("Published to the community.");
-      browse(q);
-    } catch (e) {
-      setMsg(e instanceof Error ? e.message : "publish failed");
-    } finally { setPubBusy(false); }
+  const del = async (t: CommunityTemplate) => {
+    await filterApi.removeCommunity(t.id);
+    browse(q);
   };
 
   return (
     <div>
-      <div className="mb-2 flex items-center gap-1.5">
-        <div className="relative flex-1">
-          <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-white/25" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === "Enter" && browse(q)} placeholder="Search community templates…" className="w-full rounded-md border border-white/10 bg-black/30 py-1.5 pl-7 pr-2 text-xs text-white outline-none focus:border-white/25" />
-        </div>
-        <button onClick={() => setPubOpen((v) => !v)} disabled={localCount === 0} title={localCount === 0 ? "Add filters first" : "Publish your current filters"} className="flex shrink-0 items-center gap-1 rounded-md border border-white/10 bg-white/[0.03] px-2 py-1.5 text-[11px] text-white/70 hover:text-white disabled:opacity-40">
-          <Upload className="h-3.5 w-3.5" /> Publish
-        </button>
+      <div className="relative mb-2">
+        <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-white/25" />
+        <input value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === "Enter" && browse(q)} placeholder="Search community templates…" className="w-full rounded-md border border-white/10 bg-black/30 py-1.5 pl-7 pr-2 text-xs text-white outline-none focus:border-white/25" />
       </div>
-
-      {pubOpen && (
-        <div className="mb-2 space-y-1.5 rounded-lg border border-white/10 bg-white/[0.02] p-2">
-          <div className="text-[10px] text-white/40">Publishing your {localCount} local filter{localCount === 1 ? "" : "s"} as a template.</div>
-          <input value={pubName} onChange={(e) => setPubName(e.target.value)} placeholder="Template name" className="w-full rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-xs text-white outline-none focus:border-white/25" />
-          <input value={pubDesc} onChange={(e) => setPubDesc(e.target.value)} placeholder="Description (optional)" className="w-full rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-xs text-white outline-none focus:border-white/25" />
-          <button onClick={publish} disabled={pubBusy || !pubName.trim()} className="flex items-center gap-1 rounded-md bg-white px-2.5 py-1.5 text-[11px] font-medium text-black hover:opacity-90 disabled:opacity-50">
-            {pubBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />} Publish
-          </button>
-        </div>
-      )}
       {msg && <div className="mb-2 text-[11px] text-emerald-300/80">{msg}</div>}
 
       {!items ? (
         <div className="flex justify-center py-8"><Loader2 className="h-4 w-4 animate-spin text-white/40" /></div>
       ) : items.length === 0 ? (
-        <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4 text-center text-[11px] text-white/40">No community templates yet. Be the first to publish one.</div>
+        <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4 text-center text-[11px] text-white/40">No community templates yet. Publish one from My Filters.</div>
       ) : (
         <div className="space-y-1.5">
           {items.map((t) => (
@@ -169,6 +191,9 @@ function CommunitySection({ localCount, onInstalled }: { localCount: number; onI
                 {t.description && <div className="truncate text-[10px] text-white/40">{t.description}</div>}
                 <div className="text-[10px] text-white/30">by {t.display_name || t.username} · {t.install_count} install{t.install_count === 1 ? "" : "s"}</div>
               </div>
+              {t.is_owner && (
+                <button onClick={() => del(t)} title="Delete your template" className="shrink-0 text-white/25 hover:text-red-300"><Trash2 className="h-3.5 w-3.5" /></button>
+              )}
               <button onClick={() => install(t)} disabled={installing === t.id} title="Install (merge into your filters)" className="flex shrink-0 items-center gap-1 rounded-md bg-white/10 px-2 py-1.5 text-[11px] text-white/80 hover:bg-white/20 disabled:opacity-50">
                 {installing === t.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />} Install
               </button>
