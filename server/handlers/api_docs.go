@@ -70,8 +70,11 @@ var shortcutGroups = []shortcutGroup{
 		Items: []shortcut{
 			{Keys: "Ctrl/Alt + 1", Desc: "Widget board"},
 			{Keys: "Ctrl/Alt + 2", Desc: "Terminal"},
-			{Keys: "Ctrl/Alt + 3", Desc: "Apps drawer"},
-			{Keys: "Ctrl/Alt + 4", Desc: "Docs"},
+			{Keys: "Ctrl/Alt + 3", Desc: "Chat"},
+			{Keys: "Ctrl/Alt + 4", Desc: "API Test"},
+			{Keys: "Ctrl/Alt + 5", Desc: "Apps drawer"},
+			{Keys: "Ctrl/Alt + 6", Desc: "Docs"},
+			{Keys: "Ctrl/Alt + 7", Desc: "Admin (moderators)"},
 		},
 	},
 	{
@@ -221,6 +224,24 @@ var groups = []docGroup{
 			{Method: "DELETE", Path: "/api/music/playlists/{id}/tracks/{videoId}", Desc: "Remove a track from a playlist.", Params: []docParam{{Name: "id", In: "path", Desc: "playlist id"}, {Name: "videoId", In: "path", Desc: "video id"}}},
 			{Method: "GET", Path: "/api/music/playlists/{id}/export", Desc: "Export a playlist as a portable JSON document (share/plugin contract).", Params: []docParam{{Name: "id", In: "path", Desc: "playlist id"}}},
 			{Method: "POST", Path: "/api/music/playlists/import", Desc: "Import a playlist from an exported JSON document.", Params: []docParam{{Name: "name", In: "body", Desc: "playlist name"}, {Name: "tracks", In: "body", Desc: "array of tracks"}}},
+		},
+	},
+	{
+		Name: "Plugins & marketplace",
+		Desc: "Manage local plugins (sidecar mini-apps) and the shared marketplace. Your plugin's UI is served at /plugins/{id}/; from a plugin you mostly call the other groups here via enowx.api(...), but these drive the plugin lifecycle itself.",
+		Endpoints: []docEndpoint{
+			{Method: "GET", Path: "/api/plugins", Desc: "List installed plugins (manifest, running state, port) + detected runtimes."},
+			{Method: "POST", Path: "/api/plugins", Desc: "Scaffold a new plugin folder under ~/.enowx/plugins/{id}/.", Params: []docParam{{Name: "id", In: "body", Desc: "plugin id (a-z0-9-)"}, {Name: "name", In: "body", Desc: "display name"}, {Name: "runtime", In: "body", Desc: "go|python|node|static"}, {Name: "starter", In: "body", Desc: "include starter code"}}},
+			{Method: "POST", Path: "/api/plugins/{id}/start", Desc: "Start the sidecar (assigns PORT, proxies its UI).", Params: []docParam{{Name: "id", In: "path", Desc: "plugin id"}}},
+			{Method: "POST", Path: "/api/plugins/{id}/stop", Desc: "Stop the sidecar.", Params: []docParam{{Name: "id", In: "path", Desc: "plugin id"}}},
+			{Method: "POST", Path: "/api/plugins/{id}/reveal", Desc: "Open the plugin folder in the OS file manager.", Params: []docParam{{Name: "id", In: "path", Desc: "plugin id"}}},
+			{Method: "GET", Path: "/api/plugins/{id}/logs", Desc: "Recent sidecar stdout/stderr.", Params: []docParam{{Name: "id", In: "path", Desc: "plugin id"}}},
+			{Method: "GET", Path: "/api/plugins/{id}/icon", Desc: "Serve the plugin's icon.", Params: []docParam{{Name: "id", In: "path", Desc: "plugin id"}}},
+			{Method: "POST", Path: "/api/plugins/{id}/icon", Desc: "Upload a custom icon (multipart, auto-fit).", Params: []docParam{{Name: "id", In: "path", Desc: "plugin id"}}},
+			{Method: "DELETE", Path: "/api/plugins/{id}", Desc: "Delete a plugin and its folder.", Params: []docParam{{Name: "id", In: "path", Desc: "plugin id"}}},
+			{Method: "GET", Path: "/api/market/plugins", Desc: "Browse published marketplace plugins.", Params: []docParam{{Name: "q", In: "query", Desc: "search query (optional)"}}},
+			{Method: "POST", Path: "/api/market/publish", Desc: "Bundle a local plugin + publish it (security-scanned). Returns {status: approved|rejected|pending, reason}.", Params: []docParam{{Name: "id", In: "body", Desc: "local plugin id"}}},
+			{Method: "POST", Path: "/api/market/install/{id}", Desc: "Download + install a published plugin into ~/.enowx/plugins/.", Params: []docParam{{Name: "id", In: "path", Desc: "marketplace plugin id"}}},
 		},
 	},
 	{
