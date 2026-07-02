@@ -33,15 +33,16 @@ type proc struct {
 
 // Manager runs and tracks plugin sidecar processes under the plugins dir.
 type Manager struct {
-	dir string
+	dir       string
+	enowxPort int
 
 	mu    sync.Mutex
 	procs map[string]*proc
 }
 
-func New(pluginsDir string) *Manager {
+func New(pluginsDir string, enowxPort int) *Manager {
 	_ = os.MkdirAll(pluginsDir, 0o755)
-	return &Manager{dir: pluginsDir, procs: map[string]*proc{}}
+	return &Manager{dir: pluginsDir, enowxPort: enowxPort, procs: map[string]*proc{}}
 }
 
 // Dir returns the plugins root directory.
@@ -117,6 +118,7 @@ func (m *Manager) Start(id string) error {
 	cmd.Env = append(os.Environ(),
 		"PORT="+strconv.Itoa(port),
 		"ENOWX_PLUGIN_ID="+id,
+		"ENOWX_API=http://127.0.0.1:"+strconv.Itoa(m.enowxPort),
 	)
 	hideWindow(cmd)
 

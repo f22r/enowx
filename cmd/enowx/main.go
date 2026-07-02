@@ -65,7 +65,7 @@ func main() {
 
 	px := proxy.New(reg, pool.New(db.Accounts()), doer)
 	tun := tunnel.New(cfg.RuntimeDir, cfg.Port)
-	pluginMgr := plugins.New(cfg.PluginsDir())
+	pluginMgr := plugins.New(cfg.PluginsDir(), cfg.Port)
 	syncMgr := syncpkg.New(db.Settings(), db.Music(), db.Logs())
 	// Maintain the live channel (pull side) and the automatic push side. Both
 	// are no-ops until logged in; auto-push also obeys the global toggle.
