@@ -10,19 +10,21 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/enowdev/enowx/core/sanitize"
+	syncpkg "github.com/enowdev/enowx/core/sync"
 	"github.com/enowdev/enowx/server/middleware"
 	"github.com/enowdev/enowx/store"
 )
 
 // Filters manages content-filter rules (pattern→replacement) that obfuscate
-// request text upstream and restore it downstream.
+// request text upstream and restore it downstream, plus community templates.
 type Filters struct {
 	dash  *middleware.Dashboard
 	store store.FilterStore
+	mgr   *syncpkg.Manager
 }
 
-func NewFilters(dash *middleware.Dashboard, s store.FilterStore) *Filters {
-	f := &Filters{dash: dash, store: s}
+func NewFilters(dash *middleware.Dashboard, s store.FilterStore, mgr *syncpkg.Manager) *Filters {
+	f := &Filters{dash: dash, store: s, mgr: mgr}
 	f.reload() // load rules into the engine on startup
 	return f
 }
@@ -188,6 +190,102 @@ func (h *Filters) DeleteTemplate(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := h.store.DeleteTemplate(r.Context(), chi.URLParam(r, "name")); err != nil {
 		writeAPIErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeData(w, map[string]any{"ok": true})
+}
+
+// --- community templates (proxied to the cloud) ---
+
+// CommunityList browses the public community templates.
+func (h *Filters) CommunityList(w http.ResponseWriter, r *http.Request) {
+	if !h.guard(w, r) {
+		return
+	}
+	out, err := h.mgr.CommunityFilterTemplates(r.Context(), r.URL.RawQuery)
+	if err != nil {
+		writeAPIErr(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	proxyJSON(w, out, nil)
+}
+
+// CommunityPublish publishes the current local filter set to the community.
+func (h *Filters) CommunityPublish(w http.ResponseWriter, r *http.Request) {
+	if !h.guard(w, r) {
+		return
+	}
+	var b struct {
+		Name        string `json:"name"`
+		Description string `json:"description"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&b); err != nil || strings.TrimSpace(b.Name) == "" {
+		writeAPIErr(w, http.StatusBadRequest, "name is required")
+		return
+	}
+	cur, err := h.store.List(r.Context())
+	if err != nil {
+		writeAPIErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	rules := make([]map[string]any, 0, len(cur))
+	for _, f := range cur {
+		rules = append(rules, map[string]any{"pattern": f.Pattern, "replacement": f.Replacement, "is_regex": f.IsRegex})
+	}
+	out, err := h.mgr.PublishFilterTemplate(r.Context(), map[string]any{
+		"name": strings.TrimSpace(b.Name), "description": b.Description, "rules": rules,
+	})
+	if err != nil {
+		writeAPIErr(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	proxyJSON(w, out, nil)
+}
+
+// CommunityInstall fetches a community template's rules and merges them locally.
+func (h *Filters) CommunityInstall(w http.ResponseWriter, r *http.Request) {
+	if !h.guard(w, r) {
+		return
+	}
+	raw, err := h.mgr.InstallCommunityFilterTemplate(r.Context(), chi.URLParam(r, "id"))
+	if err != nil {
+		writeAPIErr(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	var payload struct {
+		Rules []struct {
+			Pattern     string `json:"pattern"`
+			Replacement string `json:"replacement"`
+			IsRegex     bool   `json:"is_regex"`
+		} `json:"rules"`
+	}
+	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
+		writeAPIErr(w, http.StatusBadGateway, "bad template payload")
+		return
+	}
+	rules := make([]store.ContentFilter, 0, len(payload.Rules))
+	for _, ru := range payload.Rules {
+		p := strings.TrimSpace(ru.Pattern)
+		if p == "" {
+			continue
+		}
+		rules = append(rules, store.ContentFilter{Pattern: p, Replacement: ru.Replacement, IsRegex: sanitize.LooksRegex(p), IsActive: true})
+	}
+	if err := h.store.MergeAll(r.Context(), rules); err != nil {
+		writeAPIErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	h.reload()
+	writeData(w, map[string]any{"installed": len(rules)})
+}
+
+// CommunityDelete removes a community template the user owns.
+func (h *Filters) CommunityDelete(w http.ResponseWriter, r *http.Request) {
+	if !h.guard(w, r) {
+		return
+	}
+	if err := h.mgr.DeleteCommunityFilterTemplate(r.Context(), chi.URLParam(r, "id")); err != nil {
+		writeAPIErr(w, http.StatusBadGateway, err.Error())
 		return
 	}
 	writeData(w, map[string]any{"ok": true})

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Plus, Trash2, ArrowRight, Loader2, BookmarkPlus, ChevronDown } from "lucide-react";
+import { Plus, Trash2, ArrowRight, Loader2, BookmarkPlus, ChevronDown, Download, Upload, Search, Globe } from "lucide-react";
 import { AppShell } from "./shell";
-import { filterApi, type ContentFilter, type FilterTemplate } from "../lib/api";
+import { filterApi, type ContentFilter, type FilterTemplate, type CommunityTemplate } from "../lib/api";
 
 // FiltersApp manages content-filter rules: a word is swapped before the request
 // is sent to a provider (some providers block certain words) and restored in the
@@ -13,6 +13,7 @@ export function FiltersApp() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [templates, setTemplates] = useState<FilterTemplate[]>([]);
+  const [tab, setTab] = useState<"local" | "community">("local");
 
   const load = () => filterApi.list().then((r) => setRows(r.filters ?? [])).catch(() => setRows([]));
   const loadTemplates = () => filterApi.templates().then((r) => setTemplates(r.templates ?? [])).catch(() => setTemplates([]));
@@ -39,6 +40,16 @@ export function FiltersApp() {
 
   return (
     <AppShell title="Filters" subtitle="Swap blocked words before sending, restore them in the reply">
+      {/* Local / Community tabs. */}
+      <div className="mb-3 flex gap-1 rounded-lg bg-white/[0.03] p-0.5 text-[11px]">
+        <button onClick={() => setTab("local")} className={`flex-1 rounded-md px-2 py-1 font-medium transition-colors ${tab === "local" ? "bg-white/10 text-white" : "text-white/45 hover:text-white/70"}`}>My Filters</button>
+        <button onClick={() => setTab("community")} className={`flex flex-1 items-center justify-center gap-1 rounded-md px-2 py-1 font-medium transition-colors ${tab === "community" ? "bg-white/10 text-white" : "text-white/45 hover:text-white/70"}`}><Globe className="h-3 w-3" /> Community</button>
+      </div>
+
+      {tab === "community" ? (
+        <CommunitySection localCount={rows?.length ?? 0} onInstalled={load} />
+      ) : (
+      <>
       {/* Add — stacked Search / Replace with, plus templates. */}
       <div className="mb-2 flex items-start gap-1.5">
         <div className="flex-1 space-y-1.5">
@@ -76,7 +87,96 @@ export function FiltersApp() {
           ))}
         </div>
       )}
+      </>
+      )}
     </AppShell>
+  );
+}
+
+// CommunitySection browses cloud templates, installs (merge to local), and publishes.
+function CommunitySection({ localCount, onInstalled }: { localCount: number; onInstalled: () => void }) {
+  const [items, setItems] = useState<CommunityTemplate[] | null>(null);
+  const [q, setQ] = useState("");
+  const [installing, setInstalling] = useState<number | null>(null);
+  const [msg, setMsg] = useState("");
+  const [pubOpen, setPubOpen] = useState(false);
+  const [pubName, setPubName] = useState("");
+  const [pubDesc, setPubDesc] = useState("");
+  const [pubBusy, setPubBusy] = useState(false);
+
+  const browse = (query = "") => filterApi.community(query).then((r) => setItems(r.templates ?? [])).catch(() => setItems([]));
+  useEffect(() => { browse(); }, []);
+
+  const install = async (t: CommunityTemplate) => {
+    setInstalling(t.id); setMsg("");
+    try {
+      const r = await filterApi.install(t.id);
+      setMsg(`Installed ${r.installed} rule${r.installed === 1 ? "" : "s"} from "${t.name}".`);
+      onInstalled();
+      browse(q);
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "install failed");
+    } finally { setInstalling(null); }
+  };
+
+  const publish = async () => {
+    if (!pubName.trim()) return;
+    setPubBusy(true); setMsg("");
+    try {
+      await filterApi.publish(pubName.trim(), pubDesc.trim());
+      setPubOpen(false); setPubName(""); setPubDesc("");
+      setMsg("Published to the community.");
+      browse(q);
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "publish failed");
+    } finally { setPubBusy(false); }
+  };
+
+  return (
+    <div>
+      <div className="mb-2 flex items-center gap-1.5">
+        <div className="relative flex-1">
+          <Search className="absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-white/25" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === "Enter" && browse(q)} placeholder="Search community templates…" className="w-full rounded-md border border-white/10 bg-black/30 py-1.5 pl-7 pr-2 text-xs text-white outline-none focus:border-white/25" />
+        </div>
+        <button onClick={() => setPubOpen((v) => !v)} disabled={localCount === 0} title={localCount === 0 ? "Add filters first" : "Publish your current filters"} className="flex shrink-0 items-center gap-1 rounded-md border border-white/10 bg-white/[0.03] px-2 py-1.5 text-[11px] text-white/70 hover:text-white disabled:opacity-40">
+          <Upload className="h-3.5 w-3.5" /> Publish
+        </button>
+      </div>
+
+      {pubOpen && (
+        <div className="mb-2 space-y-1.5 rounded-lg border border-white/10 bg-white/[0.02] p-2">
+          <div className="text-[10px] text-white/40">Publishing your {localCount} local filter{localCount === 1 ? "" : "s"} as a template.</div>
+          <input value={pubName} onChange={(e) => setPubName(e.target.value)} placeholder="Template name" className="w-full rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-xs text-white outline-none focus:border-white/25" />
+          <input value={pubDesc} onChange={(e) => setPubDesc(e.target.value)} placeholder="Description (optional)" className="w-full rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-xs text-white outline-none focus:border-white/25" />
+          <button onClick={publish} disabled={pubBusy || !pubName.trim()} className="flex items-center gap-1 rounded-md bg-white px-2.5 py-1.5 text-[11px] font-medium text-black hover:opacity-90 disabled:opacity-50">
+            {pubBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />} Publish
+          </button>
+        </div>
+      )}
+      {msg && <div className="mb-2 text-[11px] text-emerald-300/80">{msg}</div>}
+
+      {!items ? (
+        <div className="flex justify-center py-8"><Loader2 className="h-4 w-4 animate-spin text-white/40" /></div>
+      ) : items.length === 0 ? (
+        <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4 text-center text-[11px] text-white/40">No community templates yet. Be the first to publish one.</div>
+      ) : (
+        <div className="space-y-1.5">
+          {items.map((t) => (
+            <div key={t.id} className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2">
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-xs font-medium text-white">{t.name}</div>
+                {t.description && <div className="truncate text-[10px] text-white/40">{t.description}</div>}
+                <div className="text-[10px] text-white/30">by {t.display_name || t.username} · {t.install_count} install{t.install_count === 1 ? "" : "s"}</div>
+              </div>
+              <button onClick={() => install(t)} disabled={installing === t.id} title="Install (merge into your filters)" className="flex shrink-0 items-center gap-1 rounded-md bg-white/10 px-2 py-1.5 text-[11px] text-white/80 hover:bg-white/20 disabled:opacity-50">
+                {installing === t.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />} Install
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

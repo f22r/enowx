@@ -81,7 +81,23 @@ export const filterApi = {
   saveTemplate: (name: string) => api.post<{ ok: boolean }>("/api/filter-templates", { name }),
   loadTemplate: (name: string) => api.post<{ ok: boolean }>(`/api/filter-templates/${encodeURIComponent(name)}/load`, {}),
   removeTemplate: (name: string) => api.del<{ ok: boolean }>(`/api/filter-templates/${encodeURIComponent(name)}`),
+  // Community (cloud) templates.
+  community: (q = "") => api.get<{ templates: CommunityTemplate[] }>(`/api/community/filter-templates${q ? `?q=${encodeURIComponent(q)}` : ""}`),
+  publish: (name: string, description: string) => api.post<{ id: number }>("/api/community/filter-templates/publish", { name, description }),
+  install: (id: number) => api.post<{ installed: number }>(`/api/community/filter-templates/${id}/install`, {}),
+  removeCommunity: (id: number) => api.del<{ ok: boolean }>(`/api/community/filter-templates/${id}`),
 };
+
+export interface CommunityTemplate {
+  id: number;
+  author_id: string;
+  name: string;
+  description: string;
+  install_count: number;
+  username: string;
+  display_name: string;
+  avatar_url: string;
+}
 
 export const customProviderApi = {
   list: () => api.get<{ providers: CustomProvider[] }>("/api/custom-providers"),

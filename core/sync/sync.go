@@ -666,6 +666,53 @@ func (m *Manager) SellerReviews(ctx context.Context, sellerID, query string) (st
 	return string(raw), nil
 }
 
+// --- community filter templates ---
+
+// CommunityFilterTemplates browses the public template list.
+func (m *Manager) CommunityFilterTemplates(ctx context.Context, query string) (string, error) {
+	var raw json.RawMessage
+	path := "/filter-templates"
+	if query != "" {
+		path += "?" + query
+	}
+	if err := m.call(ctx, http.MethodGet, path, nil, &raw); err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
+
+// GetCommunityFilterTemplate returns one template including its rules.
+func (m *Manager) GetCommunityFilterTemplate(ctx context.Context, id string) (string, error) {
+	var raw json.RawMessage
+	if err := m.call(ctx, http.MethodGet, "/filter-templates/"+id, nil, &raw); err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
+
+// InstallCommunityFilterTemplate bumps the counter and returns the rules to merge.
+func (m *Manager) InstallCommunityFilterTemplate(ctx context.Context, id string) (string, error) {
+	var raw json.RawMessage
+	if err := m.call(ctx, http.MethodPost, "/filter-templates/"+id+"/install", nil, &raw); err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
+
+// PublishFilterTemplate publishes a named set of rules to the community.
+func (m *Manager) PublishFilterTemplate(ctx context.Context, body any) (string, error) {
+	var raw json.RawMessage
+	if err := m.call(ctx, http.MethodPost, "/filter-templates", body, &raw); err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
+
+// DeleteCommunityFilterTemplate removes a template the user owns.
+func (m *Manager) DeleteCommunityFilterTemplate(ctx context.Context, id string) error {
+	return m.call(ctx, http.MethodDelete, "/filter-templates/"+id, nil, nil)
+}
+
 // --- marketplace orders ---
 
 // OrderCreate starts an official-store order; returns the pay URL.
