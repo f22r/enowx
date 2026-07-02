@@ -72,13 +72,8 @@ export function ProfileApp() {
 
       {profile.loggedIn && profile.user ? (
         <div className="space-y-4">
-          {/* Discord-style profile card (reused for public profiles too). */}
-          <ProfileCard p={profile.user} />
-
-          <div className="flex items-center justify-between gap-2">
-            <ProfileEditor />
-            <span className="text-[11px] text-white/35">via Discord</span>
-          </div>
+          {/* Discord-style profile card with the Edit action in the banner corner. */}
+          <ProfileCard p={profile.user} action={<ProfileEditor />} />
 
           {/* Subscription / upgrade */}
           <SubscriptionCard />

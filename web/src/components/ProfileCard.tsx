@@ -41,7 +41,7 @@ export interface CardProfile {
 // ProfileCard is the Discord-style profile card: grey banner, large avatar
 // overlapping it, name + handle, badges row, and an About section (bio, links,
 // member-since). Used as the Profile-app hero and (later) as a popover.
-export function ProfileCard({ p, footer, compact }: { p: CardProfile; footer?: React.ReactNode; compact?: boolean }) {
+export function ProfileCard({ p, footer, action, compact }: { p: CardProfile; footer?: React.ReactNode; action?: React.ReactNode; compact?: boolean }) {
   const initial = (p.display_name || p.username || "?").charAt(0).toUpperCase();
   // Like Discord: the card BODY is themed by a Primary→Accent gradient; the
   // banner is a separate element that defaults to grey (image/gif banner is a
@@ -66,10 +66,11 @@ export function ProfileCard({ p, footer, compact }: { p: CardProfile; footer?: R
       {/* Banner — equipped preset gradient, else image/gif, else grey. Shorter
           in compact mode (e.g. a popover). */}
       <div
-        className={`${compact ? "h-24" : "h-40"} w-full bg-white/[0.06]`}
+        className={`relative ${compact ? "h-24" : "h-40"} w-full bg-white/[0.06]`}
         style={eq?.banner ? { background: eq.banner } : undefined}
       >
         {!eq?.banner && p.banner_url && <img src={p.banner_url} alt="" className="h-full w-full object-cover" />}
+        {action && <div className="absolute right-2 top-2 z-10">{action}</div>}
       </div>
 
       <div className="px-4 pb-4" style={{ background: body }}>

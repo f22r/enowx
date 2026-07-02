@@ -98,11 +98,16 @@ export function ProfileEditor() {
 
   return (
     <>
+      {/* Glass pill: pencil icon that expands to "Edit" on hover. */}
       <button
         onClick={() => setOpen(true)}
-        className="flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-white/60 hover:bg-white/5 hover:text-white"
+        title="Edit profile"
+        className="group flex items-center rounded-full border border-white/15 bg-black/25 px-1.5 py-1.5 text-xs text-white/80 shadow-lg backdrop-blur-md transition-colors hover:bg-black/40 hover:text-white"
       >
-        <Pencil className="h-3.5 w-3.5" /> Edit profile
+        <Pencil className="h-3.5 w-3.5 shrink-0" />
+        <span className="max-w-0 overflow-hidden whitespace-nowrap transition-all duration-200 ease-out group-hover:ml-1 group-hover:max-w-[4rem] group-hover:pr-0.5">
+          Edit
+        </span>
       </button>
 
       {open && (
