@@ -106,6 +106,12 @@ export const TOOL_SCHEMAS = [
   },
 ];
 
+// Tools that don't need a working directory / agent mode (always available in
+// chat). generate_music just calls the gateway.
+export const ALWAYS_ON_TOOLS = TOOL_SCHEMAS.filter((t) => t.function.name === "generate_music");
+// Coding-agent tools (filesystem/exec/http) — only sent when agent mode is on.
+export const AGENT_TOOLS = TOOL_SCHEMAS.filter((t) => t.function.name !== "generate_music");
+
 export type ToolName = "read_file" | "list_dir" | "write_file" | "edit_file" | "run_command" | "http_request" | "generate_music";
 
 // Per-tool display metadata (verb label + which lucide icon name to use).

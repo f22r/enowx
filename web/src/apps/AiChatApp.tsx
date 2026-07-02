@@ -2,7 +2,7 @@ import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { Send, Trash2, Loader2, Bot, ChevronDown, ChevronRight, FolderOpen, Shield, Check, X, Terminal, FileEdit, FileText, FilePlus, Globe, Wrench, Folder, CornerLeftUp, Settings2, Plus, Brain, Music } from "lucide-react";
 import { accountsApi, keysApi, filesApi, type ProviderModel, type DirListing } from "../lib/api";
 import { AiMarkdown } from "../components/AiMarkdown";
-import { TOOL_SCHEMAS, TOOL_META, GROUPABLE_TOOLS, GROUP_VERB, lineDiff, runTool, needsApproval, type PermLevel, type ToolName, type ToolResult } from "./agent/tools";
+import { ALWAYS_ON_TOOLS, AGENT_TOOLS, TOOL_META, GROUPABLE_TOOLS, GROUP_VERB, lineDiff, runTool, needsApproval, type PermLevel, type ToolName, type ToolResult } from "./agent/tools";
 
 const DEFAULT_SYSTEM = `You are a helpful coding assistant running inside the enowx dashboard.
 Reply in the same language the user writes in. Be concise and precise.
@@ -146,7 +146,10 @@ export function AiChatApp() {
     const messages = wire(history);
     if (sysPrompt.trim()) messages.unshift({ role: "system", content: sysPrompt.trim() });
     const body: Record<string, unknown> = { model, stream: true, messages };
-    if (agentMode) body.tools = TOOL_SCHEMAS;
+    // generate_music is always available; the coding-agent tools only when agent
+    // mode is on (they need a working directory).
+    const tools = agentMode ? [...ALWAYS_ON_TOOLS, ...AGENT_TOOLS] : ALWAYS_ON_TOOLS;
+    if (tools.length > 0) body.tools = tools;
 
     const res = await fetch("/v1/chat/completions", {
       method: "POST",
