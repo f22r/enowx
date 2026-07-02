@@ -19,6 +19,7 @@ var providerCatalog = map[string]providerMeta{
 	"codex":       {Label: "Codex", Icon: "codex"},
 	"antigravity": {Label: "Antigravity", Icon: "antigravity"},
 	"suno":        {Label: "Suno", Icon: "suno"},
+	"leonardo":    {Label: "Leonardo", Icon: "leonardo"},
 }
 
 type providerDTO struct {

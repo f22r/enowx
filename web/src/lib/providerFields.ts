@@ -39,12 +39,21 @@ const sunoForm: ProviderForm = {
   fields: [{ key: "api_key", label: "Suno API Key", placeholder: "Get one at sunoapi.org", required: true, secret: true }],
 };
 
+// Leonardo authenticates with a JWT access_token, stored as a credential (the
+// cognito sub + email are derived from the token server-side).
+const leonardoForm: ProviderForm = {
+  single: false,
+  fields: [{ key: "access_token", label: "Access Token (JWT)", placeholder: "eyJ… (from app.leonardo.ai)", required: true, secret: true }],
+};
+
 export function formFor(provider: string): ProviderForm {
   switch (provider) {
     case "kiro":
       return kiroForm;
     case "suno":
       return sunoForm;
+    case "leonardo":
+      return leonardoForm;
     default:
       return apiKeyForm;
   }
