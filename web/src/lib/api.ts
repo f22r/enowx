@@ -483,9 +483,32 @@ export interface SubscriptionStatus {
   pay_enabled: boolean;
   premium_until?: string;
 }
+export interface CouponPreview {
+  valid: boolean;
+  final_price: number;
+  discount: number;
+  message: string;
+}
 export const subscriptionApi = {
   status: () => api.get<SubscriptionStatus>("/api/subscription"),
-  subscribe: () => api.post<{ order_ref: string; pay_url: string; amount: number }>("/api/subscription/subscribe", {}),
+  subscribe: (coupon?: string) => api.post<{ order_ref: string; pay_url?: string; amount?: number; free?: boolean }>("/api/subscription/subscribe", { coupon: coupon ?? "" }),
+  validateCoupon: (code: string) => api.post<CouponPreview>("/api/subscription/validate-coupon", { code }),
+};
+
+export interface Coupon {
+  id: number;
+  code: string;
+  kind: string;
+  value: number;
+  max_uses: number | null;
+  used_count: number;
+  expires_at: string | null;
+  active: boolean;
+}
+export const couponAdminApi = {
+  list: () => api.get<{ coupons: Coupon[] }>("/api/admin/coupons"),
+  create: (c: { code: string; kind: string; value: number; max_uses?: number | null; expires_at?: string }) => api.post<{ id: number }>("/api/admin/coupons", c),
+  remove: (id: number) => api.del<{ ok: boolean }>(`/api/admin/coupons/${id}`),
 };
 
 export interface VersionInfo {

@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { Loader2, Users, Copy, ScrollText, BarChart3, ShieldCheck, ShieldOff, Search, MoreHorizontal, Ban, VolumeX, AlertTriangle, Plus, Minus, Boxes, Trash2, Pencil, RefreshCw } from "lucide-react";
+import { Loader2, Users, Copy, ScrollText, BarChart3, ShieldCheck, ShieldOff, Search, MoreHorizontal, Ban, VolumeX, AlertTriangle, Plus, Minus, Boxes, Trash2, Pencil, RefreshCw, Ticket } from "lucide-react";
 import { openProfile } from "../os/profileViewer";
 import { useAdminEvents } from "../os/adminBus";
 import { useDialog } from "../os/dialog";
 import { FileSearch, X, Store, Check, Puzzle, ShoppingBag } from "lucide-react";
 import { Tooltip } from "../components/Tooltip";
-import { adminApi, modApi, searchApi, adminVipApi, type FlaggedLink, type ModAction, type AdminStats, type ProviderModel, type PluginReview, type PluginReviewDetail, type AdminMarketPlugin, type VIPProduct, type VIPService } from "../lib/api";
+import { adminApi, modApi, searchApi, adminVipApi, couponAdminApi, type FlaggedLink, type ModAction, type AdminStats, type ProviderModel, type PluginReview, type PluginReviewDetail, type AdminMarketPlugin, type VIPProduct, type VIPService, type Coupon } from "../lib/api";
 
-type Tab = "stats" | "flags" | "users" | "models" | "market" | "store" | "scan" | "reviews" | "log";
+type Tab = "stats" | "flags" | "users" | "models" | "market" | "store" | "scan" | "reviews" | "log" | "coupons";
 
 // AdminApp is the moderator-only Admin Tools app. It only appears in the dock
 // for moderators (see apps registry), and every endpoint it calls is role-gated
@@ -24,6 +24,7 @@ export function AdminApp() {
     { id: "store", label: "Official Store", icon: ShoppingBag },
     { id: "scan", label: "Plugin scan", icon: ShieldCheck },
     { id: "reviews", label: "Review log", icon: FileSearch },
+    { id: "coupons", label: "Coupons", icon: Ticket },
     { id: "log", label: "Mod log", icon: ScrollText },
   ];
   const NavBtn = ({ t }: { t: { id: Tab; label: string; icon: typeof Users } }) => {
@@ -62,6 +63,7 @@ export function AdminApp() {
         {tab === "store" && <OfficialStoreTab />}
         {tab === "scan" && <PluginScanTab />}
         {tab === "reviews" && <ReviewLogTab />}
+        {tab === "coupons" && <CouponsTab />}
         {tab === "log" && <LogTab />}
       </div>
     </div>
@@ -851,6 +853,88 @@ function AddProductModal({ onClose, onAdded }: { onClose: () => void; onAdded: (
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// CouponsTab manages Premium discount coupons.
+function CouponsTab() {
+  const [rows, setRows] = useState<Coupon[] | null>(null);
+  const [code, setCode] = useState("");
+  const [kind, setKind] = useState<"percent" | "amount">("percent");
+  const [value, setValue] = useState("");
+  const [maxUses, setMaxUses] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  const load = () => couponAdminApi.list().then((r) => setRows(r.coupons ?? [])).catch(() => setRows([]));
+  useEffect(() => { load(); }, []);
+
+  const create = async () => {
+    if (!code.trim() || !value.trim()) { setErr("Code and value are required."); return; }
+    setBusy(true); setErr("");
+    try {
+      await couponAdminApi.create({
+        code: code.trim().toUpperCase(),
+        kind,
+        value: Number(value),
+        max_uses: maxUses.trim() ? Number(maxUses) : null,
+      });
+      setCode(""); setValue(""); setMaxUses("");
+      await load();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "failed");
+    } finally { setBusy(false); }
+  };
+
+  const idr = (n: number) => "Rp" + n.toLocaleString("id-ID");
+
+  return (
+    <div>
+      <h2 className="mb-3 text-sm font-bold text-white">Coupons</h2>
+      <div className="mb-4 flex flex-wrap items-end gap-2 rounded-xl border border-white/10 bg-white/[0.02] p-3">
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] uppercase text-white/35">Code</label>
+          <input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="LAUNCH50" className="w-32 rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-xs text-white outline-none focus:border-white/25" />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] uppercase text-white/35">Type</label>
+          <select value={kind} onChange={(e) => setKind(e.target.value as "percent" | "amount")} className="rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-xs text-white outline-none">
+            <option value="percent">Percent %</option>
+            <option value="amount">Amount Rp</option>
+          </select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] uppercase text-white/35">{kind === "percent" ? "Percent (0-100)" : "Amount off"}</label>
+          <input value={value} onChange={(e) => setValue(e.target.value.replace(/\D/g, ""))} placeholder={kind === "percent" ? "50" : "10000"} className="w-24 rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-xs text-white outline-none focus:border-white/25" />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] uppercase text-white/35">Max uses (opt)</label>
+          <input value={maxUses} onChange={(e) => setMaxUses(e.target.value.replace(/\D/g, ""))} placeholder="∞" className="w-20 rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-xs text-white outline-none focus:border-white/25" />
+        </div>
+        <button onClick={create} disabled={busy} className="flex items-center gap-1 rounded-md bg-white px-3 py-1.5 text-xs font-medium text-black hover:opacity-90 disabled:opacity-50">
+          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />} Create
+        </button>
+      </div>
+      {err && <div className="mb-3 text-xs text-red-300">{err}</div>}
+
+      {!rows ? (
+        <div className="flex justify-center py-8"><Loader2 className="h-4 w-4 animate-spin text-white/40" /></div>
+      ) : rows.length === 0 ? (
+        <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4 text-center text-xs text-white/40">No coupons yet.</div>
+      ) : (
+        <div className="space-y-1.5">
+          {rows.map((c) => (
+            <div key={c.id} className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 text-xs">
+              <code className="font-mono font-semibold text-white">{c.code}</code>
+              <span className="text-emerald-300">{c.kind === "percent" ? `${c.value}%` : idr(c.value)} off</span>
+              <span className="text-white/40">{c.used_count}{c.max_uses ? `/${c.max_uses}` : ""} used</span>
+              {!c.active && <span className="rounded bg-white/10 px-1 text-[9px] uppercase text-white/40">inactive</span>}
+              <button onClick={() => couponAdminApi.remove(c.id).then(load)} className="ml-auto text-white/30 hover:text-red-300"><Trash2 className="h-3.5 w-3.5" /></button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -677,13 +677,45 @@ func (m *Manager) Subscription(ctx context.Context) (string, error) {
 	return string(raw), nil
 }
 
-// SubscribePremium starts a Premium payment and returns the gateway response (pay url).
-func (m *Manager) SubscribePremium(ctx context.Context) (string, error) {
+// SubscribePremium starts a Premium payment (optionally with a coupon) and
+// returns the gateway response (pay url, or {free:true}).
+func (m *Manager) SubscribePremium(ctx context.Context, body any) (string, error) {
 	var raw json.RawMessage
-	if err := m.call(ctx, http.MethodPost, "/subscription/subscribe", nil, &raw); err != nil {
+	if err := m.call(ctx, http.MethodPost, "/subscription/subscribe", body, &raw); err != nil {
 		return "", err
 	}
 	return string(raw), nil
+}
+
+// ValidateCoupon previews a coupon's discount on the Premium price.
+func (m *Manager) ValidateCoupon(ctx context.Context, body any) (string, error) {
+	var raw json.RawMessage
+	if err := m.call(ctx, http.MethodPost, "/subscription/validate-coupon", body, &raw); err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
+
+// --- admin coupons ---
+
+func (m *Manager) AdminCoupons(ctx context.Context) (string, error) {
+	var raw json.RawMessage
+	if err := m.call(ctx, http.MethodGet, "/admin/coupons", nil, &raw); err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
+
+func (m *Manager) CreateCoupon(ctx context.Context, body any) (string, error) {
+	var raw json.RawMessage
+	if err := m.call(ctx, http.MethodPost, "/admin/coupons", body, &raw); err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
+
+func (m *Manager) DeleteCoupon(ctx context.Context, id string) error {
+	return m.call(ctx, http.MethodDelete, "/admin/coupons/"+id, nil, nil)
 }
 
 // --- community filter templates ---
