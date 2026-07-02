@@ -27,6 +27,7 @@ interface ChatMsg {
   // UI-only: rich result of each executed tool call, keyed by call id.
   results?: Record<string, ToolResult>;
   suno?: { title: string; audio_url: string; image_url: string; duration: number }[]; // generated songs
+  musicId?: string; // stable id for updating a music-generation placeholder row
 }
 
 const PERM_LABELS: Record<PermLevel, string> = { need: "Ask every time", medium: "Confirm writes", bypass: "Auto (bypass)" };
@@ -268,28 +269,30 @@ export function AiChatApp() {
     // Music models generate directly (no LLM/tool): call the Suno endpoint, poll
     // with live status, and render an audio player when done.
     if (current?.type === "music") {
-      const placeholder: ChatMsg = { role: "assistant", content: "🎵 Starting…" };
-      setMsgs((p) => [...p, placeholder]);
-      const setStatus = (t: string) => setMsgs((p) => p.map((m) => (m === placeholder ? { ...placeholder, content: t } : m)));
+      const mid = `music_${Date.now()}`; // stable id to update the placeholder row
+      setMsgs((p) => [...p, { role: "assistant", content: "Starting…", musicId: mid }]);
+      const patch = (fields: Partial<ChatMsg>) =>
+        setMsgs((p) => p.map((m) => (m.musicId === mid ? { ...m, ...fields } : m)));
       try {
         const { task_id } = await sunoApi.generate({ prompt: text, model: current.model_id });
-        setStatus("🎵 Composing…");
+        patch({ content: "Composing…" });
         const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
         let done = false;
         for (let i = 0; i < 48 && !done; i++) {
           await sleep(5000);
           if (ac.signal.aborted) return;
           const s = await sunoApi.status(task_id);
-          setStatus(`🎵 ${musicStatusText(s.status, s.tracks)}`);
-          if (s.failed) { setStatus(`Music generation failed (${s.status}).`); break; }
+          if (s.failed) { patch({ content: `Music generation failed (${s.status}).` }); break; }
           if (s.done && s.tracks.length > 0) {
-            setMsgs((p) => p.map((m) => (m === placeholder ? { role: "assistant", content: "", suno: s.tracks } : m)));
+            patch({ content: "", suno: s.tracks });
             done = true;
+          } else {
+            patch({ content: musicStatusText(s.status, s.tracks) });
           }
         }
-        if (!done) setStatus("Still processing — try again in a moment.");
+        if (!done) patch({ content: "Still processing — poll took too long. Your song may still finish; try again." });
       } catch (e) {
-        if ((e as Error).name !== "AbortError") { const msg = e instanceof Error ? e.message : "failed"; setStatus(`Error: ${msg}`); }
+        if ((e as Error).name !== "AbortError") patch({ content: `Error: ${e instanceof Error ? e.message : "failed"}` });
       } finally {
         setBusy(false);
         abortRef.current = null;
