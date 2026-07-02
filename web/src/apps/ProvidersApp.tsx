@@ -182,16 +182,18 @@ function ProviderCard({
             </span>
           </div>
         </div>
+      </div>
+      <div className="mt-3 flex items-center gap-1.5">
+        <button
+          onClick={onAdd}
+          className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 py-1.5 text-xs font-medium text-white/80 transition-colors hover:bg-white/10"
+        >
+          <Plus className="h-3.5 w-3.5" /> Add account
+        </button>
         {onDelete && (
-          <button onClick={onDelete} className="shrink-0 rounded-lg border border-white/10 bg-white/[0.03] p-1.5 text-white/40 hover:bg-red-500/20 hover:text-red-200"><Trash2 className="h-3.5 w-3.5" /></button>
+          <button onClick={onDelete} title="Delete provider" className="shrink-0 rounded-lg border border-white/10 bg-white/5 p-1.5 text-white/40 hover:bg-red-500/20 hover:text-red-200"><Trash2 className="h-3.5 w-3.5" /></button>
         )}
       </div>
-      <button
-        onClick={onAdd}
-        className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 py-1.5 text-xs font-medium text-white/80 transition-colors hover:bg-white/10"
-      >
-        <Plus className="h-3.5 w-3.5" /> Add account
-      </button>
     </div>
   );
 }
