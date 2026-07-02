@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { Loader2, Users, Copy, ScrollText, BarChart3, ShieldCheck, ShieldOff, Search, MoreHorizontal, Ban, VolumeX, AlertTriangle, Plus, Minus, Boxes, Trash2, Pencil } from "lucide-react";
-import { AppShell } from "./shell";
+import { Loader2, Users, Copy, ScrollText, BarChart3, ShieldCheck, ShieldOff, Search, MoreHorizontal, Ban, VolumeX, AlertTriangle, Plus, Minus, Boxes, Trash2, Pencil, RefreshCw } from "lucide-react";
 import { openProfile } from "../os/profileViewer";
 import { useAdminEvents } from "../os/adminBus";
 import { useDialog } from "../os/dialog";
@@ -13,66 +12,130 @@ type Tab = "stats" | "flags" | "users" | "models" | "scan" | "log";
 // server-side — the client gating is only for UX.
 export function AdminApp() {
   const [tab, setTab] = useState<Tab>("stats");
-  const tabs: { id: Tab; label: string; icon: typeof Users }[] = [
-    { id: "stats", label: "Overview", icon: BarChart3 },
+  // Overview on top; the admin tools grouped below.
+  const overview = { id: "stats" as Tab, label: "Overview", icon: BarChart3 };
+  const tools: { id: Tab; label: string; icon: typeof Users }[] = [
     { id: "flags", label: "Duplicates", icon: Copy },
     { id: "users", label: "Users", icon: Users },
     { id: "models", label: "Models", icon: Boxes },
     { id: "scan", label: "Plugin scan", icon: ShieldCheck },
     { id: "log", label: "Mod log", icon: ScrollText },
   ];
+  const NavBtn = ({ t }: { t: { id: Tab; label: string; icon: typeof Users } }) => {
+    const Icon = t.icon;
+    const on = tab === t.id;
+    return (
+      <button
+        onClick={() => setTab(t.id)}
+        title={t.label}
+        className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-xs font-medium transition-colors ${
+          on ? "bg-white/12 text-white" : "text-white/45 hover:bg-white/5 hover:text-white/80"
+        }`}
+      >
+        <Icon className="h-4 w-4 shrink-0" />
+        <span className="truncate">{t.label}</span>
+      </button>
+    );
+  };
   return (
-    <AppShell title="Admin Tools" subtitle="Moderator only">
-      <div className="mb-3 flex items-center gap-1">
-        {tabs.map((t) => {
-          const Icon = t.icon;
-          return (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
-                tab === t.id ? "bg-white/12 text-white" : "text-white/45 hover:text-white/80"
-              }`}
-            >
-              <Icon className="h-3.5 w-3.5" />
-              {t.label}
-            </button>
-          );
-        })}
+    <div className="flex h-full">
+      {/* Icon sidebar: Overview up top, tools below. */}
+      <div className="flex w-40 shrink-0 flex-col gap-1 border-r border-white/10 p-2">
+        <div className="px-2.5 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wide text-white/30">Admin</div>
+        <NavBtn t={overview} />
+        <div className="mx-2 my-1.5 border-t border-white/5" />
+        <div className="px-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wide text-white/30">Tools</div>
+        {tools.map((t) => <NavBtn key={t.id} t={t} />)}
       </div>
-      {tab === "stats" && <StatsTab />}
-      {tab === "flags" && <FlagsTab />}
-      {tab === "users" && <UsersTab />}
-      {tab === "models" && <ModelsTab />}
-      {tab === "scan" && <PluginScanTab />}
-      {tab === "log" && <LogTab />}
-    </AppShell>
+      {/* Content */}
+      <div className="min-w-0 flex-1 overflow-auto p-4">
+        {tab === "stats" && <StatsTab />}
+        {tab === "flags" && <FlagsTab />}
+        {tab === "users" && <UsersTab />}
+        {tab === "models" && <ModelsTab />}
+        {tab === "scan" && <PluginScanTab />}
+        {tab === "log" && <LogTab />}
+      </div>
+    </div>
   );
 }
 
 function StatsTab() {
   const [s, setS] = useState<AdminStats | null>(null);
+  const [flags, setFlags] = useState<FlaggedLink[] | null>(null);
+  const [actions, setActions] = useState<ModAction[] | null>(null);
   const load = useCallback(() => {
     adminApi.stats().then(setS).catch(() => setS(null));
+    adminApi.flags().then((r) => setFlags(r.links ?? [])).catch(() => setFlags([]));
+    adminApi.log().then((r) => setActions(r.actions ?? [])).catch(() => setActions([]));
   }, []);
   useEffect(() => load(), [load]);
   useAdminEvents(load);
-  if (!s) return <div className="h-20 animate-pulse rounded-lg bg-white/5" />;
-  const cards = [
-    { label: "Users", value: s.users },
-    { label: "Moderators", value: s.moderators },
-    { label: "Messages", value: s.messages },
-    { label: "Posts", value: s.posts },
-    { label: "Open flags", value: s.open_flags },
-  ];
+
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-      {cards.map((c) => (
-        <div key={c.label} className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
-          <div className="text-lg font-semibold text-white">{c.value.toLocaleString()}</div>
-          <div className="text-[11px] text-white/45">{c.label}</div>
+    <div className="space-y-5">
+      <div>
+        <div className="mb-1.5 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-white">Overview</h2>
+          <button onClick={load} title="Refresh" className="rounded-lg border border-white/10 p-1.5 text-white/40 hover:bg-white/5 hover:text-white"><RefreshCw className="h-3.5 w-3.5" /></button>
         </div>
-      ))}
+        {!s ? (
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{[0, 1, 2, 3].map((i) => <div key={i} className="h-16 animate-pulse rounded-xl bg-white/5" />)}</div>
+        ) : (
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <StatCard icon={<Users className="h-4 w-4" />} label="Users" value={s.users} accent="text-sky-300" />
+            <StatCard icon={<ShieldCheck className="h-4 w-4" />} label="Moderators" value={s.moderators} accent="text-emerald-300" />
+            <StatCard icon={<ScrollText className="h-4 w-4" />} label="Messages" value={s.messages} accent="text-violet-300" />
+            <StatCard icon={<BarChart3 className="h-4 w-4" />} label="Posts" value={s.posts} accent="text-fuchsia-300" />
+          </div>
+        )}
+      </div>
+
+      {/* Attention: open duplicate flags */}
+      <div>
+        <h3 className="mb-1.5 text-xs font-semibold text-white/70">Needs attention</h3>
+        <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
+          {flags === null ? (
+            <div className="h-6 animate-pulse rounded bg-white/5" />
+          ) : flags.length === 0 ? (
+            <div className="flex items-center gap-2 text-xs text-white/45"><ShieldCheck className="h-4 w-4 text-emerald-400/70" /> No open duplicate-account flags.</div>
+          ) : (
+            <div className="flex items-center gap-2 text-xs text-amber-200/90"><AlertTriangle className="h-4 w-4" /> {flags.length} duplicate-account {flags.length === 1 ? "flag" : "flags"} awaiting review — see the Duplicates tab.</div>
+          )}
+        </div>
+      </div>
+
+      {/* Recent moderator activity */}
+      <div>
+        <h3 className="mb-1.5 text-xs font-semibold text-white/70">Recent activity</h3>
+        <div className="rounded-xl border border-white/10 bg-white/[0.02] p-1.5">
+          {actions === null ? (
+            <div className="h-6 animate-pulse rounded bg-white/5" />
+          ) : actions.length === 0 ? (
+            <div className="px-2 py-2 text-xs text-white/40">No moderator actions yet.</div>
+          ) : (
+            <div className="divide-y divide-white/5">
+              {actions.slice(0, 6).map((a, i) => (
+                <div key={i} className="flex items-center gap-2 px-2 py-1.5 text-[11px]">
+                  <span className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-white/70">{a.action}</span>
+                  <span className="truncate text-white/50">{a.actor_display || a.actor_name} → {a.target}</span>
+                  <span className="ml-auto shrink-0 text-white/30">{a.created_at}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatCard({ icon, label, value, accent }: { icon: ReactNode; label: string; value: number; accent: string }) {
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
+      <div className={`mb-1 ${accent}`}>{icon}</div>
+      <div className="text-xl font-semibold text-white">{value.toLocaleString()}</div>
+      <div className="text-[11px] text-white/45">{label}</div>
     </div>
   );
 }

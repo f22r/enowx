@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { AnimatePresence } from "framer-motion";
-import { LayoutGrid, SquareTerminal, BookOpen, Grid3x3, Bot, FlaskConical } from "lucide-react";
+import { LayoutGrid, SquareTerminal, BookOpen, Grid3x3, Bot, FlaskConical, ShieldCheck } from "lucide-react";
 import { buildApps } from "../apps";
 import { SideDock } from "./SideDock";
 import { SidePanel } from "./SidePanel";
@@ -14,6 +14,7 @@ import { ProfileViewer } from "../apps/ProfileViewer";
 import { Lightbox } from "../components/Lightbox";
 import { useProfile } from "./useProfile";
 import { DocsApp } from "../apps/DocsApp";
+import { AdminApp } from "../apps/AdminApp";
 import { AiChatApp } from "../apps/AiChatApp";
 import { ApiTestApp } from "../apps/ApiTestApp";
 import { usePanels } from "./usePanels";
@@ -24,12 +25,14 @@ import { useTerminals, type TermLocation } from "./useTerminals";
 import { usePluginApps } from "./usePluginApps";
 import type { AppId, Location, Side } from "./types";
 
-type CenterView = "widget" | "terminal" | "chat" | "apitest" | "apps" | "docs";
+type CenterView = "widget" | "terminal" | "chat" | "apitest" | "apps" | "admin" | "docs";
 
 export function Desktop() {
   const profile = useProfile();
+  const isMod = profile.has("chat.moderate");
   const pluginApps = usePluginApps();
-  const apps = [...buildApps(profile.has("chat.moderate")), ...pluginApps];
+  // Admin is a center view (not a docked app), so it's excluded from buildApps.
+  const apps = [...buildApps(), ...pluginApps];
   const { active, toggle, close } = usePanels();
   const [view, setView] = usePersisted<CenterView>("center-view", "widget");
 
@@ -80,7 +83,7 @@ export function Desktop() {
     c: "profile",
   };
   const leaderActive = useShortcuts((k) => {
-    const v: Record<string, CenterView> = { "1": "widget", "2": "terminal", "3": "chat", "4": "apitest", "5": "apps", "6": "docs" };
+    const v: Record<string, CenterView> = { "1": "widget", "2": "terminal", "3": "chat", "4": "apitest", "5": "apps", "6": "docs", "7": "admin" };
     if (v[k]) {
       setView(v[k]);
       return;
@@ -132,6 +135,11 @@ export function Desktop() {
             <div className={`absolute inset-0 ${view === "apps" ? "" : "hidden"}`}>
               <AppsDrawer apps={drawerApps} onOpen={openApp} onDropToDrawer={(id) => move(id, "drawer")} />
             </div>
+            {isMod && (
+              <div className={`absolute inset-0 overflow-hidden rounded-2xl border border-white/10 bg-[var(--window-bg)]/80 ${view === "admin" ? "" : "hidden"}`}>
+                <AdminApp />
+              </div>
+            )}
             <div className={`absolute inset-0 overflow-hidden rounded-2xl border border-white/10 bg-[var(--window-bg)]/80 ${view === "docs" ? "" : "hidden"}`}>
               <DocsApp />
             </div>
@@ -139,7 +147,7 @@ export function Desktop() {
         </div>
       </div>
 
-      <TopBar nav={<CenterNav view={view} onView={setView} />} />
+      <TopBar nav={<CenterNav view={view} onView={setView} isMod={isMod} />} />
 
       {/* Full-page profile overlay (opened via openProfile from anywhere). */}
       <ProfileViewer />
@@ -187,13 +195,14 @@ export function Desktop() {
 
 // Compact center-view switch that lives in the top bar. The leader-key hint is
 // shown in each tab's tooltip (tap Ctrl/Alt then the number).
-function CenterNav({ view, onView }: { view: CenterView; onView: (v: CenterView) => void }) {
+function CenterNav({ view, onView, isMod }: { view: CenterView; onView: (v: CenterView) => void; isMod: boolean }) {
   const tabs: { id: CenterView; label: string; icon: typeof LayoutGrid; key: string }[] = [
     { id: "widget", label: "Widget", icon: LayoutGrid, key: "1" },
     { id: "terminal", label: "Terminal", icon: SquareTerminal, key: "2" },
     { id: "chat", label: "Chat", icon: Bot, key: "3" },
     { id: "apitest", label: "API Test", icon: FlaskConical, key: "4" },
     { id: "apps", label: "Apps", icon: Grid3x3, key: "5" },
+    ...(isMod ? [{ id: "admin" as const, label: "Admin", icon: ShieldCheck, key: "7" }] : []),
     { id: "docs", label: "Docs", icon: BookOpen, key: "6" },
   ];
   return (
