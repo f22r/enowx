@@ -165,10 +165,11 @@ export interface PluginRuntime { id: string; available: boolean; version?: strin
 
 export const pluginsApi = {
   list: () => api.get<{ plugins: PluginManifest[]; runtimes: PluginRuntime[] }>("/api/plugins"),
-  create: (id: string, name: string, runtime: string) =>
-    api.post<PluginManifest>("/api/plugins", { id, name, runtime }),
+  create: (id: string, name: string, runtime: string, starter: boolean) =>
+    api.post<{ manifest: PluginManifest; path: string }>("/api/plugins", { id, name, runtime, starter }),
   start: (id: string) => api.post<{ ok: boolean }>(`/api/plugins/${id}/start`),
   stop: (id: string) => api.post<{ ok: boolean }>(`/api/plugins/${id}/stop`),
+  reveal: (id: string) => api.post<{ ok: boolean; path: string }>(`/api/plugins/${id}/reveal`),
   remove: (id: string) => api.del<{ ok: boolean }>(`/api/plugins/${id}`),
   logs: (id: string) => api.get<{ lines: string[] }>(`/api/plugins/${id}/logs`),
 };

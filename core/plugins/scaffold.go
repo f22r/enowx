@@ -20,9 +20,11 @@ var entryFor = map[string]string{
 	"static": "",
 }
 
-// Create scaffolds a new plugin folder from the runtime's starter template and
-// writes a plugin.json. Returns the created manifest.
-func (m *Manager) Create(id, name, runtime string) (*Manifest, error) {
+// Create scaffolds a new plugin folder + writes a plugin.json. If starter is
+// true it also copies the runtime's example files; otherwise the folder is left
+// empty (just the manifest) so the author can structure the plugin however they
+// like and code it in their own IDE. Returns the created manifest.
+func (m *Manager) Create(id, name, runtime string, starter bool) (*Manifest, error) {
 	if !idRe.MatchString(id) {
 		return nil, fmt.Errorf("invalid plugin id (lowercase letters, digits, dashes)")
 	}
@@ -33,16 +35,15 @@ func (m *Manager) Create(id, name, runtime string) (*Manifest, error) {
 	if _, err := os.Stat(dest); err == nil {
 		return nil, fmt.Errorf("a plugin with id %q already exists", id)
 	}
-	// A "go" plugin uses the node template as a starting shape isn't provided;
-	// only python/node/static ship templates — go authors bring their own.
-	tmplRuntime := runtime
-	if runtime == "go" {
-		tmplRuntime = "" // no template; just the manifest + empty folder
-	}
-	if err := os.MkdirAll(filepath.Join(dest, "public"), 0o755); err != nil {
+	if err := os.MkdirAll(dest, 0o755); err != nil {
 		return nil, err
 	}
-	if tmplRuntime != "" {
+	// Starter files ship for python/node/static; go authors bring their own.
+	tmplRuntime := runtime
+	if runtime == "go" {
+		tmplRuntime = ""
+	}
+	if starter && tmplRuntime != "" {
 		if err := copyTemplate(tmplRuntime, dest); err != nil {
 			return nil, err
 		}

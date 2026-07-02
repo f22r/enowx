@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Play, Square, Trash2, Plus, X, ScrollText, ExternalLink, Puzzle, AlertTriangle, RefreshCw } from "lucide-react";
+import { Play, Square, Trash2, Plus, X, ScrollText, ExternalLink, Puzzle, AlertTriangle, RefreshCw, FolderOpen } from "lucide-react";
 import { AppShell, Empty } from "./shell";
 import { Tooltip } from "../components/Tooltip";
 import { useDialog } from "../os/dialog";
@@ -104,6 +104,7 @@ export function PluginsApp() {
                 ) : (
                   <Tooltip label="Start"><button onClick={() => act(() => pluginsApi.start(p.id), p.id)} disabled={busy === p.id || !runtimeOk(p.runtime)} className="rounded-lg border border-white/10 bg-white/[0.03] p-1.5 text-white/55 hover:bg-white/10 hover:text-white disabled:opacity-40"><Play className="h-3.5 w-3.5" /></button></Tooltip>
                 ))}
+                <Tooltip label="Open folder (edit in your IDE)"><button onClick={() => pluginsApi.reveal(p.id).catch(() => {})} className="rounded-lg border border-white/10 bg-white/[0.03] p-1.5 text-white/55 hover:bg-white/10 hover:text-white"><FolderOpen className="h-3.5 w-3.5" /></button></Tooltip>
                 <Tooltip label="Logs"><button onClick={() => setLogsFor(p.id)} className="rounded-lg border border-white/10 bg-white/[0.03] p-1.5 text-white/55 hover:bg-white/10 hover:text-white"><ScrollText className="h-3.5 w-3.5" /></button></Tooltip>
                 <Tooltip label="Delete"><button onClick={() => remove(p)} disabled={busy === p.id} className="rounded-lg border border-white/10 bg-white/[0.03] p-1.5 text-white/55 hover:bg-red-500/30 hover:text-red-200 disabled:opacity-40"><Trash2 className="h-3.5 w-3.5" /></button></Tooltip>
               </div>
@@ -122,8 +123,10 @@ export function PluginsApp() {
 function CreateModal({ runtimes, onClose, onCreated }: { runtimes: PluginRuntime[]; onClose: () => void; onCreated: () => void }) {
   const [name, setName] = useState("");
   const [runtime, setRuntime] = useState("python");
+  const [starter, setStarter] = useState(true);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState<{ id: string; path: string } | null>(null);
   const id = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48);
   const available = (r: string) => r === "static" || runtimes.find((x) => x.id === r)?.available;
 
@@ -132,14 +135,32 @@ function CreateModal({ runtimes, onClose, onCreated }: { runtimes: PluginRuntime
     setErr("");
     setBusy(true);
     try {
-      await pluginsApi.create(id, name.trim(), runtime);
-      onCreated();
+      const r = await pluginsApi.create(id, name.trim(), runtime, starter);
+      setDone({ id, path: r.path });
     } catch (e) {
       setErr(e instanceof Error ? e.message : "failed");
     } finally {
       setBusy(false);
     }
   };
+
+  if (done) {
+    return (
+      <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm" onClick={() => { onCreated(); }}>
+        <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#11131a] p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <p className="mb-2 text-sm font-semibold text-white">Plugin created 🎉</p>
+          <p className="mb-2 text-xs text-white/55">Code it in your own IDE. Your plugin lives at:</p>
+          <div className="mb-3 break-all rounded-lg border border-white/10 bg-black/30 px-3 py-2 font-mono text-[10px] text-white/70">{done.path}</div>
+          <p className="mb-3 text-[11px] text-white/40">Structure it however you like (multi-file, modules). Your entry serves the UI + endpoints on <code className="rounded bg-white/10 px-1">$PORT</code>. Static plugins just need <code className="rounded bg-white/10 px-1">public/index.html</code>.</p>
+          <div className="flex gap-2">
+            <button onClick={() => pluginsApi.reveal(done.id).catch(() => {})} className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-white/10 px-4 py-2 text-sm text-white/80 hover:bg-white/5"><FolderOpen className="h-4 w-4" /> Open folder</button>
+            <button onClick={onCreated} className="rounded-lg bg-white px-4 py-2 text-sm font-medium text-black hover:opacity-90">Done</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm" onClick={onClose}>
       <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#11131a] p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
@@ -158,6 +179,10 @@ function CreateModal({ runtimes, onClose, onCreated }: { runtimes: PluginRuntime
             </button>
           ))}
         </div>
+        <label className="mb-3 flex cursor-pointer items-center gap-2 text-xs text-white/60">
+          <input type="checkbox" checked={starter} onChange={(e) => setStarter(e.target.checked)} className="accent-indigo-500" />
+          Include a starter example (uncheck for an empty folder + manifest only)
+        </label>
         {err && <div className="mb-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">{err}</div>}
         <button onClick={submit} disabled={busy || !id} className="w-full rounded-lg bg-white px-4 py-2 text-sm font-medium text-black hover:opacity-90 disabled:opacity-50">{busy ? "Creating…" : "Create plugin"}</button>
       </div>

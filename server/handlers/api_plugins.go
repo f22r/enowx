@@ -41,20 +41,36 @@ func (h *Plugins) List(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// POST /api/plugins { id, name, runtime }
+// POST /api/plugins { id, name, runtime, starter }
 func (h *Plugins) Create(w http.ResponseWriter, r *http.Request) {
 	if !h.guard(w, r) {
 		return
 	}
-	var in struct{ ID, Name, Runtime string }
+	var in struct {
+		ID, Name, Runtime string
+		Starter           bool `json:"starter"`
+	}
 	body, _ := io.ReadAll(r.Body)
 	_ = json.Unmarshal(body, &in)
-	man, err := h.mgr.Create(in.ID, in.Name, in.Runtime)
+	man, err := h.mgr.Create(in.ID, in.Name, in.Runtime, in.Starter)
 	if err != nil {
 		writeAPIErr(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	writeData(w, man)
+	writeData(w, map[string]any{"manifest": man, "path": h.mgr.Path(in.ID)})
+}
+
+// POST /api/plugins/{id}/reveal — open the plugin folder in the OS file manager.
+func (h *Plugins) Reveal(w http.ResponseWriter, r *http.Request) {
+	if !h.guard(w, r) {
+		return
+	}
+	path, err := h.mgr.Reveal(chi.URLParam(r, "id"))
+	if err != nil {
+		writeAPIErr(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeData(w, map[string]any{"ok": true, "path": path})
 }
 
 // POST /api/plugins/{id}/start
