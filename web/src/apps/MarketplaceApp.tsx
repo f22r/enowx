@@ -234,7 +234,10 @@ function Feed({ kind, onOpen, onDeal }: { kind: Kind; onOpen: (l: Listing) => vo
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {items.map((l) => <ListingCard key={l.id} l={l} onOpen={() => onOpen(l)} onBuy={() => buy(l)} buying={buyingId === l.id} />)}
+          {/* Prioritize listings whose seller is online (stable within each group). */}
+          {[...items].sort((a, b) => Number(!!b.seller_online) - Number(!!a.seller_online)).map((l) => (
+            <ListingCard key={l.id} l={l} onOpen={() => onOpen(l)} onBuy={() => buy(l)} buying={buyingId === l.id} />
+          ))}
         </div>
       )}
     </div>
@@ -257,9 +260,13 @@ function ListingCard({ l, onOpen, onBuy, buying }: { l: Listing; onOpen: () => v
         <div className="p-2.5 pb-1.5">
           <div className="truncate text-xs font-medium text-white">{l.title}</div>
           <div className="mt-0.5 text-sm font-semibold text-emerald-300">{idr(l.price_amount, l.currency)}</div>
-          <div className="mt-1 flex items-center gap-1.5 text-[10px] text-white/35">
-            <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${l.seller_online ? "bg-emerald-400" : "bg-white/25"}`} title={l.seller_online ? "Online" : "Offline"} />
-            <span className="truncate">by {l.display_name || l.username}</span>
+          <div className="mt-1 truncate text-[10px] text-white/35">by {l.display_name || l.username}</div>
+          <div className="mt-1 flex items-center gap-1.5 text-[10px]">
+            {l.seller_online ? (
+              <span className="flex items-center gap-1 text-emerald-300"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Online</span>
+            ) : (
+              <span className="text-white/35">{l.seller_last_seen ? `last seen ${relTime(l.seller_last_seen)}` : "offline"}</span>
+            )}
             {(l.seller_rating_count ?? 0) > 0 && (
               <span className="ml-auto flex shrink-0 items-center gap-0.5 text-amber-300"><Star className="h-2.5 w-2.5 fill-amber-300" />{(l.seller_rating_avg ?? 0).toFixed(1)}</span>
             )}
