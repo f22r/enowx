@@ -493,7 +493,16 @@ export const subscriptionApi = {
   status: () => api.get<SubscriptionStatus>("/api/subscription"),
   subscribe: (coupon?: string) => api.post<{ order_ref: string; pay_url?: string; amount?: number; free?: boolean }>("/api/subscription/subscribe", { coupon: coupon ?? "" }),
   validateCoupon: (code: string) => api.post<CouponPreview>("/api/subscription/validate-coupon", { code }),
+  gift: (username: string, coupon?: string) => api.post<{ order_ref: string; pay_url?: string; amount?: number; free?: boolean }>("/api/subscription/gift", { username, coupon: coupon ?? "" }),
+  searchUsers: (q: string) => api.get<{ users: UserHit[] }>(`/api/search-users?q=${encodeURIComponent(q)}`),
 };
+
+export interface UserHit {
+  id: string;
+  username: string;
+  display_name: string;
+  avatar_url: string;
+}
 
 export interface Coupon {
   id: number;

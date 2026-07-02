@@ -239,6 +239,8 @@ func New(addr string, d Deps) *Server {
 		r.Get("/subscription", syncH.Subscription)
 		r.Post("/subscription/subscribe", syncH.Subscribe)
 		r.Post("/subscription/validate-coupon", syncH.ValidateCoupon)
+		r.Post("/subscription/gift", syncH.GiftPremium)
+		r.Get("/search-users", syncH.SearchUsers)
 		r.Get("/admin/coupons", syncH.AdminCoupons)
 		r.Post("/admin/coupons", syncH.CreateCoupon)
 		r.Delete("/admin/coupons/{id}", syncH.DeleteCoupon)

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Loader2, LogOut, LogIn, ShieldCheck, Sparkles, Crown, Check } from "lucide-react";
-import { subscriptionApi, type SubscriptionStatus, type CouponPreview } from "../lib/api";
+import { Loader2, LogOut, LogIn, ShieldCheck, Sparkles, Crown, Check, Gift, X } from "lucide-react";
+import { subscriptionApi, type SubscriptionStatus, type CouponPreview, type UserHit } from "../lib/api";
 import { AppShell } from "./shell";
 import { Tooltip } from "../components/Tooltip";
 import { useProfile } from "../os/useProfile";
@@ -160,14 +160,13 @@ function SubscriptionCard() {
 
   if (sub.active) {
     return (
-      <div className="rounded-xl border border-amber-400/25 bg-gradient-to-b from-amber-500/10 to-transparent p-3.5">
-        <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-amber-300"><Crown className="h-3.5 w-3.5" /> Premium</div>
-        <p className="text-xs text-white/60">You have full access to cloud features.</p>
-        {sub.premium_until && <p className="mt-1 text-[11px] text-white/40">Expires {fmtDate(sub.premium_until)}</p>}
-        <button onClick={subscribe} disabled={busy} className="mt-3 flex items-center gap-1.5 rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-1.5 text-xs font-medium text-amber-200 hover:bg-amber-500/20 disabled:opacity-50">
-          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Crown className="h-3.5 w-3.5" />} Renew (+30 days)
-        </button>
-        {err && <p className="mt-1.5 text-[11px] text-red-300">{err}</p>}
+      <div className="space-y-3">
+        <div className="rounded-xl border border-amber-400/25 bg-gradient-to-b from-amber-500/10 to-transparent p-3.5">
+          <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-amber-300"><Crown className="h-3.5 w-3.5" /> Premium</div>
+          <p className="text-xs text-white/60">You're Premium — full access to cloud features.</p>
+          {sub.premium_until && <p className="mt-1 text-[11px] text-white/40">Expires {fmtDate(sub.premium_until)}</p>}
+        </div>
+        <GiftPremium />
       </div>
     );
   }
@@ -212,6 +211,86 @@ function SubscriptionCard() {
       </button>
       {!sub.pay_enabled && !isFree && <p className="mt-1.5 text-[11px] text-white/35">Payment is not configured yet — use a coupon.</p>}
       {err && <p className="mt-1.5 text-[11px] text-red-300">{err}</p>}
+
+      <div className="mt-3 border-t border-white/5 pt-3"><GiftPremium /></div>
+    </div>
+  );
+}
+
+// GiftPremium gifts Premium to another user: search by username, optional coupon,
+// then pay (or claim free). The recipient must not already be Premium.
+function GiftPremium() {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const [hits, setHits] = useState<UserHit[]>([]);
+  const [pick, setPick] = useState<UserHit | null>(null);
+  const [coupon, setCoupon] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    if (!open || pick || q.trim().length < 2) { setHits([]); return; }
+    const t = setTimeout(() => {
+      subscriptionApi.searchUsers(q.trim()).then((r) => setHits(r.users ?? [])).catch(() => setHits([]));
+    }, 300);
+    return () => clearTimeout(t);
+  }, [q, open, pick]);
+
+  const gift = async () => {
+    if (!pick) return;
+    setBusy(true); setErr(""); setMsg("");
+    try {
+      const r = await subscriptionApi.gift(pick.username, coupon.trim() || undefined);
+      if (r.free) { setMsg(`Gifted Premium to ${pick.display_name || pick.username}! 🎁`); setPick(null); setQ(""); setCoupon(""); }
+      else if (r.pay_url) window.open(r.pay_url, "_blank", "noopener");
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "gift failed");
+    } finally { setBusy(false); }
+  };
+
+  if (!open) {
+    return (
+      <button onClick={() => setOpen(true)} className="flex items-center gap-1.5 text-[11px] text-white/50 hover:text-white/80">
+        <Gift className="h-3.5 w-3.5" /> Gift Premium to a friend
+      </button>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-white/40"><Gift className="h-3.5 w-3.5" /> Gift Premium</div>
+      {pick ? (
+        <div className="flex items-center gap-2 rounded-md border border-white/10 bg-white/[0.03] px-2.5 py-1.5">
+          {pick.avatar_url && <img src={pick.avatar_url} alt="" className="h-5 w-5 rounded-full" />}
+          <span className="flex-1 truncate text-xs text-white">{pick.display_name || pick.username}</span>
+          <button onClick={() => { setPick(null); setQ(""); }} className="text-white/40 hover:text-white"><X className="h-3.5 w-3.5" /></button>
+        </div>
+      ) : (
+        <div className="relative">
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search a username…" className="w-full rounded-md border border-white/10 bg-black/30 px-2.5 py-1.5 text-xs text-white outline-none focus:border-white/25" />
+          {hits.length > 0 && (
+            <div className="absolute z-10 mt-1 max-h-40 w-full overflow-auto rounded-md border border-white/10 bg-[#0e1016] shadow-xl">
+              {hits.map((h) => (
+                <button key={h.id} onClick={() => { setPick(h); setHits([]); }} className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs hover:bg-white/5">
+                  {h.avatar_url && <img src={h.avatar_url} alt="" className="h-5 w-5 rounded-full" />}
+                  <span className="truncate text-white/80">{h.display_name || h.username}</span>
+                  <span className="truncate text-white/30">@{h.username}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      <input value={coupon} onChange={(e) => setCoupon(e.target.value.toUpperCase())} placeholder="Coupon (optional)" className="w-full rounded-md border border-white/10 bg-black/30 px-2.5 py-1.5 text-xs text-white outline-none focus:border-white/25" />
+      <div className="flex items-center gap-2">
+        <button onClick={gift} disabled={!pick || busy} className="flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-black hover:opacity-90 disabled:opacity-50">
+          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Gift className="h-3.5 w-3.5" />} Gift
+        </button>
+        <button onClick={() => { setOpen(false); setPick(null); setQ(""); setCoupon(""); setErr(""); setMsg(""); }} className="text-[11px] text-white/40 hover:text-white/70">Cancel</button>
+      </div>
+      {msg && <p className="text-[11px] text-emerald-300">{msg}</p>}
+      {err && <p className="text-[11px] text-red-300">{err}</p>}
     </div>
   );
 }

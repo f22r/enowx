@@ -696,6 +696,28 @@ func (m *Manager) ValidateCoupon(ctx context.Context, body any) (string, error) 
 	return string(raw), nil
 }
 
+// GiftPremium gifts Premium to another user (by username), optionally with a coupon.
+func (m *Manager) GiftPremium(ctx context.Context, body any) (string, error) {
+	var raw json.RawMessage
+	if err := m.call(ctx, http.MethodPost, "/subscription/gift", body, &raw); err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
+
+// SearchUsers finds users by query (for the gift recipient picker).
+func (m *Manager) SearchUsers(ctx context.Context, query string) (string, error) {
+	var raw json.RawMessage
+	path := "/search"
+	if query != "" {
+		path += "?q=" + url.QueryEscape(query)
+	}
+	if err := m.call(ctx, http.MethodGet, path, nil, &raw); err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
+
 // --- admin coupons ---
 
 func (m *Manager) AdminCoupons(ctx context.Context) (string, error) {
