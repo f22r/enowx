@@ -81,7 +81,20 @@ func (h *Sync) RekberSend(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Sync) RekberAction(w http.ResponseWriter, r *http.Request) {
-	out, err := h.mgr.RekberPost(r.Context(), "/threads/"+chi.URLParam(r, "id")+"/"+chi.URLParam(r, "action"), nil)
+	body, _ := io.ReadAll(io.LimitReader(r.Body, 1<<16))
+	out, err := h.mgr.RekberPost(r.Context(), "/threads/"+chi.URLParam(r, "id")+"/action/"+chi.URLParam(r, "action"), body)
+	proxyJSON(w, out, err)
+}
+
+// RekberAccount (admin) get/set the global rekber account.
+func (h *Sync) RekberAccountGet(w http.ResponseWriter, r *http.Request) {
+	out, err := h.mgr.RekberAccountGet(r.Context())
+	proxyJSON(w, out, err)
+}
+
+func (h *Sync) RekberAccountSet(w http.ResponseWriter, r *http.Request) {
+	body, _ := io.ReadAll(io.LimitReader(r.Body, 4096))
+	out, err := h.mgr.RekberAccountSet(r.Context(), body)
 	proxyJSON(w, out, err)
 }
 

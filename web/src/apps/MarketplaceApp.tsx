@@ -269,16 +269,27 @@ function SellModal({ onClose, onCreated }: { onClose: () => void; onCreated: () 
   );
 }
 
-const STATUS_STEPS = ["open", "buyer_paid", "delivered", "released"] as const;
+const STATUS_STEPS = ["open", "awaiting_payment", "payment_sent", "funds_held", "shipped", "released"] as const;
 const STATUS_LABEL: Record<string, string> = {
-  open: "Opened", buyer_paid: "Buyer paid", delivered: "Delivered", released: "Released",
-  cancelled: "Cancelled", disputed: "Disputed",
+  open: "Dibuka", awaiting_payment: "Nunggu bayar", payment_sent: "Sudah bayar", funds_held: "Dana aman", shipped: "Dikirim", released: "Selesai",
+  cancelled: "Batal",
+};
+// action key → button label + icon.
+const ACTION_META: Record<string, { label: string; icon: typeof Check }> = {
+  "send-payment-info": { label: "Kirim info rekening", icon: CircleDollarSign },
+  "mark-paid": { label: "Sudah bayar", icon: Check },
+  "confirm-funds": { label: "Konfirmasi dana masuk", icon: Check },
+  "mark-shipped": { label: "Barang sudah dikirim", icon: Send },
+  "confirm-receipt": { label: "Konfirmasi diterima", icon: Check },
+  "release": { label: "Rilis dana ke seller", icon: CircleDollarSign },
 };
 
 function idrShort(n: number, c: string) { return c === "IDR" ? "Rp " + n.toLocaleString("id-ID") : c + " " + n.toLocaleString(); }
 
 // DealsView lists the user's deals and opens a RekberPanel for one.
 function DealsView({ openThread, setOpenThread }: { openThread: number | null; setOpenThread: (id: number | null) => void }) {
+  const profile = useProfile();
+  const isMod = profile.has("chat.moderate");
   const [threads, setThreads] = useState<RekberThread[] | null>(null);
   const load = useCallback(() => { rekberApi.threads().then((r) => setThreads(r.threads ?? [])).catch(() => setThreads([])); }, []);
   useEffect(() => { load(); }, [load]);
@@ -287,6 +298,7 @@ function DealsView({ openThread, setOpenThread }: { openThread: number | null; s
 
   return (
     <div className="p-4">
+      {isMod && <RekberAccountEditor />}
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-sm font-semibold text-white">My deals</h2>
         <button onClick={load} className="rounded-lg border border-white/10 p-1.5 text-white/50 hover:bg-white/5 hover:text-white"><RefreshCw className="h-3.5 w-3.5" /></button>
@@ -317,10 +329,12 @@ function DealsView({ openThread, setOpenThread }: { openThread: number | null; s
 function RekberPanel({ threadId, onBack }: { threadId: number; onBack: () => void }) {
   const [thread, setThread] = useState<RekberThread | null>(null);
   const [role, setRole] = useState("");
+  const [nextAct, setNextAct] = useState("");
   const [messages, setMessages] = useState<RekberMessage[]>([]);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const dialog = useDialog();
+  const proof = useImageAttach();
   const lastId = useRef(0);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -329,6 +343,7 @@ function RekberPanel({ threadId, onBack }: { threadId: number; onBack: () => voi
       const r = await rekberApi.get(threadId, initial ? 0 : lastId.current);
       setThread(r.thread);
       setRole(r.role);
+      setNextAct(r.next_action);
       if (initial) setMessages(r.messages);
       else if (r.messages.length) setMessages((prev) => [...prev, ...r.messages]);
       if (r.messages.length) lastId.current = r.messages[r.messages.length - 1].id;
@@ -336,11 +351,7 @@ function RekberPanel({ threadId, onBack }: { threadId: number; onBack: () => voi
   }, [threadId]);
 
   useEffect(() => { lastId.current = 0; refresh(true); }, [refresh]);
-  // Poll for new messages/status while open.
-  useEffect(() => {
-    const iv = setInterval(() => refresh(false), 4000);
-    return () => clearInterval(iv);
-  }, [refresh]);
+  useEffect(() => { const iv = setInterval(() => refresh(false), 4000); return () => clearInterval(iv); }, [refresh]);
   useEffect(() => { scrollRef.current?.scrollTo(0, scrollRef.current.scrollHeight); }, [messages]);
 
   const send = async () => {
@@ -350,81 +361,107 @@ function RekberPanel({ threadId, onBack }: { threadId: number; onBack: () => voi
     try { await rekberApi.send(threadId, c); await refresh(false); } catch { /* ignore */ }
   };
 
-  const act = async (fn: () => Promise<RekberThread>) => {
+  const runAction = async (action: string) => {
+    // "mark-paid" requires a transfer proof image.
+    if (action === "mark-paid" && proof.images.length === 0) {
+      await dialog.alert({ title: "Lampirkan bukti transfer", message: "Upload bukti transfer dulu sebelum menekan \"Sudah bayar\"." });
+      return;
+    }
+    const confirmMsg: Record<string, string> = {
+      "send-payment-info": "Kirim info rekening rekber ke buyer?",
+      "confirm-funds": "Konfirmasi dana buyer sudah masuk ke rekening rekber?",
+      "release": "Rilis dana ke seller? Aksi ini final.",
+      "confirm-receipt": "Konfirmasi barang sudah diterima? Dana akan diteruskan ke seller.",
+    };
+    if (confirmMsg[action]) {
+      const ok = await dialog.confirm({ title: "Konfirmasi", message: confirmMsg[action], confirmLabel: "Ya" });
+      if (!ok) return;
+    }
     setBusy(true);
-    try { const t = await fn(); setThread(t); await refresh(false); } catch (e) { await dialog.alert({ title: "Action failed", message: e instanceof Error ? e.message : "failed" }); } finally { setBusy(false); }
+    try {
+      const t = await rekberApi.action(threadId, action, action === "mark-paid" ? proof.images : []);
+      setThread(t);
+      proof.clear();
+      await refresh(false);
+    } catch (e) {
+      await dialog.alert({ title: "Gagal", message: e instanceof Error ? e.message : "failed" });
+    } finally {
+      setBusy(false);
+    }
   };
 
   if (!thread) return <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-white/40" /></div>;
 
   const stepIdx = STATUS_STEPS.indexOf(thread.status as typeof STATUS_STEPS[number]);
   const done = thread.status === "released";
-  const dead = thread.status === "cancelled" || thread.status === "disputed";
-
-  // Role-gated primary action.
-  let action: { label: string; icon: typeof Check; fn: () => Promise<RekberThread> } | null = null;
-  if (!done && !dead) {
-    if (role === "buyer" && thread.status === "open") action = { label: "Sudah bayar", icon: Check, fn: () => rekberApi.advance(threadId) };
-    else if (role === "buyer" && thread.status === "delivered") action = { label: "Konfirmasi terima", icon: Check, fn: () => rekberApi.advance(threadId) };
-    else if (role === "seller" && thread.status === "buyer_paid") action = { label: "Sudah kirim", icon: Send, fn: () => rekberApi.advance(threadId) };
-    else if (role === "middleman" && thread.status === "delivered") action = { label: "Send Payment", icon: CircleDollarSign, fn: () => rekberApi.advance(threadId) };
-  }
+  const dead = thread.status === "cancelled";
+  const meta = nextAct ? ACTION_META[nextAct] : null;
+  const ActIcon = meta?.icon;
 
   return (
     <div className="flex h-full flex-col">
       <div className="border-b border-white/5 px-4 py-2.5">
         <button onClick={onBack} className="mb-2 flex items-center gap-1.5 text-xs text-white/50 hover:text-white"><ArrowLeft className="h-3.5 w-3.5" /> My deals</button>
-        <div className="flex items-center gap-2">
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-semibold text-white">{thread.title}</div>
-            <div className="text-[11px] text-white/45">{idrShort(thread.amount, thread.currency)} · fee {idrShort(thread.fee, thread.currency)} · you are the <span className="text-white/70">{role || "observer"}</span></div>
-          </div>
+        <div className="min-w-0">
+          <div className="truncate text-sm font-semibold text-white">{thread.title}</div>
+          <div className="text-[11px] text-white/45">{idrShort(thread.amount, thread.currency)} · fee {idrShort(thread.fee, thread.currency)} · kamu: <span className="text-white/70">{role === "middleman" ? "middleman (founder)" : role || "observer"}</span></div>
         </div>
         {/* Status stepper */}
         <div className="mt-2 flex items-center gap-1">
           {STATUS_STEPS.map((s, i) => (
-            <div key={s} className="flex flex-1 items-center gap-1">
-              <div className={`h-1.5 flex-1 rounded-full ${dead ? "bg-red-500/40" : i <= stepIdx ? "bg-emerald-400" : "bg-white/10"}`} />
-            </div>
+            <div key={s} className={`h-1.5 flex-1 rounded-full ${dead ? "bg-red-500/40" : i <= stepIdx ? "bg-emerald-400" : "bg-white/10"}`} />
           ))}
         </div>
-        <div className="mt-1 flex justify-between text-[9px] text-white/40">
-          {STATUS_STEPS.map((s) => <span key={s}>{STATUS_LABEL[s]}</span>)}
-        </div>
+        <div className="mt-1 text-[10px] text-white/40">Status: <span className="text-white/70">{STATUS_LABEL[thread.status] ?? thread.status}</span></div>
       </div>
 
       <div ref={scrollRef} className="min-h-0 flex-1 space-y-2 overflow-auto p-4">
         {messages.map((m) => m.kind === "system" ? (
-          <div key={m.id} className="mx-auto w-fit max-w-[90%] rounded-full bg-white/5 px-3 py-1 text-center text-[11px] text-white/50">{m.content}</div>
+          <div key={m.id} className="mx-auto w-fit max-w-[92%] whitespace-pre-wrap rounded-lg bg-white/5 px-3 py-1.5 text-center text-[11px] text-white/60">{m.content}</div>
         ) : (
           <div key={m.id} className="flex gap-2">
             <img src={m.avatar_url || "/favicon.png"} alt="" className="h-6 w-6 shrink-0 rounded-full object-cover" />
             <div className="min-w-0">
               <div className="text-[11px] text-white/50">{m.display_name || m.username}</div>
-              <div className="rounded-lg bg-white/[0.04] px-2.5 py-1.5 text-sm text-white/85">{m.content}</div>
+              {m.content && <div className="rounded-lg bg-white/[0.04] px-2.5 py-1.5 text-sm text-white/85">{m.content}</div>}
+              {m.images?.map((src, i) => <img key={i} src={src} alt="" onClick={() => openLightbox(m.images, i)} className="mt-1 max-h-40 cursor-zoom-in rounded-lg" />)}
             </div>
           </div>
         ))}
       </div>
 
-      {/* Actions */}
-      {(action || (!done && !dead)) && (
-        <div className="flex items-center gap-2 border-t border-white/5 px-4 py-2">
-          {action && (
-            <button onClick={() => act(action!.fn)} disabled={busy} className="flex items-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-400 disabled:opacity-50">
-              <action.icon className="h-3.5 w-3.5" /> {action.label}
+      {/* Reminder: whose turn */}
+      {!done && !dead && !meta && (
+        <div className="border-t border-white/5 px-4 py-1.5 text-center text-[11px] text-amber-200/80">Menunggu aksi pihak lain…</div>
+      )}
+
+      {/* Role-gated action */}
+      {meta && !done && !dead && (
+        <div className="border-t border-white/5 px-4 py-2">
+          {nextAct === "mark-paid" && (
+            <div className="mb-2 flex items-center gap-2">
+              {proof.images.map((src, i) => (
+                <div key={i} className="relative"><img src={src} alt="" className="h-12 w-12 rounded object-cover" /><button onClick={() => proof.removeAt(i)} className="absolute -right-1 -top-1 rounded-full bg-black/80 p-0.5 text-white/70"><X className="h-3 w-3" /></button></div>
+              ))}
+              <label className="flex cursor-pointer items-center gap-1 rounded-lg border border-white/10 bg-white/[0.03] px-2.5 py-1.5 text-[11px] text-white/60 hover:bg-white/10">
+                <ImagePlus className="h-3.5 w-3.5" /> {proof.uploading ? "…" : "Bukti transfer"}
+                <input type="file" accept="image/*" className="hidden" onChange={(e) => proof.upload(e.target.files)} />
+              </label>
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            <button onClick={() => runAction(nextAct)} disabled={busy} className="flex items-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-400 disabled:opacity-50">
+              {ActIcon && <ActIcon className="h-3.5 w-3.5" />} {meta.label}
             </button>
-          )}
-          {!done && !dead && (
-            <button onClick={() => act(() => rekberApi.cancel(threadId))} disabled={busy} className="ml-auto rounded-lg border border-white/10 px-3 py-1.5 text-xs text-white/50 hover:bg-red-500/15 hover:text-red-200">Cancel</button>
-          )}
+            <button onClick={async () => { const ok = await dialog.confirm({ title: "Batalkan deal?", message: "Deal akan dibatalkan.", confirmLabel: "Batalkan", danger: true }); if (ok) runAction("cancel"); }} disabled={busy} className="ml-auto rounded-lg border border-white/10 px-3 py-1.5 text-xs text-white/50 hover:bg-red-500/15 hover:text-red-200">Batalkan</button>
+          </div>
         </div>
       )}
 
       {/* Composer */}
       {!dead && (
         <div className="flex items-center gap-2 border-t border-white/5 px-4 py-2.5">
-          <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} placeholder="Message…" className="min-w-0 flex-1 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-white/25" />
+          <input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} placeholder="Pesan…" className="min-w-0 flex-1 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none focus:border-white/25" />
           <button onClick={send} className="rounded-lg bg-white/10 p-2 text-white/70 hover:bg-white/20"><Send className="h-4 w-4" /></button>
         </div>
       )}
@@ -591,6 +628,37 @@ function BuyModal({ product, onClose, onBought }: { product: OfficialProduct; on
           <p className="text-center text-[10px] text-white/30">You'll be redirected to the payment gateway. Delivery is automatic.</p>
         </div>
       </div>
+    </div>
+  );
+}
+
+// RekberAccountEditor (founder/moderator) sets the global rekber transfer account.
+function RekberAccountEditor() {
+  const [account, setAccount] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [saved, setSaved] = useState(false);
+  useEffect(() => { rekberApi.account.get().then((r) => setAccount(r.account || "")).catch(() => {}); }, []);
+  const save = async () => { try { await rekberApi.account.set(account); setSaved(true); setEditing(false); setTimeout(() => setSaved(false), 2000); } catch { /* ignore */ } };
+  return (
+    <div className="mb-3 rounded-xl border border-indigo-500/20 bg-indigo-500/[0.05] p-3">
+      <div className="mb-1 flex items-center justify-between">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-indigo-300/80">Rekening rekber (middleman)</span>
+        {saved && <span className="text-[10px] text-emerald-300">Tersimpan ✓</span>}
+      </div>
+      {editing ? (
+        <>
+          <textarea value={account} onChange={(e) => setAccount(e.target.value)} rows={3} placeholder="BCA 1234567890 a.n. Nama Founder&#10;DANA 0812xxxx" className="w-full resize-none rounded-lg border border-white/10 bg-black/30 px-3 py-2 font-mono text-xs text-white outline-none focus:border-white/25" />
+          <div className="mt-1.5 flex justify-end gap-2">
+            <button onClick={() => setEditing(false)} className="rounded-lg px-2.5 py-1 text-[11px] text-white/50 hover:text-white">Batal</button>
+            <button onClick={save} className="rounded-lg bg-white px-3 py-1 text-[11px] font-medium text-black hover:opacity-90">Simpan</button>
+          </div>
+        </>
+      ) : (
+        <div className="flex items-center gap-2">
+          <pre className="min-w-0 flex-1 truncate whitespace-pre-wrap font-mono text-[11px] text-white/70">{account || "Belum diatur — buyer perlu ini untuk transfer."}</pre>
+          <button onClick={() => setEditing(true)} className="shrink-0 rounded-lg border border-white/10 px-2.5 py-1 text-[11px] text-white/60 hover:bg-white/5">Edit</button>
+        </div>
+      )}
     </div>
   );
 }

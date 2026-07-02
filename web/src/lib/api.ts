@@ -815,11 +815,14 @@ export const rekberApi = {
   fee: (amount: number) => api.get<{ amount: number; fee: number }>(`/api/marketplace/rekber/fee?amount=${amount}`),
   threads: () => api.get<{ threads: RekberThread[] }>("/api/marketplace/rekber/threads"),
   create: (listing_id: number, note = "") => api.post<RekberThread>("/api/marketplace/rekber/threads", { listing_id, note }),
-  get: (id: number, after = 0) => api.get<{ thread: RekberThread; messages: RekberMessage[]; role: string }>(`/api/marketplace/rekber/threads/${id}?after=${after}`),
+  get: (id: number, after = 0) => api.get<{ thread: RekberThread; messages: RekberMessage[]; role: string; next_action: string }>(`/api/marketplace/rekber/threads/${id}?after=${after}`),
   send: (id: number, content: string, images: string[] = []) => api.post<RekberMessage>(`/api/marketplace/rekber/threads/${id}/messages`, { content, images }),
-  advance: (id: number) => api.post<RekberThread>(`/api/marketplace/rekber/threads/${id}/advance`),
+  action: (id: number, action: string, proof: string[] = []) => api.post<RekberThread>(`/api/marketplace/rekber/threads/${id}/${action}`, proof.length ? { proof } : {}),
   cancel: (id: number) => api.post<RekberThread>(`/api/marketplace/rekber/threads/${id}/cancel`),
-  dispute: (id: number) => api.post<RekberThread>(`/api/marketplace/rekber/threads/${id}/dispute`),
+  account: {
+    get: () => api.get<{ account: string }>("/api/marketplace/admin/rekber/account"),
+    set: (account: string) => api.put<{ ok: boolean }>("/api/marketplace/admin/rekber/account", { account }),
+  },
 };
 
 // Official-store order.

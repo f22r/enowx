@@ -453,6 +453,23 @@ func (m *Manager) PluginSource(ctx context.Context, id string) (string, error) {
 	return string(raw), nil
 }
 
+// RekberAccountGet/Set proxy the admin rekber account setting.
+func (m *Manager) RekberAccountGet(ctx context.Context) (string, error) {
+	var raw json.RawMessage
+	if err := m.call(ctx, http.MethodGet, "/admin/rekber/account", nil, &raw); err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
+
+func (m *Manager) RekberAccountSet(ctx context.Context, body json.RawMessage) (string, error) {
+	var raw json.RawMessage
+	if err := m.call(ctx, http.MethodPut, "/admin/rekber/account", body, &raw); err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
+
 // SetPluginStatus approves/rejects a plugin (moderator override). action = approve|reject.
 func (m *Manager) SetPluginStatus(ctx context.Context, id, action string, body json.RawMessage) (string, error) {
 	var raw json.RawMessage
