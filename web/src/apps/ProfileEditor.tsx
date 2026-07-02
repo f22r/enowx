@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Loader2, Check, Plus, X, Pencil, ImagePlus, Lock } from "lucide-react";
 import { useProfile, refreshProfile } from "../os/useProfile";
 import { profileApi, type ProfileLink } from "../lib/api";
@@ -110,7 +111,7 @@ export function ProfileEditor() {
         </span>
       </button>
 
-      {open && (
+      {open && createPortal(
         <div
           className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
           onClick={() => !busy && setOpen(false)}
@@ -242,7 +243,8 @@ export function ProfileEditor() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   );
