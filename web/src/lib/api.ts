@@ -820,8 +820,8 @@ export const rekberApi = {
   action: (id: number, action: string, proof: string[] = []) => api.post<RekberThread>(`/api/marketplace/rekber/threads/${id}/${action}`, proof.length ? { proof } : {}),
   cancel: (id: number) => api.post<RekberThread>(`/api/marketplace/rekber/threads/${id}/cancel`),
   account: {
-    get: () => api.get<{ account: string }>("/api/marketplace/admin/rekber/account"),
-    set: (account: string) => api.put<{ ok: boolean }>("/api/marketplace/admin/rekber/account", { account }),
+    get: () => api.get<{ account: string; images: string[] }>("/api/marketplace/admin/rekber/account"),
+    set: (account: string, images: string[] = []) => api.put<{ ok: boolean }>("/api/marketplace/admin/rekber/account", { account, images }),
   },
 };
 

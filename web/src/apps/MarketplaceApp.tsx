@@ -632,30 +632,55 @@ function BuyModal({ product, onClose, onBought }: { product: OfficialProduct; on
   );
 }
 
-// RekberAccountEditor (founder/moderator) sets the global rekber transfer account.
+// RekberAccountEditor (founder/moderator) sets the global rekber transfer account
+// (text + images such as a QRIS code).
 function RekberAccountEditor() {
   const [account, setAccount] = useState("");
+  const [images, setImages] = useState<string[]>([]);
   const [editing, setEditing] = useState(false);
   const [saved, setSaved] = useState(false);
-  useEffect(() => { rekberApi.account.get().then((r) => setAccount(r.account || "")).catch(() => {}); }, []);
-  const save = async () => { try { await rekberApi.account.set(account); setSaved(true); setEditing(false); setTimeout(() => setSaved(false), 2000); } catch { /* ignore */ } };
+  const img = useImageAttach();
+
+  useEffect(() => { rekberApi.account.get().then((r) => { setAccount(r.account || ""); setImages(r.images || []); }).catch(() => {}); }, []);
+
+  const save = async () => {
+    const imgs = [...images, ...img.images];
+    try { await rekberApi.account.set(account, imgs); setImages(imgs); img.clear(); setSaved(true); setEditing(false); setTimeout(() => setSaved(false), 2000); } catch { /* ignore */ }
+  };
+
   return (
     <div className="mb-3 rounded-xl border border-indigo-500/20 bg-indigo-500/[0.05] p-3">
       <div className="mb-1 flex items-center justify-between">
         <span className="text-[11px] font-semibold uppercase tracking-wide text-indigo-300/80">Rekening rekber (middleman)</span>
-        {saved && <span className="text-[10px] text-emerald-300">Tersimpan ✓</span>}
+        {saved && <span className="flex items-center gap-1 text-[10px] text-emerald-300"><Check className="h-3 w-3" /> Tersimpan</span>}
       </div>
       {editing ? (
         <>
           <textarea value={account} onChange={(e) => setAccount(e.target.value)} rows={3} placeholder="BCA 1234567890 a.n. Nama Founder&#10;DANA 0812xxxx" className="w-full resize-none rounded-lg border border-white/10 bg-black/30 px-3 py-2 font-mono text-xs text-white outline-none focus:border-white/25" />
-          <div className="mt-1.5 flex justify-end gap-2">
-            <button onClick={() => setEditing(false)} className="rounded-lg px-2.5 py-1 text-[11px] text-white/50 hover:text-white">Batal</button>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            {images.map((src, i) => (
+              <div key={src} className="relative"><img src={src} alt="" className="h-14 w-14 rounded object-cover" /><button onClick={() => setImages(images.filter((_, j) => j !== i))} className="absolute -right-1 -top-1 rounded-full bg-black/80 p-0.5 text-white/70"><X className="h-3 w-3" /></button></div>
+            ))}
+            {img.images.map((src, i) => (
+              <div key={src} className="relative"><img src={src} alt="" className="h-14 w-14 rounded object-cover" /><button onClick={() => img.removeAt(i)} className="absolute -right-1 -top-1 rounded-full bg-black/80 p-0.5 text-white/70"><X className="h-3 w-3" /></button></div>
+            ))}
+            <label className="flex h-14 w-14 cursor-pointer flex-col items-center justify-center rounded border border-dashed border-white/15 text-white/40 hover:bg-white/5">
+              {img.uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
+              <span className="mt-0.5 text-[8px]">QRIS</span>
+              <input type="file" accept="image/*" className="hidden" onChange={(e) => img.upload(e.target.files)} />
+            </label>
+          </div>
+          <div className="mt-2 flex justify-end gap-2">
+            <button onClick={() => { setEditing(false); img.clear(); }} className="rounded-lg px-2.5 py-1 text-[11px] text-white/50 hover:text-white">Batal</button>
             <button onClick={save} className="rounded-lg bg-white px-3 py-1 text-[11px] font-medium text-black hover:opacity-90">Simpan</button>
           </div>
         </>
       ) : (
-        <div className="flex items-center gap-2">
-          <pre className="min-w-0 flex-1 truncate whitespace-pre-wrap font-mono text-[11px] text-white/70">{account || "Belum diatur — buyer perlu ini untuk transfer."}</pre>
+        <div className="flex items-start gap-2">
+          <div className="min-w-0 flex-1">
+            <pre className="truncate whitespace-pre-wrap font-mono text-[11px] text-white/70">{account || "Belum diatur — buyer perlu ini untuk transfer."}</pre>
+            {images.length > 0 && <div className="mt-1.5 flex gap-1.5">{images.map((src, i) => <img key={i} src={src} alt="" onClick={() => openLightbox(images, i)} className="h-12 w-12 cursor-zoom-in rounded object-cover" />)}</div>}
+          </div>
           <button onClick={() => setEditing(true)} className="shrink-0 rounded-lg border border-white/10 px-2.5 py-1 text-[11px] text-white/60 hover:bg-white/5">Edit</button>
         </div>
       )}

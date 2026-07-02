@@ -64,9 +64,9 @@ export function PluginsApp() {
     try {
       const r = await marketApi.publish(p.id);
       if (r.status === "approved") {
-        await dialog.alert({ title: "Published 🎉", message: `${p.name} passed the scan and is now in the marketplace.` });
+        await dialog.alert({ title: "Published", message: `${p.name} passed the scan and is now in the marketplace.` });
       } else if (r.status === "pending") {
-        await dialog.alert({ title: "Pending review ⏳", message: r.reason || `${p.name} is queued for manual moderator review and will be listed once approved.` });
+        await dialog.alert({ title: "Pending review", message: r.reason || `${p.name} is queued for manual moderator review and will be listed once approved.` });
       } else {
         await dialog.alert({ title: "Rejected", message: r.reason ? `${r.reason}${r.file ? ` (${r.file})` : ""}` : "The security scan rejected this plugin." });
       }
@@ -191,7 +191,7 @@ function CreateModal({ runtimes, onClose, onCreated }: { runtimes: PluginRuntime
     return (
       <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm" onClick={() => { onCreated(); }}>
         <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#11131a] p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-          <p className="mb-2 text-sm font-semibold text-white">Plugin created 🎉</p>
+          <p className="mb-2 text-sm font-semibold text-white">Plugin created</p>
           <p className="mb-2 text-xs text-white/55">Code it in your own IDE. Your plugin lives at:</p>
           <div className="mb-3 break-all rounded-lg border border-white/10 bg-black/30 px-3 py-2 font-mono text-[10px] text-white/70">{done.path}</div>
           <p className="mb-3 text-[11px] text-white/40">Structure it however you like (multi-file, modules). Your entry serves the UI + endpoints on <code className="rounded bg-white/10 px-1">$PORT</code>. Static plugins just need <code className="rounded bg-white/10 px-1">public/index.html</code>.</p>
