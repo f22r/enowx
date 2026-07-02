@@ -33,9 +33,11 @@ func (h *Market) guard(w http.ResponseWriter, r *http.Request) bool {
 	return true
 }
 
+// rawJSON forwards the cloud's JSON response wrapped in {data: ...} so the
+// frontend's api client (which unwraps .data) sees the payload.
 func (h *Market) rawJSON(w http.ResponseWriter, raw string) {
 	w.Header().Set("Content-Type", "application/json")
-	_, _ = w.Write([]byte(raw))
+	_, _ = w.Write([]byte(`{"data":` + raw + `}`))
 }
 
 // POST /api/market/publish {id} — bundle the local plugin + publish for scanning.
@@ -97,26 +99,24 @@ func (h *Market) Install(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var meta struct {
-		Data struct {
-			BundleURL string `json:"bundle_url"`
-			Slug      string `json:"slug"`
-		} `json:"data"`
+		BundleURL string `json:"bundle_url"`
+		Slug      string `json:"slug"`
 	}
 	_ = json.Unmarshal([]byte(raw), &meta)
-	if meta.Data.BundleURL == "" || meta.Data.Slug == "" {
+	if meta.BundleURL == "" || meta.Slug == "" {
 		writeAPIErr(w, http.StatusBadGateway, "missing bundle info")
 		return
 	}
-	zipBytes, err := h.sync.DownloadBundle(r.Context(), meta.Data.BundleURL)
+	zipBytes, err := h.sync.DownloadBundle(r.Context(), meta.BundleURL)
 	if err != nil {
 		writeAPIErr(w, http.StatusBadGateway, err.Error())
 		return
 	}
-	if err := h.mgr.Extract(meta.Data.Slug, zipBytes); err != nil {
+	if err := h.mgr.Extract(meta.Slug, zipBytes); err != nil {
 		writeAPIErr(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	writeData(w, map[string]any{"installed": true, "id": meta.Data.Slug})
+	writeData(w, map[string]any{"installed": true, "id": meta.Slug})
 }
 
 // GET /api/admin/plugin-scan — the AI scan settings (proxied to cloud).

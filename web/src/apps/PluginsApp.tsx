@@ -292,7 +292,7 @@ function Marketplace({ onInstalled }: { onInstalled: () => void }) {
     setLoading(true);
     try {
       const r = await marketApi.list(query);
-      setItems(r.plugins ?? []);
+      setItems(r?.plugins ?? []);
       setError("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "failed to load (are you signed in?)");
