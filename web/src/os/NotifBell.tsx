@@ -1,13 +1,10 @@
 import { useState } from "react";
-import { Bell, MessageSquare, ChevronUp, Smile, AtSign } from "lucide-react";
+import { Bell } from "lucide-react";
 import { Popover } from "../components/Popover";
 import { useProfile } from "./useProfile";
 import { useNotifications, markNotificationsRead } from "./notifBus";
-import { openProfile } from "./profileViewer";
+import { NOTIF_ICON, NOTIF_VERB, routeNotif } from "./notifMeta";
 import type { Notification } from "../lib/api";
-
-const ICON: Record<string, typeof Bell> = { reply: MessageSquare, upvote: ChevronUp, reaction: Smile, mention: AtSign };
-const VERB: Record<string, string> = { reply: "replied", upvote: "upvoted", reaction: "reacted", mention: "mentioned you" };
 
 // NotifBell is the top-bar notifications bell + dropdown. Login-gated.
 export function NotifBell() {
@@ -52,11 +49,11 @@ export function NotifBell() {
 }
 
 function NotifRow({ n, onClose }: { n: Notification; onClose: () => void }) {
-  const Icon = ICON[n.type] ?? Bell;
+  const Icon = NOTIF_ICON[n.type] ?? Bell;
   return (
     <button
       onClick={() => {
-        if (n.actor_id) openProfile(n.actor_id);
+        routeNotif(n);
         onClose();
       }}
       className={`flex w-full items-start gap-2 border-b border-white/5 px-3 py-2 text-left hover:bg-white/5 ${n.read ? "" : "bg-indigo-500/[0.06]"}`}
@@ -64,7 +61,7 @@ function NotifRow({ n, onClose }: { n: Notification; onClose: () => void }) {
       <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-white/50" />
       <div className="min-w-0 flex-1">
         <div className="text-xs text-white/80">
-          <span className="font-semibold text-white">{n.actor_name || "Someone"}</span> {VERB[n.type] ?? "did something"}
+          <span className="font-semibold text-white">{n.actor_name || "Someone"}</span> {NOTIF_VERB[n.type] ?? "did something"}
         </div>
         {n.preview && <div className="truncate text-[11px] text-white/45">{n.preview}</div>}
         <div className="text-[10px] text-white/30">{new Date(n.created_at).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</div>

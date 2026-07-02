@@ -6,6 +6,7 @@ import { useImageAttach } from "../os/useImageAttach";
 import { useDialog } from "../os/dialog";
 import { openLightbox } from "../os/lightbox";
 import { openProfile } from "../os/profileViewer";
+import { useMarketplaceNav, consumeMarketplaceThread } from "../os/marketplaceNav";
 
 type Kind = "community" | "official";
 type View = "browse" | "deals" | "orders" | "payout";
@@ -24,6 +25,13 @@ export function MarketplaceApp() {
   const dialog = useDialog();
 
   const openDeal = (id: number) => { setOpenThread(id); setView("deals"); };
+
+  // A rekber notification click routes here with a pending thread id.
+  const mktNav = useMarketplaceNav();
+  useEffect(() => {
+    const id = consumeMarketplaceThread();
+    if (id !== null) { setOpenThread(id); setView("deals"); }
+  }, [mktNav]);
 
   // Selling requires a payout account first.
   const onSell = async () => {

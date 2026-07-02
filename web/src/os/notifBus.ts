@@ -9,6 +9,18 @@ let loaded = false;
 let es: EventSource | null = null;
 const listeners = new Set<() => void>();
 
+// Banner emitter: a separate channel so a macOS-style banner can pop for any
+// incoming notification without coupling to the bell list. Local (non-server)
+// events can also raise a banner by calling showBanner directly.
+const bannerListeners = new Set<(n: Notification) => void>();
+export function onBanner(fn: (n: Notification) => void): () => void {
+  bannerListeners.add(fn);
+  return () => bannerListeners.delete(fn);
+}
+export function showBanner(n: Notification) {
+  bannerListeners.forEach((l) => l(n));
+}
+
 function emit() {
   listeners.forEach((l) => l());
 }
@@ -42,6 +54,7 @@ function ensureStream() {
         items = [ev.data, ...items].slice(0, 50);
         unread += 1;
         emit();
+        showBanner(ev.data); // pop a macOS-style card
       }
     } catch {
       /* ignore */

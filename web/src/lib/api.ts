@@ -1005,7 +1005,7 @@ export const modApi = {
 
 export interface Notification {
   id: number;
-  type: "reply" | "upvote" | "reaction" | "mention";
+  type: "reply" | "upvote" | "reaction" | "mention" | "deal" | "middleman" | "shipped" | "purchase" | "released";
   actor_id: string;
   actor_name: string;
   ref_type: string;

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import { LayoutGrid, SquareTerminal, BookOpen, Grid3x3, Bot, FlaskConical, ShieldCheck, Store } from "lucide-react";
 import { buildApps } from "../apps";
@@ -12,6 +12,8 @@ import { AppsDrawer } from "./AppsDrawer";
 import { Tooltip } from "../components/Tooltip";
 import { ProfileViewer } from "../apps/ProfileViewer";
 import { Lightbox } from "../components/Lightbox";
+import { NotifBanner } from "./NotifBanner";
+import { useMarketplaceNav, hasPendingThread } from "./marketplaceNav";
 import { useProfile } from "./useProfile";
 import { DocsApp } from "../apps/DocsApp";
 import { AdminApp } from "../apps/AdminApp";
@@ -116,6 +118,13 @@ export function Desktop() {
     if (appShortcuts[k]) openApp(appShortcuts[k]);
   });
 
+  // Clicking a rekber notification requests a marketplace thread → switch to the
+  // marketplace view; MarketplaceApp consumes the pending thread id.
+  const mktNav = useMarketplaceNav();
+  useEffect(() => {
+    if (hasPendingThread()) setView("marketplace");
+  }, [mktNav]);
+
   const renderPanel = (side: Side) => {
     const openT = openTermOn(side);
     if (openT) {
@@ -181,6 +190,8 @@ export function Desktop() {
       <ProfileViewer />
       {/* Image lightbox overlay (opened from any thumbnail). */}
       <Lightbox />
+      {/* macOS-style notification banners (top-right). */}
+      <NotifBanner />
 
       {leaderActive && (
         <div className="pointer-events-none fixed left-1/2 top-9 z-[10000] -translate-x-1/2 rounded-lg border border-emerald-500/30 bg-black/80 px-3 py-1.5 font-mono text-[11px] text-emerald-300 shadow-lg">
