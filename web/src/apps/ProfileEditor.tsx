@@ -112,7 +112,7 @@ export function ProfileEditor() {
 
       {open && (
         <div
-          className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"
           onClick={() => !busy && setOpen(false)}
         >
           <div
