@@ -555,6 +555,10 @@ func (h *Sync) ChatStream(w http.ResponseWriter, r *http.Request) {
 	ch, cancel := h.mgr.Subscribe()
 	defer cancel()
 
+	// A connected browser means the dashboard is open → drive cloud presence.
+	h.mgr.BrowserConnected()
+	defer h.mgr.BrowserDisconnected()
+
 	// Initial comment so the client knows the stream is open.
 	_, _ = w.Write([]byte(": connected\n\n"))
 	flusher.Flush()

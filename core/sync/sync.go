@@ -653,6 +653,19 @@ func (m *Manager) RekberPost(ctx context.Context, path string, body json.RawMess
 	return string(raw), nil
 }
 
+// SellerReviews proxies GET /marketplace/sellers/{id}/reviews.
+func (m *Manager) SellerReviews(ctx context.Context, sellerID, query string) (string, error) {
+	var raw json.RawMessage
+	path := "/marketplace/sellers/" + sellerID + "/reviews"
+	if query != "" {
+		path += "?" + query
+	}
+	if err := m.call(ctx, http.MethodGet, path, nil, &raw); err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
+
 // --- marketplace orders ---
 
 // OrderCreate starts an official-store order; returns the pay URL.
@@ -1051,6 +1064,16 @@ func (m *Manager) reportUsage(ctx context.Context) {
 		"stat_in_tokens":  inTok,
 		"stat_out_tokens": outTok,
 	}, nil)
+}
+
+// Presence reports whether the user's dashboard is currently open (a browser tab
+// is connected to the gateway). Only sent while active; the server marks the user
+// offline when heartbeats stop. Best-effort.
+func (m *Manager) Presence(ctx context.Context, active bool) {
+	if !m.Configured(ctx) {
+		return
+	}
+	_ = m.call(ctx, http.MethodPost, "/presence", map[string]any{"active": active}, nil)
 }
 
 func randHex(n int) string {

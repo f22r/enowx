@@ -102,6 +102,19 @@ func (h *Sync) RekberDelivery(w http.ResponseWriter, r *http.Request) {
 	proxyJSON(w, out, err)
 }
 
+// RekberReview proxies the buyer's seller review for a completed deal.
+func (h *Sync) RekberReview(w http.ResponseWriter, r *http.Request) {
+	body, _ := io.ReadAll(io.LimitReader(r.Body, 1<<14))
+	out, err := h.mgr.RekberPost(r.Context(), "/threads/"+chi.URLParam(r, "id")+"/review", body)
+	proxyJSON(w, out, err)
+}
+
+// SellerReviews proxies a seller's reviews + rating.
+func (h *Sync) SellerReviews(w http.ResponseWriter, r *http.Request) {
+	out, err := h.mgr.SellerReviews(r.Context(), chi.URLParam(r, "id"), r.URL.RawQuery)
+	proxyJSON(w, out, err)
+}
+
 func (h *Sync) RekberOrders(w http.ResponseWriter, r *http.Request) {
 	out, err := h.mgr.RekberOrders(r.Context())
 	proxyJSON(w, out, err)
