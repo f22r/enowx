@@ -6,6 +6,7 @@ import { AddAccountModal } from "../components/AddAccountModal";
 import { KiroAddModal } from "../components/KiroAddModal";
 import { CodexAddModal } from "../components/CodexAddModal";
 import { AntigravityAddModal } from "../components/AntigravityAddModal";
+import { LeonardoAddModal } from "../components/LeonardoAddModal";
 import { providersApi, accountsApi, type Provider, type Account } from "../lib/api";
 
 export function ProvidersApp() {
@@ -118,7 +119,17 @@ export function ProvidersApp() {
           }}
         />
       )}
-      {adding && adding.name !== "kiro" && adding.name !== "codex" && adding.name !== "antigravity" && (
+      {adding && adding.name === "leonardo" && (
+        <LeonardoAddModal
+          provider={adding}
+          onClose={() => setAdding(null)}
+          onSaved={() => {
+            setAdding(null);
+            load();
+          }}
+        />
+      )}
+      {adding && adding.name !== "kiro" && adding.name !== "codex" && adding.name !== "antigravity" && adding.name !== "leonardo" && (
         <AddAccountModal
           provider={adding}
           onClose={() => setAdding(null)}

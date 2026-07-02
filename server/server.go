@@ -61,6 +61,7 @@ func New(addr string, d Deps) *Server {
 	kiro := handlers.NewKiro(d.Doer, d.Accounts)
 	codex := handlers.NewCodex(d.Doer, d.Accounts)
 	antigravity := handlers.NewAntigravity(d.Doer, d.Accounts)
+	leonardoAcc := handlers.NewLeonardo(d.Accounts, d.Doer)
 	local := handlers.NewLocal(d.Accounts)
 	usage := handlers.NewUsage(d.Registry, d.Accounts)
 	models := handlers.NewModels(d.Registry, d.Accounts, d.Sync)
@@ -73,6 +74,7 @@ func New(addr string, d Deps) *Server {
 	kiro.SetWarmer(warmup)
 	codex.SetWarmer(warmup)
 	antigravity.SetWarmer(warmup)
+	leonardoAcc.SetWarmer(warmup)
 	local.SetWarmer(warmup)
 	dash := middleware.NewDashboard(d.SettingsKV)
 	term := handlers.NewTerminal(dash)
@@ -153,6 +155,8 @@ func New(addr string, d Deps) *Server {
 		r.Post("/accounts/antigravity/oauth/start", antigravity.OAuthStart)
 		r.Post("/accounts/antigravity/oauth/exchange", antigravity.OAuthExchange)
 		r.Post("/accounts/antigravity/manual", antigravity.Manual)
+
+		r.Post("/accounts/leonardo/cookie", leonardoAcc.FromCookie)
 
 		r.Get("/local-sources", local.Scan)
 		r.Post("/local-sources/import", local.Import)

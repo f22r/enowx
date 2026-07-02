@@ -18,11 +18,77 @@ import (
 
 const (
 	graphQLEndpoint = "https://api.leonardo.ai/v1/graphql"
+	getSessionURL   = "https://app.leonardo.ai/api/auth/get-session"
 	origin          = "https://app.leonardo.ai"
 	referer         = "https://app.leonardo.ai/"
 	schemaVersion   = "latest"
 	noneStyleID     = "556c1ee5-ec38-42e8-955a-1e82dad0ffa1"
+	userAgent       = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 )
+
+// SessionCreds is the auth material extracted from a Leonardo session.
+type SessionCreds struct {
+	AccessToken string
+	CognitoSub  string
+	Email       string
+}
+
+// SessionFromCookie exchanges an app.leonardo.ai cookie header for the current
+// session's access token (via the NextAuth get-session endpoint) — no browser
+// needed.
+func (c *Client) SessionFromCookie(cookieHeader string) (*SessionCreds, error) {
+	cookieHeader = strings.TrimSpace(cookieHeader)
+	if cookieHeader == "" {
+		return nil, fmt.Errorf("cookie header is empty")
+	}
+	req, err := http.NewRequest(http.MethodGet, getSessionURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Cookie", cookieHeader)
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", userAgent)
+	req.Header.Set("Referer", referer)
+	resp, err := c.doer.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("leonardo get-session: %w", err)
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(resp.Body)
+	if strings.Contains(string(raw), "Vercel Security Checkpoint") || strings.Contains(string(raw), "<!DOCTYPE html>") {
+		return nil, fmt.Errorf("Leonardo blocked the request (bot check). Copy a fresh, complete Cookie header from a logged-in tab, or use the Manual tab (paste the access token)")
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("leonardo get-session %d: %s", resp.StatusCode, trunc(raw))
+	}
+	var payload struct {
+		Session struct {
+			AccessToken string `json:"accessToken"`
+			CognitoSub  string `json:"cognitoSub"`
+		} `json:"session"`
+		User struct {
+			Email string `json:"email"`
+		} `json:"user"`
+	}
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return nil, fmt.Errorf("leonardo get-session decode: %w", err)
+	}
+	token := strings.TrimSpace(payload.Session.AccessToken)
+	if token == "" {
+		return nil, fmt.Errorf("no access token in session (is the cookie logged in?)")
+	}
+	sub, email := payload.Session.CognitoSub, payload.User.Email
+	if sub == "" || email == "" {
+		js, je := JWTFields(token)
+		if sub == "" {
+			sub = js
+		}
+		if email == "" {
+			email = je
+		}
+	}
+	return &SessionCreds{AccessToken: token, CognitoSub: strings.TrimSpace(sub), Email: strings.TrimSpace(email)}, nil
+}
 
 // Client talks to Leonardo's GraphQL API with a given doer.
 type Client struct{ doer transport.Doer }

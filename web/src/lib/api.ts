@@ -149,6 +149,11 @@ export const codexApi = {
     api.post<{ id: number }>("/api/accounts/codex/manual", { json, label }),
 };
 
+export const leonardoApi = {
+  fromCookie: (cookie: string, label?: string) =>
+    api.post<{ id: number; email: string }>("/api/accounts/leonardo/cookie", { cookie, label }),
+};
+
 export const antigravityApi = {
   oauthStart: () => api.post<{ session: string; authorize_url: string }>("/api/accounts/antigravity/oauth/start"),
   oauthExchange: (session: string, code: string) =>
