@@ -61,17 +61,29 @@ export function AccountsApp() {
     load();
   }, []);
 
-  // Refetch a provider's usage/credit when something elsewhere (e.g. a Suno
-  // generation in the Chat app) consumes quota.
+  // Refetch usage for accounts (optionally scoped to one provider).
+  const refreshUsage = (provider?: string) => {
+    for (const acc of accountsRef.current) {
+      if (provider && acc.provider !== provider) continue;
+      accountsApi.usage(acc.id).then((r) => {
+        if (r.supported && r.usage) setUsage((m) => ({ ...m, [acc.id]: r.usage! }));
+      }).catch(() => {});
+    }
+  };
+
+  // Refresh credit when something elsewhere consumes quota (a Suno/Leonardo
+  // generation in Chat signals this), and whenever the window regains focus (so
+  // usage from API Test or an external call is picked up too).
   useEffect(() => {
-    return onUsageStale((provider) => {
-      for (const acc of accountsRef.current) {
-        if (acc.provider !== provider) continue;
-        accountsApi.usage(acc.id).then((r) => {
-          if (r.supported && r.usage) setUsage((m) => ({ ...m, [acc.id]: r.usage! }));
-        }).catch(() => {});
-      }
-    });
+    const off = onUsageStale((provider) => refreshUsage(provider));
+    const onFocus = () => refreshUsage();
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    return () => {
+      off();
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
   }, []);
 
   const iconFor = (name: string) => providers.find((p) => p.name === name)?.icon ?? name;

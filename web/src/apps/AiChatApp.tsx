@@ -56,6 +56,16 @@ const clip = (s: string, max: number) => (s.length > max ? s.slice(0, max) + `\n
 const NO_TOOLS_PREFIXES = ["cb/"];
 const supportsTools = (model: string) => !NO_TOOLS_PREFIXES.some((p) => model.startsWith(p));
 
+// providerOf resolves a model's provider — from the model row when known, else
+// from its id prefix (ld/ → leonardo, cb/ → codebuddy, …).
+const PREFIX_PROVIDER: Record<string, string> = { ld: "leonardo", cb: "codebuddy", sn: "suno", cx: "codex", kr: "kiro", ag: "antigravity" };
+function providerOf(m?: ProviderModel): string {
+  if (m?.provider) return m.provider;
+  const id = m?.model_id ?? "";
+  const pfx = id.includes("/") ? id.slice(0, id.indexOf("/")) : "";
+  return PREFIX_PROVIDER[pfx] ?? pfx;
+}
+
 // musicStatusText maps a Suno task status to a short progress line.
 function musicStatusText(status: string, tracks: { title: string }[]): string {
   switch (status) {
@@ -315,6 +325,7 @@ export function AiChatApp() {
         const j = await res.json();
         const srcs = (j.data ?? []).map((d: { b64_json?: string; url?: string }) => (d.b64_json ? `data:image/png;base64,${d.b64_json}` : d.url)).filter(Boolean) as string[];
         setMsgs((p) => [...p, { role: "assistant", content: "", images: srcs }]);
+        markUsageStale(providerOf(current)); // image gen consumed credits — refresh the bar
       } catch (e) {
         if ((e as Error).name !== "AbortError") setErr(e instanceof Error ? e.message : "failed");
       } finally {
