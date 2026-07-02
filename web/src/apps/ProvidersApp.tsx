@@ -170,12 +170,12 @@ function ProviderCard({
   return (
     <div className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-3.5 transition-colors hover:bg-white/[0.06]">
       <div className="flex items-start gap-3">
-        <ProviderIcon icon={provider.icon} label={provider.label} size={44} />
+        <div className="relative shrink-0">
+          <ProviderIcon icon={provider.icon} label={provider.label} size={44} />
+          {provider.custom && <span className="absolute -bottom-1 -right-1 rounded bg-indigo-500 px-1 text-[7px] font-bold uppercase leading-tight text-white shadow" title="Custom provider">custom</span>}
+        </div>
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
-            <p className="truncate text-sm font-semibold text-white">{provider.label}</p>
-            {provider.custom && <span className="shrink-0 rounded bg-indigo-500/20 px-1 text-[8px] font-bold uppercase text-indigo-300">custom</span>}
-          </div>
+          <p className="truncate text-sm font-semibold text-white">{provider.label}</p>
           <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-white/40">
             <span className="rounded-md bg-white/5 px-1.5 py-0.5">
               {count} {count === 1 ? "account" : "accounts"}
@@ -206,7 +206,6 @@ function AddProviderModal({ onClose, onSaved }: { onClose: () => void; onSaved: 
   const [baseURL, setBaseURL] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [models, setModels] = useState<CustomModel[]>([]);
-  const [defaultModel, setDefaultModel] = useState("");
   const [newModel, setNewModel] = useState("");
   const [fetching, setFetching] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -218,7 +217,6 @@ function AddProviderModal({ onClose, onSaved }: { onClose: () => void; onSaved: 
     try {
       const r = await customProviderApi.probe(baseURL.trim(), format, apiKey.trim());
       setModels(r.models ?? []);
-      if (r.models?.[0] && !defaultModel) setDefaultModel(r.models[0].id);
     } catch (e) {
       setErr(e instanceof Error ? e.message : "couldn't fetch models — add them manually");
     } finally {
@@ -230,7 +228,6 @@ function AddProviderModal({ onClose, onSaved }: { onClose: () => void; onSaved: 
     const id = newModel.trim();
     if (!id || models.some((m) => m.id === id)) return;
     setModels([...models, { id, name: id }]);
-    if (!defaultModel) setDefaultModel(id);
     setNewModel("");
   };
 
@@ -239,7 +236,7 @@ function AddProviderModal({ onClose, onSaved }: { onClose: () => void; onSaved: 
     if (models.length === 0) { setErr("Add at least one model (fetch or manual)."); return; }
     setSaving(true); setErr("");
     try {
-      await customProviderApi.create({ name: name.trim(), prefix: prefix.trim().toLowerCase(), format, base_url: baseURL.trim(), default_model: defaultModel || models[0].id, models, api_key: apiKey.trim() });
+      await customProviderApi.create({ name: name.trim(), prefix: prefix.trim().toLowerCase(), format, base_url: baseURL.trim(), default_model: models[0]?.id ?? "", models, api_key: apiKey.trim() });
       onSaved();
     } catch (e) {
       setErr(e instanceof Error ? e.message : "failed to create");
@@ -272,18 +269,17 @@ function AddProviderModal({ onClose, onSaved }: { onClose: () => void; onSaved: 
 
           <div className="rounded-lg border border-white/10 bg-white/[0.02] p-2.5">
             <div className="mb-2 flex items-center justify-between">
-              <span className="text-[11px] font-semibold text-white/60">Models</span>
+              <span className="text-[11px] font-semibold text-white/60">Models {models.length > 0 && <span className="text-white/40">({models.length})</span>}</span>
               <button onClick={fetchModels} disabled={fetching} className="flex items-center gap-1 rounded-lg border border-white/10 px-2 py-1 text-[11px] text-white/70 hover:bg-white/5 disabled:opacity-50">{fetching ? <Loader2 className="h-3 w-3 animate-spin" /> : null} Fetch models</button>
             </div>
+            <p className="mb-2 text-[10px] text-white/35">All these models are added to every account under this provider.</p>
             {models.length > 0 && (
               <div className="mb-2 max-h-32 space-y-1 overflow-auto">
                 {models.map((m) => (
-                  <label key={m.id} className="flex items-center gap-2 text-xs text-white/70">
-                    <input type="radio" checked={defaultModel === m.id} onChange={() => setDefaultModel(m.id)} className="accent-indigo-500" />
+                  <div key={m.id} className="flex items-center gap-2 text-xs text-white/70">
                     <span className="flex-1 truncate font-mono">{m.id}</span>
-                    {defaultModel === m.id && <span className="text-[9px] text-emerald-300">default</span>}
                     <button onClick={() => setModels(models.filter((x) => x.id !== m.id))} className="text-white/30 hover:text-red-300"><X className="h-3 w-3" /></button>
-                  </label>
+                  </div>
                 ))}
               </div>
             )}
