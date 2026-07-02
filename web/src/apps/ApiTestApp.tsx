@@ -10,6 +10,7 @@ import {
 } from "../lib/api";
 import { useDialog } from "../os/dialog";
 import { useContextMenu } from "../os/contextmenu";
+import { openLightbox } from "../os/lightbox";
 
 type Method = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 const METHODS: Method[] = ["GET", "POST", "PUT", "PATCH", "DELETE"];
@@ -605,9 +606,9 @@ function ResponseImages({ body }: { body: string }) {
   return (
     <div className="mb-2 flex flex-wrap gap-2">
       {srcs.map((s, i) => (
-        <a key={i} href={s} target="_blank" rel="noreferrer">
+        <button key={i} onClick={() => openLightbox(srcs, i)} className="cursor-zoom-in">
           <img src={s} alt="" className="max-h-48 rounded-lg border border-white/10 object-contain" />
-        </a>
+        </button>
       ))}
     </div>
   );

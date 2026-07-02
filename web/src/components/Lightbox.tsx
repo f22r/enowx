@@ -1,6 +1,29 @@
 import { useEffect, useRef, useState } from "react";
-import { X, ChevronLeft, ChevronRight, ZoomIn, ZoomOut } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Download } from "lucide-react";
 import { useLightbox, closeLightbox, stepLightbox } from "../os/lightbox";
+
+// downloadImage saves the current image, fetching remote URLs into a blob so it
+// downloads instead of navigating (works for data: URLs and cross-origin CDNs).
+async function downloadImage(src: string) {
+  const name = `enowx-image-${Date.now()}.png`;
+  try {
+    const blob = src.startsWith("data:") ? await (await fetch(src)).blob() : await (await fetch(src, { mode: "cors" })).blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch {
+    // Fallback: open the URL (some CDNs block CORS fetch).
+    const a = document.createElement("a");
+    a.href = src;
+    a.download = name;
+    a.target = "_blank";
+    a.rel = "noreferrer";
+    a.click();
+  }
+}
 
 // Lightbox is the full-screen image viewer overlay (zoom + prev/next + esc/
 // click-away). Mounted once in Desktop; driven by the lightbox store.
@@ -37,6 +60,7 @@ export function Lightbox() {
       <div className="absolute right-3 top-3 z-10 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
         <button onClick={() => setZoom((z) => Math.max(1, z - 0.5))} className="rounded-lg bg-white/10 p-2 text-white/80 hover:bg-white/20"><ZoomOut className="h-4 w-4" /></button>
         <button onClick={() => setZoom((z) => Math.min(5, z + 0.5))} className="rounded-lg bg-white/10 p-2 text-white/80 hover:bg-white/20"><ZoomIn className="h-4 w-4" /></button>
+        <button onClick={() => downloadImage(src)} title="Download" className="rounded-lg bg-white/10 p-2 text-white/80 hover:bg-white/20"><Download className="h-4 w-4" /></button>
         <button onClick={closeLightbox} className="rounded-lg bg-white/10 p-2 text-white/80 hover:bg-white/20"><X className="h-4 w-4" /></button>
       </div>
       {multi && lb.index > 0 && (

@@ -2,6 +2,7 @@ import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { Send, Trash2, Loader2, Bot, ChevronDown, ChevronRight, FolderOpen, Shield, Check, X, Terminal, FileEdit, FileText, FilePlus, Globe, Wrench, Folder, CornerLeftUp, Settings2, Plus, Brain, Music, Image as ImageIcon } from "lucide-react";
 import { accountsApi, keysApi, filesApi, sunoApi, type ProviderModel, type DirListing } from "../lib/api";
 import { markUsageStale } from "../os/usageBus";
+import { openLightbox } from "../os/lightbox";
 import { AiMarkdown } from "../components/AiMarkdown";
 import { ALWAYS_ON_TOOLS, AGENT_TOOLS, TOOL_META, GROUPABLE_TOOLS, GROUP_VERB, lineDiff, runTool, needsApproval, type PermLevel, type ToolName, type ToolResult } from "./agent/tools";
 
@@ -607,9 +608,9 @@ function Conversation({ msgs, progress }: { msgs: ChatMsg[]; progress: Record<st
             return (
               <div key={it.key} className="flex flex-wrap gap-2">
                 {it.images.map((src, k) => (
-                  <a key={k} href={src} target="_blank" rel="noreferrer">
+                  <button key={k} onClick={() => openLightbox(it.images, k)} className="cursor-zoom-in">
                     <img src={src} alt="" className="max-h-72 rounded-lg border border-white/10 object-contain" />
-                  </a>
+                  </button>
                 ))}
               </div>
             );
