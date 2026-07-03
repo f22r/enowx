@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { Loader2, Users, Copy, ScrollText, BarChart3, ShieldCheck, ShieldOff, Search, MoreHorizontal, Ban, VolumeX, AlertTriangle, Plus, Minus, Boxes, Trash2, Pencil, RefreshCw, Ticket, Mail, Send } from "lucide-react";
+import { Loader2, Users, Copy, ScrollText, BarChart3, ShieldCheck, ShieldOff, Search, MoreHorizontal, Ban, VolumeX, AlertTriangle, Plus, Minus, Boxes, Trash2, Pencil, RefreshCw, Ticket, Mail, Send, Bug, CheckCircle2, RotateCcw } from "lucide-react";
 import { openProfile } from "../os/profileViewer";
 import { useAdminEvents } from "../os/adminBus";
 import { useDialog } from "../os/dialog";
 import { FileSearch, X, Store, Check, Puzzle, ShoppingBag } from "lucide-react";
 import { Tooltip } from "../components/Tooltip";
-import { adminApi, modApi, searchApi, adminVipApi, couponAdminApi, inboxAdminApi, subscriptionApi, type FlaggedLink, type ModAction, type AdminStats, type ProviderModel, type PluginReview, type PluginReviewDetail, type AdminMarketPlugin, type VIPProduct, type VIPService, type Coupon, type InboxMessage, type InboxRole, type UserHit } from "../lib/api";
+import { adminApi, modApi, searchApi, adminVipApi, couponAdminApi, inboxAdminApi, subscriptionApi, bugAdminApi, type FlaggedLink, type ModAction, type AdminStats, type ProviderModel, type PluginReview, type PluginReviewDetail, type AdminMarketPlugin, type VIPProduct, type VIPService, type Coupon, type InboxMessage, type InboxRole, type UserHit, type BugReport } from "../lib/api";
 
-type Tab = "stats" | "flags" | "users" | "models" | "market" | "store" | "scan" | "reviews" | "log" | "coupons" | "inbox";
+type Tab = "stats" | "flags" | "users" | "models" | "market" | "store" | "scan" | "reviews" | "log" | "coupons" | "inbox" | "bugs";
 
 // AdminApp is the moderator-only Admin Tools app. It only appears in the dock
 // for moderators (see apps registry), and every endpoint it calls is role-gated
@@ -26,6 +26,7 @@ export function AdminApp() {
     { id: "reviews", label: "Review log", icon: FileSearch },
     { id: "coupons", label: "Coupons", icon: Ticket },
     { id: "inbox", label: "Inbox", icon: Mail },
+    { id: "bugs", label: "Bug reports", icon: Bug },
     { id: "log", label: "Mod log", icon: ScrollText },
   ];
   const NavBtn = ({ t }: { t: { id: Tab; label: string; icon: typeof Users } }) => {
@@ -66,6 +67,7 @@ export function AdminApp() {
         {tab === "reviews" && <ReviewLogTab />}
         {tab === "coupons" && <CouponsTab />}
         {tab === "inbox" && <InboxTab />}
+        {tab === "bugs" && <BugReportsTab />}
         {tab === "log" && <LogTab />}
       </div>
     </div>
@@ -1053,6 +1055,82 @@ function InboxTab() {
               <button onClick={() => inboxAdminApi.remove(m.id).then(load)} className="text-white/30 hover:text-red-300"><Trash2 className="h-3.5 w-3.5" /></button>
             </div>
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// BugReportsTab lists user bug reports and triages them (resolve/reopen/delete).
+function BugReportsTab() {
+  const [rows, setRows] = useState<BugReport[] | null>(null);
+  const [open, setOpen] = useState(0);
+  const [filter, setFilter] = useState<"open" | "resolved" | "all">("open");
+  const [zoom, setZoom] = useState<string | null>(null);
+
+  const load = () => bugAdminApi.list(filter === "all" ? undefined : filter).then((r) => { setRows(r.reports ?? []); setOpen(r.open ?? 0); }).catch(() => setRows([]));
+  useEffect(() => { load(); }, [filter]);
+
+  const relTime = (iso: string) => {
+    const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+    if (s < 60) return "just now";
+    if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+    if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+    return `${Math.floor(s / 86400)}d ago`;
+  };
+
+  return (
+    <div>
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="flex items-center gap-2 text-sm font-bold text-white">Bug reports {open > 0 && <span className="rounded-full bg-rose-500/20 px-1.5 text-[10px] text-rose-300">{open} open</span>}</h2>
+        <div className="flex gap-1 rounded-lg bg-white/[0.03] p-0.5 text-[11px]">
+          {(["open", "resolved", "all"] as const).map((f) => (
+            <button key={f} onClick={() => setFilter(f)} className={`rounded-md px-2 py-1 capitalize transition-colors ${filter === f ? "bg-white/10 text-white" : "text-white/45 hover:text-white/70"}`}>{f}</button>
+          ))}
+        </div>
+      </div>
+
+      {!rows ? (
+        <div className="flex justify-center py-8"><Loader2 className="h-4 w-4 animate-spin text-white/40" /></div>
+      ) : rows.length === 0 ? (
+        <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4 text-center text-xs text-white/40">No {filter === "all" ? "" : filter} reports.</div>
+      ) : (
+        <div className="space-y-2">
+          {rows.map((b) => (
+            <div key={b.id} className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
+              <div className="flex items-start gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="truncate text-xs font-semibold text-white">{b.title}</span>
+                    {b.status === "resolved" && <span className="rounded bg-emerald-500/15 px-1 text-[9px] uppercase text-emerald-300">resolved</span>}
+                  </div>
+                  <div className="text-[10px] text-white/40">by {b.reporter_display || b.reporter_name} · {relTime(b.created_at)}</div>
+                  {b.body && <p className="mt-1 whitespace-pre-wrap text-[11px] leading-relaxed text-white/60">{b.body}</p>}
+                  {b.shots.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {b.shots.map((url) => (
+                        <button key={url} onClick={() => setZoom(url)}><img src={url} alt="" className="h-16 w-16 rounded-md border border-white/10 object-cover hover:opacity-80" /></button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  {b.status === "open" ? (
+                    <button onClick={() => bugAdminApi.resolve(b.id).then(load)} title="Mark resolved" className="rounded-lg border border-white/10 p-1.5 text-emerald-300/70 hover:bg-emerald-500/10 hover:text-emerald-300"><CheckCircle2 className="h-3.5 w-3.5" /></button>
+                  ) : (
+                    <button onClick={() => bugAdminApi.reopen(b.id).then(load)} title="Reopen" className="rounded-lg border border-white/10 p-1.5 text-white/40 hover:bg-white/5 hover:text-white"><RotateCcw className="h-3.5 w-3.5" /></button>
+                  )}
+                  <button onClick={() => bugAdminApi.remove(b.id).then(load)} title="Delete" className="rounded-lg border border-white/10 p-1.5 text-white/30 hover:bg-red-500/20 hover:text-red-200"><Trash2 className="h-3.5 w-3.5" /></button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {zoom && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 p-6" onClick={() => setZoom(null)}>
+          <img src={zoom} alt="" className="max-h-full max-w-full rounded-lg" />
         </div>
       )}
     </div>

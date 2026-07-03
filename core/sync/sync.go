@@ -666,6 +666,36 @@ func (m *Manager) SellerReviews(ctx context.Context, sellerID, query string) (st
 	return string(raw), nil
 }
 
+// --- bug reports ---
+
+func (m *Manager) ReportBug(ctx context.Context, body any) (string, error) {
+	var raw json.RawMessage
+	if err := m.call(ctx, http.MethodPost, "/bug-reports", body, &raw); err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
+
+func (m *Manager) BugReports(ctx context.Context, query string) (string, error) {
+	var raw json.RawMessage
+	path := "/admin/bug-reports"
+	if query != "" {
+		path += "?" + query
+	}
+	if err := m.call(ctx, http.MethodGet, path, nil, &raw); err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
+
+func (m *Manager) SetBugStatus(ctx context.Context, id, action string) error {
+	return m.call(ctx, http.MethodPost, "/admin/bug-reports/"+id+"/"+action, nil, nil)
+}
+
+func (m *Manager) DeleteBug(ctx context.Context, id string) error {
+	return m.call(ctx, http.MethodDelete, "/admin/bug-reports/"+id, nil, nil)
+}
+
 // --- inbox ---
 
 func (m *Manager) Inbox(ctx context.Context) (string, error) {

@@ -665,6 +665,27 @@ async function uploadFile<T>(path: string, file: File): Promise<T> {
   return body.data as T;
 }
 
+export interface BugReport {
+  id: number;
+  title: string;
+  body: string;
+  shots: string[];
+  status: string;
+  created_at: string;
+  reporter_name: string;
+  reporter_display: string;
+  reporter_avatar: string;
+}
+export const bugApi = {
+  report: (b: { title: string; body: string; shots: string[] }) => api.post<{ id: number }>("/api/bug-reports", b),
+};
+export const bugAdminApi = {
+  list: (status?: string) => api.get<{ reports: BugReport[]; open: number }>(`/api/admin/bug-reports${status ? `?status=${status}` : ""}`),
+  resolve: (id: number) => api.post<{ ok: boolean }>(`/api/admin/bug-reports/${id}/resolve`, {}),
+  reopen: (id: number) => api.post<{ ok: boolean }>(`/api/admin/bug-reports/${id}/reopen`, {}),
+  remove: (id: number) => api.del<{ ok: boolean }>(`/api/admin/bug-reports/${id}`),
+};
+
 // imageApi uploads a chat/post image and returns its CDN URL.
 export const imageApi = {
   upload: (file: File) => uploadFile<{ url: string }>("/api/upload/image", file),

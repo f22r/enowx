@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { Lock, LogOut, Loader2, Check, RefreshCw, Cloud } from "lucide-react";
+import { Lock, LogOut, Loader2, Check, RefreshCw, Cloud, Bug, ImagePlus, X } from "lucide-react";
 import { AppShell } from "./shell";
 import { Tooltip } from "../components/Tooltip";
 import { useDialog } from "../os/dialog";
-import { authApi, settingsApi, syncApi, type AuthStatus, type Settings } from "../lib/api";
+import { authApi, settingsApi, syncApi, imageApi, bugApi, type AuthStatus, type Settings } from "../lib/api";
 import { useProfile } from "../os/useProfile";
 
 export function SettingsApp() {
@@ -33,6 +33,10 @@ export function SettingsApp() {
         <PasswordCard auth={auth} reload={loadAuth} />
       </Section>
 
+      <Section title="Report a bug">
+        <BugReportCard />
+      </Section>
+
       <Section title="Gateway">
         <div className="space-y-1 text-[11px]">
           <Row k="Version" v={info ? `enx ${info.version}` : "…"} />
@@ -41,6 +45,85 @@ export function SettingsApp() {
         </div>
       </Section>
     </AppShell>
+  );
+}
+
+// BugReportCard lets a signed-in user file a bug with a title, description, and
+// screenshots (file pick or paste). Each image uploads to R2 via imageApi.
+function BugReportCard() {
+  const profile = useProfile();
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  const [shots, setShots] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
+  const [err, setErr] = useState("");
+
+  if (!profile.loggedIn) {
+    return (
+      <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3.5 text-[11px] leading-relaxed text-white/55">
+        Sign in with Discord in the <span className="text-white/80">Profile</span> app to report a bug.
+      </div>
+    );
+  }
+
+  const addImage = async (file: File) => {
+    if (shots.length >= 6) { setErr("Up to 6 screenshots."); return; }
+    setUploading(true); setErr("");
+    try {
+      const r = await imageApi.upload(file);
+      setShots((s) => [...s, r.url]);
+    } catch {
+      setErr("Couldn't upload that image.");
+    } finally { setUploading(false); }
+  };
+
+  const onPaste = (e: React.ClipboardEvent) => {
+    const item = Array.from(e.clipboardData.items).find((i) => i.type.startsWith("image/"));
+    const f = item?.getAsFile();
+    if (f) { e.preventDefault(); addImage(f); }
+  };
+
+  const submit = async () => {
+    if (!title.trim()) { setErr("Please add a title."); return; }
+    setBusy(true); setErr("");
+    try {
+      await bugApi.report({ title: title.trim(), body: body.trim(), shots });
+      setTitle(""); setBody(""); setShots([]);
+      setDone(true); setTimeout(() => setDone(false), 2500);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "couldn't send");
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <div className="space-y-2 rounded-xl border border-white/10 bg-white/[0.03] p-3.5">
+      <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="What went wrong?" className="w-full rounded-md border border-white/10 bg-black/30 px-2.5 py-1.5 text-sm text-white outline-none focus:border-white/25" />
+      <textarea value={body} onChange={(e) => setBody(e.target.value)} onPaste={onPaste} placeholder="Describe the steps to reproduce… (you can paste a screenshot here)" rows={3} className="w-full resize-y rounded-md border border-white/10 bg-black/30 px-2.5 py-1.5 text-xs text-white outline-none focus:border-white/25" />
+
+      {shots.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {shots.map((url, i) => (
+            <div key={url} className="group relative">
+              <img src={url} alt="" className="h-16 w-16 rounded-md border border-white/10 object-cover" />
+              <button onClick={() => setShots((s) => s.filter((_, j) => j !== i))} className="absolute -right-1.5 -top-1.5 rounded-full bg-black/70 p-0.5 text-white/70 hover:text-white"><X className="h-3 w-3" /></button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="flex items-center gap-2">
+        <label className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-white/10 px-2.5 py-1.5 text-[11px] text-white/60 hover:bg-white/5 hover:text-white">
+          {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ImagePlus className="h-3.5 w-3.5" />} Screenshot
+          <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) addImage(f); e.target.value = ""; }} />
+        </label>
+        <button onClick={submit} disabled={busy || !title.trim()} className="ml-auto flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-black hover:opacity-90 disabled:opacity-50">
+          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : done ? <Check className="h-3.5 w-3.5" /> : <Bug className="h-3.5 w-3.5" />} {done ? "Sent — thanks!" : "Send report"}
+        </button>
+      </div>
+      {err && <p className="text-[11px] text-red-300">{err}</p>}
+    </div>
   );
 }
 
