@@ -4,6 +4,15 @@ import { Loader2, Check, Plus, X, Pencil, ImagePlus, Lock } from "lucide-react";
 import { useProfile, refreshProfile } from "../os/useProfile";
 import { profileApi, type ProfileLink } from "../lib/api";
 
+// cleanErr turns a raw thrown error into a friendly, prefix-free message
+// (strips technical "... failed (NNN):" wrappers from the API/proxy layers).
+function cleanErr(e: unknown, fallback: string): string {
+  let m = e instanceof Error ? e.message : "";
+  m = m.replace(/^.*?failed \(\d+\):\s*/i, "").trim(); // drop "upload failed (403): "
+  m = m.replace(/^sync\s+\w+\s+\S+\s+/i, "").trim();
+  return m || fallback;
+}
+
 // Field limits mirror the server (it re-validates; this is just nicer UX).
 const MAX_DISPLAY = 32;
 const MAX_PRONOUNS = 40;
@@ -32,7 +41,8 @@ export function ProfileEditor() {
   const [uploading, setUploading] = useState("");
   const avatarInput = useRef<HTMLInputElement>(null);
   const bannerInput = useRef<HTMLInputElement>(null);
-  const canBanner = profile.has("cloud.sync.full"); // Premium unlocks banners
+  // Banner: Premium unlocks it; staff (moderator/admin) are exempt from perks.
+  const canBanner = profile.has("cloud.sync.full") || !!u?.is_moderator || !!u?.is_admin;
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState("");
@@ -45,7 +55,7 @@ export function ProfileEditor() {
       await profileApi.uploadAvatar(file);
       refreshProfile();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "avatar upload failed");
+      setError(cleanErr(e, "Couldn't upload your avatar."));
     } finally {
       setUploading("");
     }
@@ -58,7 +68,7 @@ export function ProfileEditor() {
       await profileApi.uploadBanner(file);
       refreshProfile();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "banner upload failed");
+      setError(cleanErr(e, "Couldn't upload your banner."));
     } finally {
       setUploading("");
     }

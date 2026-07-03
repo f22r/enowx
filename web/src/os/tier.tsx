@@ -23,6 +23,29 @@ export function tierClass(tier?: NickTier | null): string {
   return `${t.gradient ? " role-gradient" : ""}${t.glow ? " tier-glow" : ""}`;
 }
 
+// TierBadge is the single identity chip for a user's tier. Free shows nothing
+// (the plain white nick already says it); Premium/Moderator/GOD get a colored
+// chip matching the nick gradient.
+const TIER_BADGE: Partial<Record<NickTier, { label: string; c1: string; c2: string }>> = {
+  premium: { label: "PREMIUM", c1: "#ffe08a", c2: "#c8912b" },
+  moderator: { label: "MOD", c1: "#5ab0ff", c2: "#2156c9" },
+  god: { label: "GOD", c1: "#ff5a5a", c2: "#141414" },
+};
+export function TierBadge({ tier }: { tier?: NickTier | null }) {
+  const t = tier && TIER_BADGE[tier];
+  if (!t) return null;
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ring-1 ring-inset ring-white/10"
+      style={{ background: `${t.c1}22` }}
+    >
+      <span className="bg-clip-text text-transparent" style={{ backgroundImage: `linear-gradient(90deg, ${t.c1}, ${t.c2})`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+        {t.label}
+      </span>
+    </span>
+  );
+}
+
 // hexOf converts a decimal Discord color to a #rrggbb string (grey when 0).
 function hexOf(n?: number): string {
   if (!n || n <= 0) return "#8a8f98";

@@ -1,4 +1,4 @@
-import { ShieldCheck, Coins, Link as LinkIcon, Crown, HandCoins, Star } from "lucide-react";
+import { ShieldCheck, Coins, Link as LinkIcon, HandCoins, Star } from "lucide-react";
 
 // cardRelTime formats an ISO timestamp as a short "2h ago".
 function cardRelTime(iso: string): string {
@@ -9,7 +9,7 @@ function cardRelTime(iso: string): string {
   return `${Math.floor(s / 86400)}d ago`;
 }
 import type { TopRole, ProfileLink, Equipped, NickTier, RoleBadge as RoleBadgeInfo } from "../lib/api";
-import { tierVars, tierClass, RoleBadges } from "../os/tier";
+import { tierVars, tierClass, RoleBadges, TierBadge } from "../os/tier";
 
 // CardProfile is the shape the card renders. Both SyncUser (self) and
 // PublicProfile (others) satisfy it, so the card is reused in both places.
@@ -69,8 +69,8 @@ export function ProfileCard({ p, footer, action, compact }: { p: CardProfile; fo
       {/* Banner — equipped preset gradient, else image/gif, else grey. Shorter
           in compact mode (e.g. a popover). */}
       <div
-        className={`relative ${compact ? "h-24" : "h-40"} w-full bg-white/[0.06]`}
-        style={eq?.banner ? { background: eq.banner } : undefined}
+        className={`relative ${compact ? "h-24" : "h-40"} w-full`}
+        style={eq?.banner ? { background: eq.banner } : { backgroundColor: "#26282f" }}
       >
         {!eq?.banner && p.banner_url && <img src={p.banner_url} alt="" className="h-full w-full object-cover" />}
         {action && <div className="absolute right-2 top-2 z-10">{action}</div>}
@@ -126,13 +126,12 @@ export function ProfileCard({ p, footer, action, compact }: { p: CardProfile; fo
         </div>
         {p.pronouns && <p className="text-[11px] text-white/40">{p.pronouns}</p>}
 
-        {/* Badges: all held Discord roles, plus perk badges. */}
+        {/* Badges: the identity tier chip, then held Discord roles + perks. */}
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          <TierBadge tier={p.nick_tier} />
           <RoleBadges roles={p.role_badges} max={8} />
           {p.wears_tag && <TagBadge tag={p.guild_tag} />}
-          {p.is_premium && <PremiumBadge />}
           {p.is_donor && <DonorBadge />}
-          {p.is_moderator && <ModBadge />}
           {eq?.badge && (
             <span className="inline-flex items-center rounded-full bg-fuchsia-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-fuchsia-200 ring-1 ring-inset ring-fuchsia-400/20">
               {eq.badge}
@@ -175,21 +174,6 @@ export function ProfileCard({ p, footer, action, compact }: { p: CardProfile; fo
 
 
 
-function ModBadge() {
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-300 ring-1 ring-inset ring-sky-400/20">
-      <ShieldCheck className="h-3 w-3" /> Mod
-    </span>
-  );
-}
-
-function PremiumBadge() {
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300 ring-1 ring-inset ring-amber-400/30">
-      <Crown className="h-3 w-3" /> Premium
-    </span>
-  );
-}
 
 function DonorBadge() {
   return (
