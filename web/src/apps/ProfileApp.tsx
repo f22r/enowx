@@ -6,6 +6,7 @@ import { SignInGate } from "../components/SignInGate";
 import { subscriptionApi, type SubscriptionStatus, type CouponPreview, type UserHit } from "../lib/api";
 import { AppShell } from "./shell";
 import { useProfile, refreshProfile } from "../os/useProfile";
+import { loadInbox } from "../os/inboxBus";
 import { ProfileEditor } from "./ProfileEditor";
 import { ProfileCard } from "../components/ProfileCard";
 
@@ -131,7 +132,7 @@ function SubscriptionCard() {
         <QrisModal
           pay={pay}
           onClose={() => setPay(null)}
-          onPaid={async () => { setPay(null); await load(); refreshProfile(); }}
+          onPaid={async () => { setPay(null); await load(); refreshProfile(); loadInbox(); }}
         />
       )}
       <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-indigo-300"><Sparkles className="h-3.5 w-3.5" /> Upgrade to Premium</div>
