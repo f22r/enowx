@@ -762,9 +762,12 @@ export interface ModAction {
 export interface AdminStats {
   users: number;
   moderators: number;
+  premium_users: number;
+  free_users: number;
   messages: number;
   posts: number;
   open_flags: number;
+  upgrade_revenue: number; // total paid subscription amount (IDR)
 }
 
 // AdminUser is a user row in the admin user list.

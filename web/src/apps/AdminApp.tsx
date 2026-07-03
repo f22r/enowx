@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { Loader2, Users, Copy, ScrollText, BarChart3, ShieldCheck, ShieldOff, Search, MoreHorizontal, Ban, VolumeX, AlertTriangle, Plus, Minus, Boxes, Trash2, Pencil, RefreshCw, Ticket, Mail, Send, Bug, CheckCircle2, RotateCcw } from "lucide-react";
+import { Loader2, Users, Copy, ScrollText, BarChart3, ShieldCheck, ShieldOff, Search, MoreHorizontal, Ban, VolumeX, AlertTriangle, Plus, Minus, Boxes, Trash2, Pencil, RefreshCw, Ticket, Mail, Send, Bug, CheckCircle2, RotateCcw, Crown, Coins } from "lucide-react";
 import { openProfile } from "../os/profileViewer";
 import { useAdminEvents } from "../os/adminBus";
 import { useProfile } from "../os/useProfile";
@@ -100,12 +100,19 @@ function StatsTab() {
         {!s ? (
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">{[0, 1, 2, 3].map((i) => <div key={i} className="h-16 animate-pulse rounded-xl bg-white/5" />)}</div>
         ) : (
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <StatCard icon={<Users className="h-4 w-4" />} label="Users" value={s.users} accent="text-sky-300" />
-            <StatCard icon={<ShieldCheck className="h-4 w-4" />} label="Moderators" value={s.moderators} accent="text-emerald-300" />
-            <StatCard icon={<ScrollText className="h-4 w-4" />} label="Messages" value={s.messages} accent="text-violet-300" />
-            <StatCard icon={<BarChart3 className="h-4 w-4" />} label="Posts" value={s.posts} accent="text-fuchsia-300" />
-          </div>
+          <>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <StatCard icon={<Users className="h-4 w-4" />} label="Users" value={s.users} accent="text-sky-300" />
+              <StatCard icon={<Crown className="h-4 w-4" />} label="Premium" value={s.premium_users} accent="text-amber-300" />
+              <StatCard icon={<Users className="h-4 w-4" />} label="Free" value={s.free_users} accent="text-white/60" />
+              <StatCard icon={<ShieldCheck className="h-4 w-4" />} label="Moderators" value={s.moderators} accent="text-emerald-300" />
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <StatCard icon={<Coins className="h-4 w-4" />} label="Upgrade revenue" value={`Rp${s.upgrade_revenue.toLocaleString("id-ID")}`} accent="text-emerald-300" />
+              <StatCard icon={<ScrollText className="h-4 w-4" />} label="Messages" value={s.messages} accent="text-violet-300" />
+              <StatCard icon={<BarChart3 className="h-4 w-4" />} label="Posts" value={s.posts} accent="text-fuchsia-300" />
+            </div>
+          </>
         )}
       </div>
 
@@ -148,11 +155,11 @@ function StatsTab() {
   );
 }
 
-function StatCard({ icon, label, value, accent }: { icon: ReactNode; label: string; value: number; accent: string }) {
+function StatCard({ icon, label, value, accent }: { icon: ReactNode; label: string; value: number | string; accent: string }) {
   return (
     <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3">
       <div className={`mb-1 ${accent}`}>{icon}</div>
-      <div className="text-xl font-semibold text-white">{value.toLocaleString()}</div>
+      <div className="text-xl font-semibold text-white">{typeof value === "number" ? value.toLocaleString() : value}</div>
       <div className="text-[11px] text-white/45">{label}</div>
     </div>
   );
