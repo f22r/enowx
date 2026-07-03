@@ -8,6 +8,9 @@ cd "$(dirname "$0")"
 
 export ENOWX_PORT="${ENOWX_PORT:-1431}"
 export ENOWX_VITE_PORT="${ENOWX_VITE_PORT:-5174}"
+# Dev uses its own runtime dir so it never collides with an installed `enx`
+# instance (shared PID file / SQLite DB).
+export ENOWX_RUNTIME_DIR="${ENOWX_RUNTIME_DIR:-$HOME/.enowx-dev}"
 # Dev talks to the staging cloud; the built-in default is production.
 export ENOWX_SYNC_SERVER="${ENOWX_SYNC_SERVER:-https://api-dev.enowxlabs.com}"
 
