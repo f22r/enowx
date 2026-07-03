@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Loader2, Users, Copy, ScrollText, BarChart3, ShieldCheck, ShieldOff, Search, MoreHorizontal, Ban, VolumeX, AlertTriangle, Plus, Minus, Boxes, Trash2, Pencil, RefreshCw, Ticket, Mail, Send, Bug, CheckCircle2, RotateCcw } from "lucide-react";
 import { openProfile } from "../os/profileViewer";
 import { useAdminEvents } from "../os/adminBus";
+import { useProfile } from "../os/useProfile";
 import { useDialog } from "../os/dialog";
 import { FileSearch, X, Store, Check, Puzzle, ShoppingBag } from "lucide-react";
 import { Tooltip } from "../components/Tooltip";
@@ -13,22 +14,25 @@ type Tab = "stats" | "flags" | "users" | "models" | "market" | "store" | "scan" 
 // for moderators (see apps registry), and every endpoint it calls is role-gated
 // server-side — the client gating is only for UX.
 export function AdminApp() {
+  const isAdmin = !!useProfile().user?.is_admin; // GOD; moderators see less
   const [tab, setTab] = useState<Tab>("stats");
-  // Overview on top; the admin tools grouped below.
+  // Overview on top; the admin tools grouped below. `admin` marks tabs that only
+  // the super-admin (GOD) may use — the server enforces it too (403 otherwise).
   const overview = { id: "stats" as Tab, label: "Overview", icon: BarChart3 };
-  const tools: { id: Tab; label: string; icon: typeof Users }[] = [
+  const allTools: { id: Tab; label: string; icon: typeof Users; admin?: boolean }[] = [
     { id: "flags", label: "Duplicates", icon: Copy },
     { id: "users", label: "Users", icon: Users },
-    { id: "models", label: "Models", icon: Boxes },
+    { id: "models", label: "Models", icon: Boxes, admin: true },
     { id: "market", label: "Plugins", icon: Store },
-    { id: "store", label: "Official Store", icon: ShoppingBag },
+    { id: "store", label: "Official Store", icon: ShoppingBag, admin: true },
     { id: "scan", label: "Plugin scan", icon: ShieldCheck },
     { id: "reviews", label: "Review log", icon: FileSearch },
-    { id: "coupons", label: "Coupons", icon: Ticket },
+    { id: "coupons", label: "Coupons", icon: Ticket, admin: true },
     { id: "inbox", label: "Inbox", icon: Mail },
     { id: "bugs", label: "Bug reports", icon: Bug },
     { id: "log", label: "Mod log", icon: ScrollText },
   ];
+  const tools = allTools.filter((t) => isAdmin || !t.admin);
   const NavBtn = ({ t }: { t: { id: Tab; label: string; icon: typeof Users } }) => {
     const Icon = t.icon;
     const on = tab === t.id;
@@ -262,6 +266,7 @@ const MUTE_OPTIONS = [
 // role-gated server-side.
 function UserRow({ u, patch }: { u: AdminUserRow; patch: (id: string, p: Partial<AdminUserRow>) => void }) {
   const dialog = useDialog();
+  const isAdmin = !!useProfile().user?.is_admin; // mod-toggle + kleos are admin-only
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const muted = !!u.muted_until && new Date(u.muted_until).getTime() > Date.now();
@@ -311,7 +316,7 @@ function UserRow({ u, patch }: { u: AdminUserRow; patch: (id: string, p: Partial
       </div>
       {open && (
         <div className="flex flex-wrap gap-1.5 border-t border-white/5 p-2">
-          <ActBtn onClick={toggleMod} tone={u.is_moderator ? "red" : "green"} icon={u.is_moderator ? ShieldOff : ShieldCheck}>{u.is_moderator ? "Revoke mod" : "Make mod"}</ActBtn>
+          {isAdmin && <ActBtn onClick={toggleMod} tone={u.is_moderator ? "red" : "green"} icon={u.is_moderator ? ShieldOff : ShieldCheck}>{u.is_moderator ? "Revoke mod" : "Make mod"}</ActBtn>}
           <ActBtn onClick={toggleBan} tone="red" icon={Ban}>{u.is_banned ? "Unban" : "Ban"}</ActBtn>
           {muted ? (
             <ActBtn onClick={() => mute(0)} tone="amber" icon={VolumeX}>Unmute</ActBtn>
@@ -319,8 +324,8 @@ function UserRow({ u, patch }: { u: AdminUserRow; patch: (id: string, p: Partial
             MUTE_OPTIONS.map((m) => <ActBtn key={m.minutes} onClick={() => mute(m.minutes)} tone="amber" icon={VolumeX}>Mute {m.label}</ActBtn>)
           )}
           <ActBtn onClick={warn} tone="neutral" icon={AlertTriangle}>Warn</ActBtn>
-          <ActBtn onClick={() => kleos(1)} tone="neutral" icon={Plus}>Kleos</ActBtn>
-          <ActBtn onClick={() => kleos(-1)} tone="neutral" icon={Minus}>Kleos</ActBtn>
+          {isAdmin && <ActBtn onClick={() => kleos(1)} tone="neutral" icon={Plus}>Kleos</ActBtn>}
+          {isAdmin && <ActBtn onClick={() => kleos(-1)} tone="neutral" icon={Minus}>Kleos</ActBtn>}
         </div>
       )}
     </div>
