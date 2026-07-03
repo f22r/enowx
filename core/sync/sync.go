@@ -772,6 +772,15 @@ func (m *Manager) Subscription(ctx context.Context) (string, error) {
 	return string(raw), nil
 }
 
+// SubscriptionOrderStatus proxies a poll of a subscription order's status.
+func (m *Manager) SubscriptionOrderStatus(ctx context.Context, ref string) (string, error) {
+	var raw json.RawMessage
+	if err := m.call(ctx, http.MethodGet, "/subscription/order/"+url.PathEscape(ref), nil, &raw); err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
+
 // SubscribePremium starts a Premium payment (optionally with a coupon) and
 // returns the gateway response (pay url, or {free:true}).
 func (m *Manager) SubscribePremium(ctx context.Context, body any) (string, error) {

@@ -514,11 +514,13 @@ export interface CouponPreview {
   discount: number;
   message: string;
 }
+export type SubscribeResult = { order_ref: string; pay_url?: string; qr_string?: string; amount?: number; free?: boolean };
 export const subscriptionApi = {
   status: () => api.get<SubscriptionStatus>("/api/subscription"),
-  subscribe: (coupon?: string) => api.post<{ order_ref: string; pay_url?: string; amount?: number; free?: boolean }>("/api/subscription/subscribe", { coupon: coupon ?? "" }),
+  subscribe: (coupon?: string) => api.post<SubscribeResult>("/api/subscription/subscribe", { coupon: coupon ?? "" }),
   validateCoupon: (code: string) => api.post<CouponPreview>("/api/subscription/validate-coupon", { code }),
-  gift: (username: string) => api.post<{ order_ref: string; pay_url?: string; amount?: number }>("/api/subscription/gift", { username }),
+  gift: (username: string) => api.post<SubscribeResult>("/api/subscription/gift", { username }),
+  orderStatus: (ref: string) => api.get<{ status: string }>(`/api/subscription/order/${encodeURIComponent(ref)}`),
   searchUsers: (q: string) => api.get<{ users: UserHit[] }>(`/api/search-users?q=${encodeURIComponent(q)}`),
 };
 

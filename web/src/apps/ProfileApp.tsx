@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
-import { Loader2, LogOut, Sparkles, Crown, Check, Gift, X, Search } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Loader2, LogOut, Sparkles, Crown, Check, Gift, X, Search, ExternalLink } from "lucide-react";
 import { createPortal } from "react-dom";
+import QRCode from "qrcode";
 import { SignInGate } from "../components/SignInGate";
 import { subscriptionApi, type SubscriptionStatus, type CouponPreview, type UserHit } from "../lib/api";
 import { AppShell } from "./shell";
-import { useProfile } from "../os/useProfile";
+import { useProfile, refreshProfile } from "../os/useProfile";
 import { ProfileEditor } from "./ProfileEditor";
 import { ProfileCard } from "../components/ProfileCard";
 
@@ -72,6 +73,7 @@ function SubscriptionCard() {
   const [coupon, setCoupon] = useState("");
   const [preview, setPreview] = useState<CouponPreview | null>(null);
   const [checking, setChecking] = useState(false);
+  const [pay, setPay] = useState<{ ref: string; qr?: string; url?: string; amount: number } | null>(null);
 
   const load = () => subscriptionApi.status().then(setSub).catch(() => setSub(null));
   useEffect(() => { load(); }, []);
@@ -91,7 +93,8 @@ function SubscriptionCard() {
     try {
       const r = await subscriptionApi.subscribe(coupon.trim() || undefined);
       if (r.free) { await load(); return; } // fully-discounted → premium granted now
-      if (r.pay_url) window.open(r.pay_url, "_blank", "noopener");
+      // Show the QRIS in-app (no new tab); pay_url is a fallback link.
+      setPay({ ref: r.order_ref, qr: r.qr_string, url: r.pay_url, amount: r.amount ?? sub?.price ?? 0 });
     } catch (e) {
       setErr(e instanceof Error ? e.message : "could not start payment");
     } finally { setBusy(false); }
@@ -124,6 +127,13 @@ function SubscriptionCard() {
 
   return (
     <div className="rounded-xl border border-white/10 bg-gradient-to-b from-indigo-500/10 to-transparent p-3.5">
+      {pay && (
+        <QrisModal
+          pay={pay}
+          onClose={() => setPay(null)}
+          onPaid={async () => { setPay(null); await load(); refreshProfile(); }}
+        />
+      )}
       <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-indigo-300"><Sparkles className="h-3.5 w-3.5" /> Upgrade to Premium</div>
       <ul className="mb-3 space-y-1 text-xs text-white/60">
         <li className="flex items-center gap-1.5"><Check className="h-3 w-3 shrink-0 text-emerald-400" /> Full cloud sync (providers, accounts, keys, settings)</li>
@@ -162,6 +172,79 @@ function SubscriptionCard() {
 
       <div className="mt-3 border-t border-white/5 pt-3"><GiftPremium /></div>
     </div>
+  );
+}
+
+// QrisModal shows the QRIS in-app: renders qr_string to a canvas, polls the order
+// status every 3s, and calls onPaid when settled. A fallback link opens Duitku's
+// hosted page if the user can't scan.
+function QrisModal({ pay, onClose, onPaid }: {
+  pay: { ref: string; qr?: string; url?: string; amount: number };
+  onClose: () => void;
+  onPaid: () => void;
+}) {
+  const canvas = useRef<HTMLCanvasElement>(null);
+  const [state, setState] = useState<"pending" | "paid" | "failed">("pending");
+  const idr = (n: number) => "Rp" + n.toLocaleString("id-ID");
+
+  // Draw the QR once we have the payload.
+  useEffect(() => {
+    if (pay.qr && canvas.current) {
+      QRCode.toCanvas(canvas.current, pay.qr, { width: 224, margin: 1 }).catch(() => {});
+    }
+  }, [pay.qr]);
+
+  // Poll payment status until settled or the modal closes.
+  useEffect(() => {
+    let alive = true;
+    const tick = async () => {
+      try {
+        const r = await subscriptionApi.orderStatus(pay.ref);
+        if (!alive) return;
+        if (r.status === "paid") { setState("paid"); setTimeout(onPaid, 900); }
+        else if (r.status === "failed") setState("failed");
+      } catch { /* keep polling */ }
+    };
+    const id = setInterval(tick, 3000);
+    tick();
+    return () => { alive = false; clearInterval(id); };
+  }, [pay.ref]);
+
+  return createPortal(
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
+      <div className="w-full max-w-xs rounded-2xl border border-white/10 bg-[#14161c] p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-3 flex items-center justify-between">
+          <div className="text-sm font-semibold text-white">Scan QRIS</div>
+          <button onClick={onClose} className="rounded-md p-1 text-white/50 hover:bg-white/10 hover:text-white"><X className="h-4 w-4" /></button>
+        </div>
+
+        {state === "paid" ? (
+          <div className="flex flex-col items-center gap-2 py-8">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/15"><Check className="h-7 w-7 text-emerald-400" /></div>
+            <p className="text-sm font-medium text-emerald-300">Pembayaran diterima!</p>
+            <p className="text-[11px] text-white/50">Mengaktifkan Premium…</p>
+          </div>
+        ) : (
+          <>
+            <div className="mx-auto flex w-fit items-center justify-center rounded-xl bg-white p-2">
+              {pay.qr ? <canvas ref={canvas} /> : <div className="flex h-56 w-56 items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-black/40" /></div>}
+            </div>
+            <p className="mt-3 text-center text-lg font-bold text-white">{idr(pay.amount)}</p>
+            <p className="mt-1 flex items-center justify-center gap-1.5 text-center text-[11px] text-white/45">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              {state === "failed" ? <span className="text-red-300">Pembayaran gagal / kedaluwarsa</span> : "Menunggu pembayaran…"}
+            </p>
+            <p className="mt-3 text-center text-[11px] text-white/40">Scan pakai e-wallet / m-banking apa saja (GoPay, OVO, DANA, dll).</p>
+            {pay.url && (
+              <a href={pay.url} target="_blank" rel="noreferrer noopener" className="mt-2 flex items-center justify-center gap-1 text-[11px] text-indigo-300 hover:underline">
+                <ExternalLink className="h-3 w-3" /> Buka halaman pembayaran
+              </a>
+            )}
+          </>
+        )}
+      </div>
+    </div>,
+    document.body,
   );
 }
 

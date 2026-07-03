@@ -35,6 +35,12 @@ func (h *Sync) ValidateCoupon(w http.ResponseWriter, r *http.Request) {
 	proxyJSON(w, out, err)
 }
 
+// SubscriptionOrder proxies polling a subscription order's payment status.
+func (h *Sync) SubscriptionOrder(w http.ResponseWriter, r *http.Request) {
+	out, err := h.mgr.SubscriptionOrderStatus(r.Context(), chi.URLParam(r, "ref"))
+	proxyJSON(w, out, err)
+}
+
 // GiftPremium proxies gifting Premium to another user.
 func (h *Sync) GiftPremium(w http.ResponseWriter, r *http.Request) {
 	out, err := h.mgr.GiftPremium(r.Context(), readBody(r))
