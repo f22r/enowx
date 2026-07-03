@@ -48,7 +48,12 @@ func (h *Terminal) WS(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	c, err := websocket.Accept(w, r, &websocket.AcceptOptions{OriginPatterns: []string{"*"}})
+	// Same-origin only (default when OriginPatterns is unset): the library rejects
+	// a WebSocket whose Origin host differs from the request Host. This blocks
+	// cross-site WebSocket hijacking — a malicious page can't open the localhost
+	// shell — while the app's own UI (localhost or the tunnel host) still works
+	// because its Origin matches the Host.
+	c, err := websocket.Accept(w, r, nil)
 	if err != nil {
 		return
 	}

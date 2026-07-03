@@ -163,11 +163,12 @@ func (d *Dashboard) ClearCookie(w http.ResponseWriter, r *http.Request) {
 }
 
 // Authorized reports whether the request may access the dashboard + its
-// loopback tools: trusted if it comes from localhost, or carries a valid
-// session. Used both by the middleware and directly by the terminal/files
-// handlers (which previously checked loopback only).
+// loopback tools: trusted if it genuinely comes from the same machine (a
+// loopback TCP peer AND not forwarded through the tunnel), or carries a valid
+// session. Used both by the Require middleware and directly by the
+// terminal/files/agent handlers.
 func (d *Dashboard) Authorized(r *http.Request) bool {
-	if IsLoopback(r) {
+	if TrustedLocal(r) {
 		return true
 	}
 	c, err := r.Cookie(sessionCookie)
@@ -175,6 +176,28 @@ func (d *Dashboard) Authorized(r *http.Request) bool {
 		return false
 	}
 	return d.validSession(c.Value)
+}
+
+// bootstrapPaths stay reachable without auth so a first-time REMOTE user can set
+// and enter the dashboard password (otherwise remote access would be impossible
+// to bootstrap). Everything else under /api requires TrustedLocal or a session.
+var bootstrapPaths = map[string]bool{
+	"/api/auth/status": true,
+	"/api/auth/setup":  true,
+	"/api/auth/login":  true,
+}
+
+// Require is middleware that 401s any request that isn't Authorized (trusted
+// local or session), except the login-bootstrap endpoints. Wrap sensitive route
+// groups (e.g. all of /api) with it.
+func (d *Dashboard) Require(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if bootstrapPaths[r.URL.Path] || d.Authorized(r) {
+			next.ServeHTTP(w, r)
+			return
+		}
+		http.Error(w, "dashboard login required (reachable locally, or after signing in)", http.StatusUnauthorized)
+	})
 }
 
 // LoggedIn reports whether the request carries a valid session (ignores
@@ -194,17 +217,34 @@ func isTLS(r *http.Request) bool {
 	return r.Header.Get("X-Forwarded-Proto") == "https"
 }
 
-// IsLoopback reports whether the request originates from localhost (by Host).
-func IsLoopback(r *http.Request) bool {
-	host := r.Host
-	if h, _, err := net.SplitHostPort(r.Host); err == nil {
+// peerIsLoopback reports whether the request's actual TCP peer is a loopback
+// address. Unlike the Host header, RemoteAddr is set by the server from the
+// real connection and cannot be spoofed by the client.
+func peerIsLoopback(r *http.Request) bool {
+	host := r.RemoteAddr
+	if h, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
 		host = h
 	}
-	if host == "localhost" {
-		return true
-	}
-	if ip := net.ParseIP(host); ip != nil {
-		return ip.IsLoopback()
-	}
-	return len(host) >= 4 && host[:4] == "127." || host == "[::1]"
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
+}
+
+// looksForwarded reports whether the request arrived through a reverse proxy /
+// tunnel (cloudflared sets these). Such a request reaches the origin from a
+// loopback connector, so the TCP peer looks local even though the real client
+// is remote — we must NOT trust it as same-machine.
+func looksForwarded(r *http.Request) bool {
+	h := r.Header
+	return h.Get("X-Forwarded-For") != "" ||
+		h.Get("X-Forwarded-Proto") != "" ||
+		h.Get("X-Forwarded-Host") != "" ||
+		h.Get("Cf-Connecting-Ip") != "" ||
+		h.Get("Cf-Ray") != ""
+}
+
+// TrustedLocal reports whether the request genuinely originates on this machine:
+// a loopback TCP peer that did NOT arrive via the tunnel/proxy. Remote requests
+// (including anything through cloudflared) return false and must authenticate.
+func TrustedLocal(r *http.Request) bool {
+	return peerIsLoopback(r) && !looksForwarded(r)
 }

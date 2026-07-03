@@ -110,6 +110,11 @@ func New(addr string, d Deps) *Server {
 	})
 
 	r.Route("/api", func(r chi.Router) {
+		// Gate the whole /api surface: local (same-machine) requests pass; remote
+		// requests (e.g. via the tunnel) require the dashboard session. The
+		// login-bootstrap endpoints (auth status/setup/login) are whitelisted
+		// inside Require so a first-time remote user can still sign in.
+		r.Use(dash.Require)
 		r.Get("/providers", providers.List)
 		r.Get("/filters", filters.List)
 		r.Post("/filters", filters.Add)
@@ -335,38 +340,44 @@ func New(addr string, d Deps) *Server {
 		r.Delete("/music/playlists/{id}/tracks/{videoId}", music.RemoveTrack)
 	})
 
-	// Real PTY shell over WebSocket — loopback-only (guarded in the handler).
-	r.Get("/api/terminal", term.WS)
+	// Privileged surfaces registered outside the /api Route block above still get
+	// the same dashboard gate (local passes; remote needs a session).
+	r.Group(func(r chi.Router) {
+		r.Use(dash.Require)
 
-	// Plugin management (dashboard-gated).
-	r.Route("/api/plugins", func(r chi.Router) {
-		r.Get("/", pluginsH.List)
-		r.Post("/", pluginsH.Create)
-		r.Post("/{id}/start", pluginsH.Start)
-		r.Post("/{id}/stop", pluginsH.Stop)
-		r.Post("/{id}/reveal", pluginsH.Reveal)
-		r.Get("/{id}/icon", pluginsH.Icon)
-		r.Post("/{id}/icon", pluginsH.UploadIcon)
-		r.Get("/{id}/logs", pluginsH.Logs)
-		r.Delete("/{id}", pluginsH.Delete)
-	})
-	// Plugin marketplace (publish/browse/install) + admin scan settings.
-	r.Route("/api/market", func(r chi.Router) {
-		r.Post("/publish", market.Publish)
-		r.Get("/plugins", market.List)
-		r.Post("/install/{id}", market.Install)
-	})
-	r.Get("/api/admin/plugin-scan", market.GetScanSettings)
-	r.Put("/api/admin/plugin-scan", market.SaveScanSettings)
-	r.Get("/api/admin/plugin-reviews", market.Reviews)
-	r.Get("/api/admin/plugin-reviews/{id}", market.ReviewDetail)
-	r.Get("/api/admin/marketplace", market.AdminPlugins)
-	r.Get("/api/admin/marketplace/{id}/source", market.PluginSource)
-	r.Post("/api/admin/marketplace/{id}/{action}", market.SetStatus)
-	r.Delete("/api/admin/marketplace/{id}", market.Takedown)
+		// Real PTY shell over WebSocket.
+		r.Get("/api/terminal", term.WS)
 
-	// Plugin UIs, reverse-proxied to their sidecar (gated in the handler).
-	r.Handle("/plugins/*", pluginsH.PluginProxy())
+		// Plugin management.
+		r.Route("/api/plugins", func(r chi.Router) {
+			r.Get("/", pluginsH.List)
+			r.Post("/", pluginsH.Create)
+			r.Post("/{id}/start", pluginsH.Start)
+			r.Post("/{id}/stop", pluginsH.Stop)
+			r.Post("/{id}/reveal", pluginsH.Reveal)
+			r.Get("/{id}/icon", pluginsH.Icon)
+			r.Post("/{id}/icon", pluginsH.UploadIcon)
+			r.Get("/{id}/logs", pluginsH.Logs)
+			r.Delete("/{id}", pluginsH.Delete)
+		})
+		// Plugin marketplace (publish/browse/install) + admin scan settings.
+		r.Route("/api/market", func(r chi.Router) {
+			r.Post("/publish", market.Publish)
+			r.Get("/plugins", market.List)
+			r.Post("/install/{id}", market.Install)
+		})
+		r.Get("/api/admin/plugin-scan", market.GetScanSettings)
+		r.Put("/api/admin/plugin-scan", market.SaveScanSettings)
+		r.Get("/api/admin/plugin-reviews", market.Reviews)
+		r.Get("/api/admin/plugin-reviews/{id}", market.ReviewDetail)
+		r.Get("/api/admin/marketplace", market.AdminPlugins)
+		r.Get("/api/admin/marketplace/{id}/source", market.PluginSource)
+		r.Post("/api/admin/marketplace/{id}/{action}", market.SetStatus)
+		r.Delete("/api/admin/marketplace/{id}", market.Takedown)
+
+		// Plugin UIs, reverse-proxied to their sidecar.
+		r.Handle("/plugins/*", pluginsH.PluginProxy())
+	})
 
 	// WebOS SPA on the same port (everything not matched above).
 	r.Handle("/*", spaHandler())

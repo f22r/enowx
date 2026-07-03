@@ -20,7 +20,7 @@ func NewAuth(dash *middleware.Dashboard) *Auth { return &Auth{dash: dash} }
 func (h *Auth) Status(w http.ResponseWriter, r *http.Request) {
 	writeData(w, map[string]any{
 		"password_set": h.dash.HasPassword(r.Context()),
-		"loopback":     middleware.IsLoopback(r),
+		"loopback":     middleware.TrustedLocal(r),
 		"logged_in":    h.dash.LoggedIn(r),
 		"authorized":   h.dash.Authorized(r),
 	})
