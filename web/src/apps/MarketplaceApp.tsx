@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Store, ShieldCheck, Plus, X, Search, RefreshCw, Loader2, Trash2, ImagePlus, ArrowLeft, Tag, Handshake, Send, Check, CircleDollarSign, ShoppingCart, ExternalLink, Copy, Wallet, AlertTriangle, Star } from "lucide-react";
 import { marketplaceApi, rekberApi, orderApi, officialApi, payoutApi, reviewApi, type Listing, type ListingCategory, type RekberThread, type RekberMessage, type Order, type OfficialProduct, type RekberOrder, type PayoutAccount } from "../lib/api";
 import { useProfile } from "../os/useProfile";
+import { SignInGate } from "../components/SignInGate";
 import { useImageAttach } from "../os/useImageAttach";
 import { useDialog } from "../os/dialog";
 import { openLightbox } from "../os/lightbox";
@@ -26,10 +27,12 @@ function relTime(iso: string): string {
 }
 
 export function MarketplaceApp() {
+  const rootProfile = useProfile();
   const [view, setView] = useState<View>("browse");
   const [kind, setKind] = useState<Kind>("community");
   const [detail, setDetail] = useState<Listing | null>(null);
   const [creating, setCreating] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [openThread, setOpenThread] = useState<number | null>(null);
   const dialog = useDialog();
 
@@ -55,6 +58,12 @@ export function MarketplaceApp() {
     setCreating(true);
   };
 
+  // Marketplace needs an account (cloud-backed). Gate before firing any request
+  // so logged-out users see a clean sign-in card, not a "token revoked" error.
+  if (!rootProfile.loading && !rootProfile.loggedIn) {
+    return <SignInGate reason="Sign in to browse the marketplace" />;
+  }
+
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center gap-2 border-b border-white/5 px-4 py-2.5">
@@ -75,12 +84,12 @@ export function MarketplaceApp() {
         ) : kind === "official" ? (
           <OfficialStore onBought={() => setView("orders")} />
         ) : (
-          <Feed kind={kind} onOpen={setDetail} onDeal={openDeal} />
+          <Feed kind={kind} refreshKey={refreshKey} onOpen={setDetail} onDeal={openDeal} />
         )}
       </div>
       {/* Details is a modal popup, not a page. */}
       {detail && <ListingDetail listing={detail} onClose={() => setDetail(null)} onDeleted={() => setDetail(null)} onDeal={openDeal} />}
-      {creating && <SellModal onClose={() => setCreating(false)} onCreated={() => setCreating(false)} />}
+      {creating && <SellModal onClose={() => setCreating(false)} onCreated={() => { setCreating(false); setKind("community"); setView("browse"); setRefreshKey((k) => k + 1); }} />}
     </div>
   );
 }
@@ -175,7 +184,7 @@ function PayoutView() {
   );
 }
 
-function Feed({ kind, onOpen, onDeal }: { kind: Kind; onOpen: (l: Listing) => void; onDeal: (threadId: number) => void }) {
+function Feed({ kind, refreshKey, onOpen, onDeal }: { kind: Kind; refreshKey: number; onOpen: (l: Listing) => void; onDeal: (threadId: number) => void }) {
   const [items, setItems] = useState<Listing[] | null>(null);
   const [cats, setCats] = useState<ListingCategory[]>([]);
   const [category, setCategory] = useState("");
@@ -210,7 +219,7 @@ function Feed({ kind, onOpen, onDeal }: { kind: Kind; onOpen: (l: Listing) => vo
       setItems([]);
     }
   }, [kind, category, q]);
-  useEffect(() => { setItems(null); load(); }, [load]);
+  useEffect(() => { setItems(null); load(); }, [load, refreshKey]);
 
   return (
     <div className="p-4">

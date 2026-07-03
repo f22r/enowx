@@ -4,6 +4,8 @@ import { AppShell, Empty } from "./shell";
 import { Tooltip } from "../components/Tooltip";
 import { useDialog } from "../os/dialog";
 import { notifyPluginsChanged } from "../os/pluginBus";
+import { useProfile } from "../os/useProfile";
+import { SignInGate } from "../components/SignInGate";
 import { pluginsApi, marketApi, type PluginManifest, type PluginRuntime, type MarketPlugin } from "../lib/api";
 
 const RUNTIMES = [
@@ -286,6 +288,7 @@ function PluginWindow({ plugin, onClose }: { plugin: PluginManifest; onClose: ()
 
 // Marketplace browses published plugins and installs them locally.
 function Marketplace({ onInstalled }: { onInstalled: () => void }) {
+  const profile = useProfile();
   const [items, setItems] = useState<MarketPlugin[]>([]);
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
@@ -305,7 +308,11 @@ function Marketplace({ onInstalled }: { onInstalled: () => void }) {
       setLoading(false);
     }
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { if (profile.loggedIn) load(); }, [profile.loggedIn]);
+
+  if (!profile.loading && !profile.loggedIn) {
+    return <SignInGate reason="Sign in to browse plugins" />;
+  }
 
   const install = async (p: MarketPlugin) => {
     setBusy(p.id);

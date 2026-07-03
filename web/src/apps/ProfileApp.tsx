@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from "react";
-import { Loader2, LogOut, LogIn, ShieldCheck, Sparkles, Crown, Check, Gift, X, Search } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Loader2, LogOut, Sparkles, Crown, Check, Gift, X, Search } from "lucide-react";
 import { createPortal } from "react-dom";
+import { SignInGate } from "../components/SignInGate";
 import { subscriptionApi, type SubscriptionStatus, type CouponPreview, type UserHit } from "../lib/api";
 import { AppShell } from "./shell";
-import { Tooltip } from "../components/Tooltip";
 import { useProfile } from "../os/useProfile";
 import { ProfileEditor } from "./ProfileEditor";
 import { ProfileCard } from "../components/ProfileCard";
@@ -15,38 +15,6 @@ import { ProfileCard } from "../components/ProfileCard";
 export function ProfileApp() {
   const profile = useProfile();
   const [busy, setBusy] = useState("");
-  const [error, setError] = useState("");
-  const poll = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (poll.current) clearInterval(poll.current);
-    };
-  }, []);
-
-  async function connect() {
-    setError("");
-    setBusy("Opening Discord…");
-    try {
-      const { authorize_url, state } = await profile.startLogin();
-      window.open(authorize_url, "_blank", "noopener");
-      setBusy("Waiting for Discord authorization…");
-      poll.current = setInterval(async () => {
-        try {
-          const done = await profile.pollLogin(state);
-          if (done) {
-            if (poll.current) clearInterval(poll.current);
-            setBusy("");
-          }
-        } catch {
-          /* keep polling */
-        }
-      }, 2000);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "couldn't reach the server");
-      setBusy("");
-    }
-  }
 
   async function logout() {
     setBusy("Signing out…");
@@ -69,7 +37,6 @@ export function ProfileApp() {
 
   return (
     <AppShell title="Profile" subtitle="Your enowx account">
-      {error && <div className="mb-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">{error}</div>}
 
       {profile.loggedIn && profile.user ? (
         <div className="space-y-4">
@@ -90,27 +57,7 @@ export function ProfileApp() {
           </button>
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center py-6 text-center">
-          <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500/30 to-violet-600/30">
-            <ShieldCheck className="h-7 w-7 text-indigo-200" />
-          </div>
-          <h2 className="text-sm font-semibold text-white">Sign in to enowx</h2>
-          <p className="mt-1 max-w-xs text-[11px] leading-relaxed text-white/50">
-            Connect your Discord account to sync across devices and unlock account features. enowx works fine without
-            signing in — login just adds more.
-          </p>
-          <Tooltip label="Sign in with Discord" place="bottom">
-            <button
-              onClick={connect}
-              disabled={!!busy}
-              className="mt-4 flex items-center gap-1.5 rounded-lg bg-[#5865F2] px-4 py-2 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50"
-            >
-              {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LogIn className="h-3.5 w-3.5" />}
-              Connect Discord
-            </button>
-          </Tooltip>
-          {busy && <p className="mt-2 text-[11px] text-white/45">{busy}</p>}
-        </div>
+        <SignInGate reason="Sign in to enowx" />
       )}
     </AppShell>
   );
