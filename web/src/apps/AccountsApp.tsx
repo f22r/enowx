@@ -270,8 +270,11 @@ export function AccountsApp() {
   }
 
   return (
-    <AppShell title="Accounts" subtitle="The credential pool across providers">
-      <div className="flex h-full flex-col">
+    <AppShell title="Accounts" subtitle="The credential pool across providers" flush>
+      {/* flush: AppShell doesn't add its own scroll/padding, so our inner
+          scroll container (scrollRef) is the single bounded viewport the list
+          virtualizer clips against. */}
+      <div className="flex h-full flex-col p-4">
         {/* Search on its own row so it stays full-width; controls below. */}
         <div className="mb-2 flex h-10 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3">
           <Search className="h-4 w-4 shrink-0 text-white/30" />
