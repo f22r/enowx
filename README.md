@@ -1,15 +1,41 @@
-# enx
+<div align="center">
 
-enx is an OpenAI-compatible LLM proxy gateway. It exposes a single endpoint that
-speaks the OpenAI and Anthropic wire formats, normalizes every request into one
-internal representation, and forwards it to the upstream provider you route it
-to. It ships as a single binary that serves the API, the management UI, and the
-account pool on one port.
+# enowX
 
-- Website: https://enowxlabs.com
-- Community: https://discord.gg/enowxlabs
+**A flexible developer workspace in a single binary.**
 
-## Installation
+enowX bundles an AI gateway, a plugin runtime, a built-in terminal and file
+browser, and a small community layer into one local app that runs on a single
+port. Add your own providers, extend it with plugins, and drive it from a clean
+web UI or the `enx` CLI — no external services required.
+
+[Website](https://enowxlabs.com) · [Discord](https://discord.gg/enowxlabs) · [Releases](https://github.com/enowdev/enowx/releases)
+
+</div>
+
+---
+
+## What is enowX?
+
+enowX is a self-hosted **developer workspace**. It started as an
+OpenAI/Anthropic-compatible LLM proxy, and that's still the core, but it has
+grown into a small, extensible desktop-in-a-tab:
+
+- **AI gateway** — one endpoint that speaks the OpenAI and Anthropic wire
+  formats, normalizes every request internally, and routes it to whichever
+  provider you point it at. Pool many accounts, warm them up, and monitor usage.
+- **Plugins** — run your own tools (Go / Node / Python / prebuilt binaries) as
+  sidecars, each with its own UI, and publish/install them from a marketplace.
+- **Built-in tools** — a real PTY terminal, a file browser, an API tester, and
+  an agent toolset, all in the same window.
+- **Community layer** — sign in with Discord for chat, posts, a plugin
+  marketplace, profiles, and optional cloud sync of your setup across devices.
+
+Everything runs from a **single binary** that serves the API, the management UI,
+and the local database on one port. State lives in a pure-Go SQLite database, so
+there are no external dependencies to run it.
+
+## Install
 
 ### Install script
 
@@ -35,7 +61,7 @@ checksum, and installs the `enx` binary (to `/usr/local/bin` on Unix, or
 Prebuilt binaries for Linux, macOS, and Windows (amd64 and arm64) are attached to
 every release on the [Releases page](https://github.com/enowdev/enowx/releases).
 Download the asset for your platform, rename it to `enx` (or `enx.exe` on
-Windows), make it executable, and place it on your `PATH`.
+Windows), make it executable, and put it on your `PATH`.
 
 ### Build from source
 
@@ -48,18 +74,19 @@ make build      # builds the web UI, embeds it, and produces bin/enx
 ./bin/enx
 ```
 
-## Usage
+## Quickstart
 
-Start the gateway:
+Start enowX (it runs in the background by default):
 
 ```sh
 enx
 ```
 
-By default it listens on `127.0.0.1:1430`. Open `http://localhost:1430` for the
-management UI, where you add provider accounts (keys/tokens) to the pool.
+It listens on `127.0.0.1:1430`. Open **http://localhost:1430** for the workspace
+UI. On first launch you set a dashboard password; from there you can add provider
+accounts, install plugins, and (optionally) sign in with Discord.
 
-Once an account is added, send a standard OpenAI request:
+Once a provider account is in the pool, send a standard OpenAI request:
 
 ```sh
 curl http://localhost:1430/v1/chat/completions \
@@ -70,57 +97,90 @@ curl http://localhost:1430/v1/chat/completions \
   }'
 ```
 
-Streaming is supported with `"stream": true` and is returned as OpenAI-style
-server-sent events.
+Streaming works with `"stream": true` and is returned as OpenAI-style
+server-sent events. Anthropic-format requests are accepted at
+`/anthropic/v1/messages`.
+
+## The `enx` CLI
+
+The binary is `enx`; running it with no arguments starts the server. It also has
+a small set of commands for headless / VPS use:
+
+```sh
+enx                   # start the server in the background
+enx start -f          # run in the foreground (this terminal)
+enx stop              # stop the server
+enx restart           # restart it
+enx status            # is it running? pid + address + version
+enx doctor            # environment checklist (runtimes, config, server)
+enx update [--check]  # self-update to the latest release
+enx tunnel start      # expose the dashboard via a public URL (Cloudflare)
+enx tunnel stop       # tear the tunnel down
+enx version           # print the version
+```
+
+On a headless box, `enx start` + `enx tunnel start` prints a public URL; opening
+it prompts you to set the dashboard password on first visit, so remote access is
+gated by default.
+
+## AI gateway
 
 ### Routing
 
 The `model` field selects the upstream provider:
 
-- A `provider/model` prefix routes explicitly, for example `codebuddy/...` or
-  `kiro/...`.
+- A `provider/model` prefix routes explicitly, e.g. `codebuddy/...` or `kiro/...`.
 - Known prefixes route automatically (`kiro-...`, `codebuddy-...`).
 - Anything else falls back to the OpenAI-compatible upstream.
 
-### Configuration
+Inbound OpenAI and Anthropic traffic is normalized into one internal request.
+Outbound, each provider re-encodes only what it needs: providers that already
+speak OpenAI pass through unchanged; providers with their own formats are
+normalized per provider. Providers today include OpenAI-compatible upstreams,
+CodeBuddy (global + CN), Kiro, Codex, Antigravity, Leonardo, and Suno, plus your
+own **custom providers** defined in the UI.
+
+### Endpoints
+
+- `POST /v1/chat/completions` — OpenAI-compatible chat completions.
+- `POST /v1/images/generations` — image generation.
+- `POST /anthropic/v1/messages` — Anthropic-compatible messages.
+- `GET /health` — health check.
+- `GET /api/*` — management API used by the UI.
+- `/` — embedded workspace UI.
+
+## Plugins
+
+Plugins are sidecar apps with their own UI, launched by enowX and reachable at
+`/plugins/<id>/`. They can be written in Go, Node, Python, served as static
+files, or shipped as a **prebuilt binary** (`bin` runtime) so users run them with
+no toolchain installed. Create one from the Plugins app, or install a published
+plugin from the marketplace. Official plugins can ship prebuilt cross-platform
+binaries.
+
+## Configuration
 
 Configuration is read from the environment and an optional `config.json` in the
 runtime directory.
 
-| Variable             | Default            | Description                          |
-| -------------------- | ------------------ | ------------------------------------ |
-| `ENOWX_PORT`         | `1430`             | Listen port.                         |
-| `ENOWX_HOST`         | `127.0.0.1`        | Listen address.                      |
-| `ENOWX_RUNTIME_DIR`  | `~/.enowx`         | Data directory (SQLite database).    |
-| `ENOWX_LOG_LEVEL`    | `info`             | Log verbosity.                       |
+| Variable            | Default     | Description                       |
+| ------------------- | ----------- | --------------------------------- |
+| `ENOWX_PORT`        | `1430`      | Listen port.                      |
+| `ENOWX_HOST`        | `127.0.0.1` | Listen address.                   |
+| `ENOWX_RUNTIME_DIR` | `~/.enowx`  | Data directory (SQLite database). |
+| `ENOWX_LOG_LEVEL`   | `info`      | Log verbosity.                    |
 
 State is stored locally in a pure-Go SQLite database; no external services are
-required to run the gateway.
+required to run enowX.
 
-### Commands
+## Security model
 
-```sh
-enx            # start the gateway
-enx version    # print the version
-```
-
-## Endpoints
-
-- `POST /v1/chat/completions` — OpenAI-compatible chat completions.
-- `GET /health` — health check.
-- `GET /api/*` — management API used by the UI.
-- `/` — embedded management UI.
-
-## Providers
-
-enx normalizes inbound OpenAI and Anthropic traffic into a single internal
-request. Outbound, each provider re-encodes only what it needs: providers that
-already speak OpenAI pass through unchanged, while providers with their own
-formats are normalized per provider. Current providers:
-
-- OpenAI-compatible upstreams
-- CodeBuddy
-- Kiro
+enowX is local-first. The management surface (terminal, file browser, agent, and
+the rest of `/api`) is trusted only from the same machine; any request that
+arrives from elsewhere — e.g. through a tunnel — must carry a valid dashboard
+session, and a session can only exist once you've set a password. The dashboard
+password never leaves your machine, and credentials synced to the cloud are
+end-to-end encrypted (the server only ever sees ciphertext).
 
 ## Development
 
