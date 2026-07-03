@@ -87,7 +87,13 @@ function StatsTab() {
     adminApi.flags().then((r) => setFlags(r.links ?? [])).catch(() => setFlags([]));
     adminApi.log().then((r) => setActions(r.actions ?? [])).catch(() => setActions([]));
   }, []);
-  useEffect(() => load(), [load]);
+  // Load on mount, then auto-refresh so the counters stay current without a
+  // manual reload (they're live DB counts, so a poll keeps them fresh).
+  useEffect(() => {
+    load();
+    const id = setInterval(load, 15000);
+    return () => clearInterval(id);
+  }, [load]);
   useAdminEvents(load);
 
   return (
