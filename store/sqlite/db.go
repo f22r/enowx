@@ -66,7 +66,30 @@ func Open(path string) (*DB, error) {
 	d.filters = &filterStore{db: db}
 	d.proxies = &proxyStore{db: db}
 	seedApiTest(db)
+	backfillApiTest(db)
 	return d, nil
+}
+
+// backfillApiTest adds newer built-in sample requests to an EXISTING Gateway
+// collection (seedApiTest only runs on a fresh DB). Idempotent: it inserts each
+// sample only when a request with that url isn't already present, so users who
+// created the collection before a sample existed still get it.
+func backfillApiTest(db *sql.DB) {
+	var cid int64
+	if err := db.QueryRow(`SELECT id FROM apitest_collections WHERE name = 'Gateway' ORDER BY id LIMIT 1`).Scan(&cid); err != nil {
+		return // no built-in collection (or a totally custom setup) — leave it alone
+	}
+	auth := `{"type":"bearer","token":"{{api_key}}"}`
+	ensureReq := func(name, method, url, auth string, sort int) {
+		var n int
+		db.QueryRow(`SELECT COUNT(*) FROM apitest_requests WHERE collection_id = ? AND url = ?`, cid, url).Scan(&n)
+		if n > 0 {
+			return
+		}
+		db.Exec(`INSERT INTO apitest_requests (collection_id, name, method, base_url, url, body, body_type, auth, sort)
+			 VALUES (?,?,?,?,?,?,?,?,?)`, cid, name, method, "{{base_url}}", url, "", "none", auth, sort)
+	}
+	ensureReq("List models (OpenAI)", "GET", "/v1/models", auth, 7)
 }
 
 // seedApiTest inserts a built-in "Gateway" collection with example requests the
@@ -119,6 +142,7 @@ func seedApiTest(db *sql.DB) {
 	db.Exec(stmt, cid, "Music Status (poll)", "GET", base, "/api/music/generate/status?task_id={{task_id}}", "", "none", "none", 4)
 	db.Exec(stmt, cid, "List accounts", "GET", base, "/api/accounts", "", "none", auth, 5)
 	db.Exec(stmt, cid, "List models", "GET", base, "/api/models", "", "none", auth, 6)
+	db.Exec(stmt, cid, "List models (OpenAI)", "GET", base, "/v1/models", "", "none", auth, 7)
 
 	// Built-in "Local" environment: base_url + api_key (from an existing gateway
 	// key if there is one), so the Gateway samples run out of the box.

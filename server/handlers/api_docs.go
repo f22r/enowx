@@ -101,6 +101,7 @@ var groups = []docGroup{
 		Desc: "OpenAI- and Anthropic-compatible inference, routed to a provider by model id.",
 		Endpoints: []docEndpoint{
 			{Method: "POST", Path: "/v1/chat/completions", Desc: "OpenAI chat completions (streaming or JSON). Model id like 'codebuddy/...' or 'kiro/...' selects the provider.", Params: []docParam{{Name: "model", In: "body", Desc: "model id"}, {Name: "messages", In: "body", Desc: "chat messages"}, {Name: "stream", In: "body", Desc: "stream SSE"}}},
+			{Method: "GET", Path: "/v1/models", Desc: "OpenAI-standard model list ({object:list, data:[{id,object:model,owned_by}]}) with the same prefixed ids chat completions accepts — for external OpenAI-compatible clients."},
 			{Method: "POST", Path: "/anthropic/v1/messages", Desc: "Anthropic Messages API; decoded to the internal request and streamed back as Anthropic SSE."},
 			{Method: "GET", Path: "/health", Desc: "Liveness check; returns {\"status\":\"ok\"}."},
 		},
@@ -155,10 +156,23 @@ var groups = []docGroup{
 		},
 	},
 	{
+		Name: "Proxy pool",
+		Desc: "Outbound proxies that upstream provider requests can be routed through. Add proxies in any format (scheme URLs, host:port:user:pass, ip:port, bulk paste); routing is controlled by the settings (enabled, mode, per-provider whitelist). The pool syncs to the cloud like accounts.",
+		Endpoints: []docEndpoint{
+			{Method: "GET", Path: "/api/proxies", Desc: "List the pool (passwords stripped)."},
+			{Method: "POST", Path: "/api/proxies", Desc: "Add one or many proxies (any format). Returns {added, errors}.", Params: []docParam{{Name: "text", In: "body", Desc: "proxies, one per line for bulk"}}},
+			{Method: "DELETE", Path: "/api/proxies/{id}", Desc: "Delete a proxy.", Params: []docParam{{Name: "id", In: "path", Desc: "proxy id"}}},
+			{Method: "PATCH", Path: "/api/proxies/{id}/enabled", Desc: "Enable/disable a proxy.", Params: []docParam{{Name: "id", In: "path", Desc: "proxy id"}, {Name: "enabled", In: "body", Desc: "true to enable"}}},
+			{Method: "POST", Path: "/api/proxies/{id}/test", Desc: "Probe a proxy (fetches ipify through it); records status + latency.", Params: []docParam{{Name: "id", In: "path", Desc: "proxy id"}}},
+			{Method: "GET", Path: "/api/proxies/settings", Desc: "Routing config: {enabled, mode, providers}."},
+			{Method: "PUT", Path: "/api/proxies/settings", Desc: "Update routing config.", Params: []docParam{{Name: "enabled", In: "body", Desc: "route through the pool"}, {Name: "mode", In: "body", Desc: "rotate|random|sticky"}, {Name: "providers", In: "body", Desc: "provider names to proxy ([] = all)"}}},
+		},
+	},
+	{
 		Name: "Requests & stats",
 		Desc: "Served request history and usage statistics.",
 		Endpoints: []docEndpoint{
-			{Method: "GET", Path: "/api/requests", Desc: "Recent request log rows.", Params: []docParam{{Name: "limit", In: "query", Desc: "max rows"}}},
+			{Method: "GET", Path: "/api/requests", Desc: "Recent request log rows (incl. proxy_used + account_label per request; no request/response bodies).", Params: []docParam{{Name: "limit", In: "query", Desc: "max rows"}}},
 			{Method: "DELETE", Path: "/api/requests", Desc: "Clear all request logs."},
 			{Method: "GET", Path: "/api/requests/summary", Desc: "Today's totals (requests, ok, errors, tokens, avg latency)."},
 			{Method: "GET", Path: "/api/requests/series", Desc: "Time-bucketed series.", Params: []docParam{{Name: "range", In: "query", Desc: "daily|7d|30d|all"}}},
@@ -253,7 +267,7 @@ var groups = []docGroup{
 			{Method: "GET", Path: "/api/files", Desc: "List a directory (loopback only).", Params: []docParam{{Name: "path", In: "query", Desc: "directory (defaults to home)"}}},
 			{Method: "GET", Path: "/api/files/read", Desc: "Read a text file, capped (loopback only).", Params: []docParam{{Name: "path", In: "query", Desc: "file path"}}},
 			{Method: "GET", Path: "/api/files/raw", Desc: "Stream raw file bytes, e.g. for images (loopback only).", Params: []docParam{{Name: "path", In: "query", Desc: "file path"}}},
-			{Method: "GET", Path: "/api/terminal", Desc: "WebSocket PTY shell (loopback only)."},
+			{Method: "GET", Path: "/api/terminal", Desc: "WebSocket PTY shell, keyed by ?id= so a session persists across reconnects (scrollback replayed on reattach). Loopback only.", Params: []docParam{{Name: "id", In: "query", Desc: "terminal/session id (persists the shell)"}}},
 			{Method: "GET", Path: "/api/docs", Desc: "This endpoint catalog (machine-readable)."},
 		},
 	},
