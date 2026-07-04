@@ -20,6 +20,7 @@ const (
 	typeAccount        = "account"
 	typeAPIKey         = "apikey"
 	typeAlias          = "alias"
+	typeProxy          = "proxy"
 )
 
 func shortHash(s string) string {
@@ -30,7 +31,7 @@ func shortHash(s string) string {
 // gatedItemID reports whether a sync item id belongs to a gated (full-sync) type,
 // so tombstoning only touches those (not playlists).
 func gatedItemID(id string) bool {
-	for _, t := range []string{typeCustomProvider, typeAccount, typeAPIKey, typeAlias} {
+	for _, t := range []string{typeCustomProvider, typeAccount, typeAPIKey, typeAlias, typeProxy} {
 		if strings.HasPrefix(id, t+":") {
 			return true
 		}
@@ -124,6 +125,24 @@ func (m *Manager) fullSyncItems(ctx context.Context, out map[string]item) {
 		}
 	}
 
+	// Proxies (encrypted — they carry credentials) — keyed by endpoint identity.
+	if m.proxies != nil && key != nil {
+		if list, err := m.proxies.List(ctx); err == nil {
+			for _, p := range list {
+				raw, _ := json.Marshal(syncProxy{
+					Label: p.Label, Scheme: p.Scheme, Host: p.Host, Port: p.Port,
+					Username: p.Username, Password: p.Password, Enabled: p.Enabled,
+				})
+				payload, nonce, err := seal(key, raw)
+				if err != nil {
+					continue
+				}
+				id := typeProxy + ":" + shortHash(p.Scheme+p.Host+fmt.Sprint(p.Port)+p.Username)
+				out[id] = item{ItemID: id, Type: typeProxy, Version: 1, UpdatedAt: nowMillis(), Encrypted: true, Payload: payload, Nonce: nonce}
+			}
+		}
+	}
+
 	// Model aliases (plaintext) — keyed by alias.
 	if m.aliases != nil {
 		if list, err := m.aliases.List(ctx); err == nil {
@@ -154,6 +173,16 @@ type syncKey struct {
 	Enabled       bool   `json:"enabled"`
 }
 
+type syncProxy struct {
+	Label    string `json:"label"`
+	Scheme   string `json:"scheme"`
+	Host     string `json:"host"`
+	Port     int    `json:"port"`
+	Username string `json:"username"`
+	Password string `json:"password"`
+	Enabled  bool   `json:"enabled"`
+}
+
 // --- apply: pulled items → local rows ---
 
 // applyFullItem applies one non-playlist pulled item. Returns true if handled.
@@ -165,6 +194,8 @@ func (m *Manager) applyFullItem(ctx context.Context, ri item) bool {
 		return m.applyAccount(ctx, ri)
 	case typeAPIKey:
 		return m.applyAPIKey(ctx, ri)
+	case typeProxy:
+		return m.applyProxy(ctx, ri)
 	case typeAlias:
 		return m.applyAlias(ctx, ri)
 	}
@@ -259,6 +290,47 @@ func (m *Manager) applyAccount(ctx context.Context, ri item) bool {
 		}
 	}
 	_, _ = m.accounts.Add(ctx, store.Account{Provider: sa.Provider, Label: sa.Label, Secret: sa.Secret, Creds: sa.Creds, Status: sa.Status, Disabled: sa.Disabled})
+	return true
+}
+
+func (m *Manager) applyProxy(ctx context.Context, ri item) bool {
+	if m.proxies == nil {
+		return false
+	}
+	proxyHash := func(p store.Proxy) string {
+		return shortHash(p.Scheme + p.Host + fmt.Sprint(p.Port) + p.Username)
+	}
+	// Deletion: id is proxy:<hash>. Delete the local proxy whose identity matches.
+	if ri.Deleted {
+		hash := strings.TrimPrefix(ri.ItemID, typeProxy+":")
+		existing, _ := m.proxies.List(ctx)
+		for _, e := range existing {
+			if proxyHash(e) == hash {
+				_ = m.proxies.Delete(ctx, e.ID)
+			}
+		}
+		return true
+	}
+	if !ri.Encrypted {
+		return false
+	}
+	key := m.credKey(ctx)
+	if key == nil {
+		return false
+	}
+	raw, err := open(key, ri.Payload, ri.Nonce)
+	if err != nil {
+		return false
+	}
+	var sp syncProxy
+	if json.Unmarshal(raw, &sp) != nil {
+		return false
+	}
+	// Add upserts on identity, so this is idempotent whether or not it exists.
+	_, _ = m.proxies.Add(ctx, store.Proxy{
+		Label: sp.Label, Scheme: sp.Scheme, Host: sp.Host, Port: sp.Port,
+		Username: sp.Username, Password: sp.Password, Enabled: sp.Enabled,
+	})
 	return true
 }
 

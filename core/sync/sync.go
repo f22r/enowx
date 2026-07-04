@@ -52,6 +52,7 @@ type Manager struct {
 	keys     store.KeyStore
 	aliases  store.AliasStore
 	custom   store.CustomProviderStore
+	proxies  store.ProxyStore
 	// onCustomProvider re-registers a pulled custom provider live (custommgr).
 	onCustomProvider func(store.CustomProvider)
 	onCustomDelete   func(prefix, name string)
@@ -64,8 +65,8 @@ type Manager struct {
 // SetFullSync wires the extra local stores (and a live custom-provider register
 // hook) so the manager can snapshot/apply accounts, keys, aliases, and custom
 // providers. Called once at startup after the stores + custommgr exist.
-func (m *Manager) SetFullSync(a store.AccountStore, k store.KeyStore, al store.AliasStore, cp store.CustomProviderStore, onCP func(store.CustomProvider), onDel func(prefix, name string)) {
-	m.accounts, m.keys, m.aliases, m.custom = a, k, al, cp
+func (m *Manager) SetFullSync(a store.AccountStore, k store.KeyStore, al store.AliasStore, cp store.CustomProviderStore, px store.ProxyStore, onCP func(store.CustomProvider), onDel func(prefix, name string)) {
+	m.accounts, m.keys, m.aliases, m.custom, m.proxies = a, k, al, cp, px
 	m.onCustomProvider, m.onCustomDelete = onCP, onDel
 }
 
