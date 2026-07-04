@@ -114,6 +114,9 @@ function setLastRead(ch: string, id: number) {
 export function markRead() {
   if (messages.length === 0) return;
   const newest = messages[messages.length - 1].id;
+  // Nothing new to mark → don't emit (avoids a re-render feedback loop when a
+  // markRead effect runs repeatedly).
+  if (getLastRead(channel) >= newest && firstUnreadId === 0) return;
   setLastRead(channel, newest);
   emitUnread(); // clear the app-icon badge
   if (firstUnreadId !== 0) {

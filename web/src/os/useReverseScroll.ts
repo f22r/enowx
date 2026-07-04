@@ -96,5 +96,9 @@ export function useReverseScroll(opts: {
     atBottomRef.current = true;
   }, []);
 
-  return { scrollToBottom, reset, atBottom: () => atBottomRef.current };
+  // Stable identity so effects that depend on `atBottom` don't re-run every
+  // render (a fresh arrow each render would loop a markRead effect).
+  const atBottom = useCallback(() => atBottomRef.current, []);
+
+  return { scrollToBottom, reset, atBottom };
 }
