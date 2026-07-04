@@ -1,10 +1,22 @@
 import { useEffect, useState } from "react";
-import { Folder, FileText, ArrowUp, Home, Plus, X } from "lucide-react";
+import { Folder, FileText, ArrowUp, Home, Plus, X, Copy, Check, MoreVertical } from "lucide-react";
 import { AppShell } from "./shell";
 import { filesApi, type DirListing } from "../lib/api";
 import { fileKind } from "../os/fileKind";
 import { FileViewer } from "./FileViewer";
 import { useFileTabs } from "./useFileTabs";
+import { copyText } from "../os/clipboard";
+import { useContextMenu, type MenuItem } from "../os/contextmenu";
+
+// relativeTo returns `full` expressed relative to `home` (e.g. "~/foo/bar"), or
+// the absolute path if it isn't under home.
+function relativeTo(full: string, home: string | undefined): string {
+  if (!home) return full;
+  const h = home.replace(/\/+$/, "");
+  if (full === h) return "~";
+  if (full.startsWith(h + "/")) return "~/" + full.slice(h.length + 1);
+  return full;
+}
 
 const fmtSize = (n: number) =>
   n >= 1 << 20 ? `${(n / (1 << 20)).toFixed(1)} MB` : n >= 1 << 10 ? `${(n / (1 << 10)).toFixed(1)} KB` : `${n} B`;
@@ -83,6 +95,14 @@ function FileBrowser({ path, onPath }: { path: string | null; onPath: (p: string
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [viewing, setViewing] = useState<Viewing | null>(null);
+  const [copiedDir, setCopiedDir] = useState(false);
+  const menu = useContextMenu();
+
+  // Build the copy menu for an entry (or the current dir when full == dir.path).
+  const pathMenu = (full: string): MenuItem[] => [
+    { label: "Copy path", icon: <Copy className="h-3.5 w-3.5" />, onClick: () => copyText(full) },
+    { label: "Copy relative path", icon: <Copy className="h-3.5 w-3.5" />, onClick: () => copyText(relativeTo(full, dir?.home)) },
+  ];
 
   useEffect(() => {
     let alive = true;
@@ -117,9 +137,24 @@ function FileBrowser({ path, onPath }: { path: string | null; onPath: (p: string
         <IconBtn onClick={() => dir?.parent && onPath(dir.parent)} title="Up" disabled={!dir?.parent}>
           <ArrowUp className="h-3.5 w-3.5" />
         </IconBtn>
-        <div className="ml-1 min-w-0 flex-1 truncate rounded-lg border border-white/10 bg-black/20 px-2.5 py-1.5 font-mono text-[11px] text-white/60">
+        <div
+          className="ml-1 min-w-0 flex-1 truncate rounded-lg border border-white/10 bg-black/20 px-2.5 py-1.5 font-mono text-[11px] text-white/60"
+          onContextMenu={(e) => dir && menu.show(e, pathMenu(dir.path))}
+        >
           {dir?.path ?? "…"}
         </div>
+        <IconBtn
+          onClick={() => {
+            if (!dir) return;
+            copyText(dir.path);
+            setCopiedDir(true);
+            setTimeout(() => setCopiedDir(false), 1200);
+          }}
+          title="Copy directory path"
+          disabled={!dir}
+        >
+          {copiedDir ? <Check className="h-3.5 w-3.5 text-emerald-300" /> : <Copy className="h-3.5 w-3.5" />}
+        </IconBtn>
       </div>
 
       {error && <div className="mb-3 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">{error}</div>}
@@ -134,17 +169,26 @@ function FileBrowser({ path, onPath }: { path: string | null; onPath: (p: string
             <div className="h-full divide-y divide-white/5 overflow-auto">
               {dir?.entries.map((e) => {
                 const full = join(dir.path, e.name);
+                const open = () => (e.is_dir ? onPath(full) : setViewing({ path: full, name: e.name, kind: fileKind(e.name) }));
                 return (
-                  <button
+                  <div
                     key={e.name}
-                    onDoubleClick={() => (e.is_dir ? onPath(full) : setViewing({ path: full, name: e.name, kind: fileKind(e.name) }))}
-                    className="flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-xs transition-colors hover:bg-white/[0.04]"
+                    onDoubleClick={open}
+                    onContextMenu={(ev) => menu.show(ev, pathMenu(full))}
+                    className="group/row flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-xs transition-colors hover:bg-white/[0.04]"
                   >
                     {e.is_dir ? <Folder className="h-4 w-4 shrink-0 text-sky-300/80" /> : <FileText className="h-4 w-4 shrink-0 text-white/40" />}
                     <span className="min-w-0 flex-1 truncate text-white/80">{e.name}</span>
                     {!e.is_dir && <span className="shrink-0 tabular-nums text-white/30">{fmtSize(e.size)}</span>}
                     <span className="hidden shrink-0 text-white/25 sm:inline">{e.mod}</span>
-                  </button>
+                    <button
+                      onClick={(ev) => { ev.stopPropagation(); menu.show(ev, pathMenu(full)); }}
+                      title="Actions"
+                      className="-mr-1 shrink-0 rounded p-0.5 text-white/30 opacity-0 transition-opacity hover:bg-white/10 hover:text-white group-hover/row:opacity-100"
+                    >
+                      <MoreVertical className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 );
               })}
             </div>
