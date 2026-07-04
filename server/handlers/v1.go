@@ -11,6 +11,7 @@ import (
 	"github.com/enowdev/enowx/core/convert"
 	"github.com/enowdev/enowx/core/model"
 	"github.com/enowdev/enowx/core/proxy"
+	"github.com/enowdev/enowx/core/transport"
 	"github.com/enowdev/enowx/server/sse"
 	"github.com/enowdev/enowx/store"
 )
@@ -56,9 +57,12 @@ func (h *V1) ChatCompletions(w http.ResponseWriter, r *http.Request) {
 	if req.Model != orig {
 		req.Raw = proxy.RewriteBody(req.Raw, orig, req.Model)
 	}
-	stream, err := h.proxy.Forward(r.Context(), providerName, req)
+	// Attach a trace so the proxy/pool layers can report which account + proxy
+	// actually served this request, for the log.
+	ctx, trace := transport.WithTrace(r.Context())
+	stream, err := h.proxy.Forward(ctx, providerName, req)
 	if err != nil {
-		h.log(providerName, req.Model, "error", start, model.Usage{})
+		h.log(providerName, req.Model, "error", start, model.Usage{}, trace)
 		writeErr(w, http.StatusBadGateway, err.Error())
 		return
 	}
@@ -68,22 +72,27 @@ func (h *V1) ChatCompletions(w http.ResponseWriter, r *http.Request) {
 	} else {
 		writeJSON(w, us)
 	}
-	h.log(providerName, req.Model, "success", start, us.usage)
+	h.log(providerName, req.Model, "success", start, us.usage, trace)
 	chargeKey(r, h.keys, us.usage)
 }
 
-func (h *V1) log(provider, modelID, status string, start time.Time, usage model.Usage) {
+func (h *V1) log(provider, modelID, status string, start time.Time, usage model.Usage, trace *transport.Trace) {
 	if h.logs == nil {
 		return
 	}
-	_ = h.logs.Insert(context.Background(), store.RequestLog{
+	l := store.RequestLog{
 		Provider:  provider,
 		Model:     modelID,
 		Status:    status,
 		InTokens:  usage.PromptTokens,
 		OutTokens: usage.CompletionTokens,
 		LatencyMS: time.Since(start).Milliseconds(),
-	})
+	}
+	if trace != nil {
+		l.ProxyUsed = trace.Proxy
+		l.AccountLabel = trace.Account
+	}
+	_ = h.logs.Insert(context.Background(), l)
 }
 
 func writeJSON(w http.ResponseWriter, s interface{ Recv() (model.Event, error) }) {

@@ -21,15 +21,17 @@ type Account struct {
 
 // RequestLog is one served request record.
 type RequestLog struct {
-	ID        int64
-	Provider  string
-	Model     string
-	Status    string // success | error
-	Source    string // api | warmup
-	InTokens  int64
-	OutTokens int64
-	LatencyMS int64
-	CreatedAt time.Time
+	ID           int64
+	Provider     string
+	Model        string
+	Status       string // success | error
+	Source       string // api | warmup
+	InTokens     int64
+	OutTokens    int64
+	LatencyMS    int64
+	ProxyUsed    string // proxy label if routed through the pool ("" = direct)
+	AccountLabel string // the account that served the request
+	CreatedAt    time.Time
 }
 
 // APIKey is a gateway key that protects /v1 and /anthropic when any exist.

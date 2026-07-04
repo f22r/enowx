@@ -66,6 +66,9 @@ func (p *Proxy) Forward(ctx context.Context, providerName string, req *model.Req
 			return nil, err
 		}
 		tried[acc.ID] = true
+		if t := transport.TraceFrom(ctx); t != nil {
+			t.Account = fmt.Sprintf("#%d", acc.ID)
+		}
 
 		hreq, err := prov.BuildRequest(req, acc)
 		if err != nil {

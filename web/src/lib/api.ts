@@ -369,6 +369,8 @@ export interface RequestRow {
   in_tokens: number;
   out_tokens: number;
   latency_ms: number;
+  proxy_used: string;
+  account_label: string;
   created_at: string;
 }
 

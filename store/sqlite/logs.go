@@ -21,9 +21,9 @@ func (s *logStore) Insert(ctx context.Context, l store.RequestLog) error {
 	defer tx.Rollback()
 
 	if _, err := tx.ExecContext(ctx,
-		`INSERT INTO request_logs (provider, model, status, source, in_tokens, out_tokens, latency_ms)
-		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		l.Provider, l.Model, l.Status, source, l.InTokens, l.OutTokens, l.LatencyMS); err != nil {
+		`INSERT INTO request_logs (provider, model, status, source, in_tokens, out_tokens, latency_ms, proxy_used, account_label)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		l.Provider, l.Model, l.Status, source, l.InTokens, l.OutTokens, l.LatencyMS, l.ProxyUsed, l.AccountLabel); err != nil {
 		return err
 	}
 	// Accumulate the aggregate rollup (survives "clear logs").
@@ -162,7 +162,7 @@ func (s *logStore) Recent(ctx context.Context, limit int) ([]store.RequestLog, e
 		limit = 100
 	}
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, provider, model, status, source, in_tokens, out_tokens, latency_ms, created_at
+		`SELECT id, provider, model, status, source, in_tokens, out_tokens, latency_ms, proxy_used, account_label, created_at
 		 FROM request_logs ORDER BY created_at DESC LIMIT ?`, limit)
 	if err != nil {
 		return nil, err
@@ -171,7 +171,7 @@ func (s *logStore) Recent(ctx context.Context, limit int) ([]store.RequestLog, e
 	var out []store.RequestLog
 	for rows.Next() {
 		var l store.RequestLog
-		if err := rows.Scan(&l.ID, &l.Provider, &l.Model, &l.Status, &l.Source, &l.InTokens, &l.OutTokens, &l.LatencyMS, &l.CreatedAt); err != nil {
+		if err := rows.Scan(&l.ID, &l.Provider, &l.Model, &l.Status, &l.Source, &l.InTokens, &l.OutTokens, &l.LatencyMS, &l.ProxyUsed, &l.AccountLabel, &l.CreatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, l)

@@ -26,6 +26,28 @@ func providerFrom(ctx context.Context) string {
 	return s
 }
 
+// Trace records which account + proxy actually served a request, filled in as
+// the request flows through the layers and read by the handler for logging.
+type Trace struct {
+	Account string // account label the pool picked
+	Proxy   string // proxy label the doer routed through ("" = direct)
+}
+
+type traceKey struct{}
+
+// WithTrace attaches a fresh Trace to the context; the returned *Trace is filled
+// in by the proxy/pool layers during the request and read afterward.
+func WithTrace(ctx context.Context) (context.Context, *Trace) {
+	t := &Trace{}
+	return context.WithValue(ctx, traceKey{}, t), t
+}
+
+// TraceFrom returns the Trace attached to ctx, or nil.
+func TraceFrom(ctx context.Context) *Trace {
+	t, _ := ctx.Value(traceKey{}).(*Trace)
+	return t
+}
+
 // settings keys (mirror handlers/api_proxy.go; kept in sync by value, not import
 // to avoid a server→core dependency).
 const (
@@ -59,9 +81,12 @@ func NewProxyDoer(inner Doer, proxies store.ProxyStore, settings store.SettingsS
 
 func (d *ProxyDoer) Do(r *http.Request) (*http.Response, error) {
 	prov := providerFrom(r.Context())
-	rt, id, ok := d.pick(r.Context(), prov)
+	rt, id, label, ok := d.pick(r.Context(), prov)
 	if !ok {
 		return d.inner.Do(r)
+	}
+	if t := TraceFrom(r.Context()); t != nil {
+		t.Proxy = label
 	}
 	client := &http.Client{Transport: rt}
 	resp, err := client.Do(r)
@@ -78,13 +103,13 @@ func (d *ProxyDoer) Do(r *http.Request) (*http.Response, error) {
 }
 
 // pick decides whether to route `prov` through a proxy and, if so, returns the
-// proxy's transport + id. Returns ok=false to go direct.
-func (d *ProxyDoer) pick(ctx context.Context, prov string) (http.RoundTripper, int64, bool) {
+// proxy's transport, id, and label. Returns ok=false to go direct.
+func (d *ProxyDoer) pick(ctx context.Context, prov string) (http.RoundTripper, int64, string, bool) {
 	if d.proxies == nil || d.settings == nil {
-		return nil, 0, false
+		return nil, 0, "", false
 	}
 	if v, _ := d.settings.Get(ctx, setProxyEnabled); v != "true" {
-		return nil, 0, false
+		return nil, 0, "", false
 	}
 	// Whitelist: empty = all providers; otherwise the target must be listed.
 	if raw, _ := d.settings.Get(ctx, setProxyProviders); raw != "" {
@@ -98,13 +123,13 @@ func (d *ProxyDoer) pick(ctx context.Context, prov string) (http.RoundTripper, i
 				}
 			}
 			if !found {
-				return nil, 0, false
+				return nil, 0, "", false
 			}
 		}
 	}
 	all, err := d.proxies.List(ctx)
 	if err != nil {
-		return nil, 0, false
+		return nil, 0, "", false
 	}
 	live := all[:0]
 	for _, p := range all {
@@ -113,16 +138,16 @@ func (d *ProxyDoer) pick(ctx context.Context, prov string) (http.RoundTripper, i
 		}
 	}
 	if len(live) == 0 {
-		return nil, 0, false
+		return nil, 0, "", false
 	}
 
 	mode, _ := d.settings.Get(ctx, setProxyMode)
 	chosen := d.choose(prov, mode, live)
 	rt, err := d.transportFor(chosen)
 	if err != nil {
-		return nil, 0, false
+		return nil, 0, "", false
 	}
-	return rt, chosen.ID, true
+	return rt, chosen.ID, chosen.Label, true
 }
 
 // choose selects a proxy from the live set per mode (rotate | random | sticky).

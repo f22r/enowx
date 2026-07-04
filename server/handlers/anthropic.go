@@ -9,6 +9,7 @@ import (
 	"github.com/enowdev/enowx/core/convert"
 	"github.com/enowdev/enowx/core/model"
 	"github.com/enowdev/enowx/core/proxy"
+	"github.com/enowdev/enowx/core/transport"
 	"github.com/enowdev/enowx/server/sse"
 	"github.com/enowdev/enowx/store"
 )
@@ -53,28 +54,34 @@ func (h *Anthropic) Messages(w http.ResponseWriter, r *http.Request) {
 	if req.Model != orig {
 		req.Raw = proxy.RewriteBody(req.Raw, orig, req.Model)
 	}
-	stream, err := h.proxy.Forward(r.Context(), providerName, req)
+	ctx, trace := transport.WithTrace(r.Context())
+	stream, err := h.proxy.Forward(ctx, providerName, req)
 	if err != nil {
-		h.log(providerName, req.Model, "error", start, model.Usage{})
+		h.log(providerName, req.Model, "error", start, model.Usage{}, trace)
 		writeErr(w, http.StatusBadGateway, err.Error())
 		return
 	}
 	us := wrapUsage(stream)
 	sse.WriteAnthropic(w, us, req.Model)
-	h.log(providerName, req.Model, "success", start, us.usage)
+	h.log(providerName, req.Model, "success", start, us.usage, trace)
 	chargeKey(r, h.keys, us.usage)
 }
 
-func (h *Anthropic) log(provider, modelID, status string, start time.Time, usage model.Usage) {
+func (h *Anthropic) log(provider, modelID, status string, start time.Time, usage model.Usage, trace *transport.Trace) {
 	if h.logs == nil {
 		return
 	}
-	_ = h.logs.Insert(context.Background(), store.RequestLog{
+	l := store.RequestLog{
 		Provider:  provider,
 		Model:     modelID,
 		Status:    status,
 		InTokens:  usage.PromptTokens,
 		OutTokens: usage.CompletionTokens,
 		LatencyMS: time.Since(start).Milliseconds(),
-	})
+	}
+	if trace != nil {
+		l.ProxyUsed = trace.Proxy
+		l.AccountLabel = trace.Account
+	}
+	_ = h.logs.Insert(context.Background(), l)
 }
