@@ -9,6 +9,7 @@ import { accountsApi, providersApi, aliasesApi, type Account, type Provider, typ
 import { useDialog } from "../os/dialog";
 import { startWarmup, finishWarmup } from "../os/warmupBus";
 import { onUsageStale } from "../os/usageBus";
+import { copyText } from "../os/clipboard";
 
 const STATUS_TONE: Record<string, string> = {
   active: "text-emerald-300 bg-emerald-500/10 ring-emerald-500/30",
@@ -520,7 +521,7 @@ function ModelRow({ m, accountId, aliases, onAddAlias, onRemoveAlias }: { m: Pro
   const [testing, setTesting] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
   const copy = () => {
-    navigator.clipboard?.writeText(m.model_id);
+    copyText(m.model_id);
     setCopied(true);
     setTimeout(() => setCopied(false), 1200);
   };

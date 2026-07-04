@@ -4,6 +4,7 @@ import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { Check, Copy } from "lucide-react";
+import { copyText } from "../os/clipboard";
 
 // AiMarkdown renders full GitHub-flavored markdown for the AI chat: headings,
 // lists (incl. nested + task lists), tables, blockquotes, links, and fenced code
@@ -59,7 +60,7 @@ function CodeBlock({ inline, className, children }: { inline?: boolean; classNam
 function FencedCode({ code, lang }: { code: string; lang?: string }) {
   const [copied, setCopied] = useState(false);
   const copy = () => {
-    navigator.clipboard?.writeText(code);
+    copyText(code);
     setCopied(true);
     setTimeout(() => setCopied(false), 1200);
   };

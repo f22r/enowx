@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { X, ExternalLink, Copy, Check, RefreshCw, Download } from "lucide-react";
 import { ProviderIcon } from "./ProviderIcon";
 import { kiroApi, localApi, type AwsStart, type LocalSource, type Provider } from "../lib/api";
+import { copyText } from "../os/clipboard";
 
 type Tab = "oauth" | "aws" | "refresh" | "manual";
 
@@ -362,7 +363,7 @@ function OAuthTab({ onSaved }: { onSaved: () => void }) {
       <p className="text-xs text-white/50">After approving in the browser, paste the redirect code (from the kiro:// URL).</p>
       <div
         onClick={() => {
-          navigator.clipboard?.writeText(url);
+          copyText(url);
           setCopied(true);
           setTimeout(() => setCopied(false), 1200);
         }}

@@ -51,6 +51,7 @@ async function handleMusicClick(m: MusicShare, dialog: ReturnType<typeof useDial
   }
 }
 import { profileApi, modApi, type ChatMessage, type PublicProfile } from "../lib/api";
+import { copyText } from "../os/clipboard";
 
 interface ReplyTarget {
   id: number;
@@ -356,7 +357,7 @@ function MessageRow({
           )}
         </div>
         <ActBtn label="Reply" onClick={onReply}><Reply className="h-3.5 w-3.5" /></ActBtn>
-        <ActBtn label="Copy" onClick={() => navigator.clipboard?.writeText(m.content)}><Copy className="h-3.5 w-3.5" /></ActBtn>
+        <ActBtn label="Copy" onClick={() => copyText(m.content)}><Copy className="h-3.5 w-3.5" /></ActBtn>
         {mine && (
           <ActBtn label="Edit" onClick={() => { setEditText(m.content); setEditing(true); }}><Pencil className="h-3.5 w-3.5" /></ActBtn>
         )}

@@ -4,6 +4,7 @@ import { AppShell } from "./shell";
 import { Tooltip } from "../components/Tooltip";
 import { useDialog } from "../os/dialog";
 import { useKeys } from "../os/useKeys";
+import { copyText } from "../os/clipboard";
 import { type ApiKey, type NewApiKey } from "../lib/api";
 
 const compact = (n: number) =>
@@ -100,7 +101,7 @@ function KeyCard({ k, onDelete }: { k: ApiKey; onDelete: () => void }) {
           <Tooltip label="Copy key">
             <button
               onClick={() => {
-                navigator.clipboard?.writeText(k.secret);
+                copyText(k.secret);
                 setCopied(true);
                 setTimeout(() => setCopied(false), 1200);
               }}

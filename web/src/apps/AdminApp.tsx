@@ -8,6 +8,7 @@ import { useDialog } from "../os/dialog";
 import { FileSearch, X, Store, Check, Puzzle, ShoppingBag } from "lucide-react";
 import { Tooltip } from "../components/Tooltip";
 import { adminApi, modApi, searchApi, adminVipApi, couponAdminApi, inboxAdminApi, subscriptionApi, bugAdminApi, type FlaggedLink, type ModAction, type AdminStats, type ProviderModel, type PluginReview, type PluginReviewDetail, type AdminMarketPlugin, type VIPProduct, type VIPService, type Coupon, type InboxMessage, type InboxRole, type UserHit, type BugReport, type NickTier } from "../lib/api";
+import { copyText } from "../os/clipboard";
 
 type Tab = "stats" | "flags" | "users" | "models" | "market" | "store" | "scan" | "reviews" | "log" | "coupons" | "inbox" | "bugs";
 
@@ -453,7 +454,7 @@ function ModelsTab() {
                 {m.owned_by && <span>· {m.owned_by}</span>}
                 {ctx(m.max_input) && <span>· in {ctx(m.max_input)}</span>}
                 {ctx(m.max_output) && <span>· out {ctx(m.max_output)}</span>}
-                <button onClick={() => navigator.clipboard?.writeText(m.model_id)} title="Copy id" className="text-white/30 hover:text-white"><Copy className="h-3 w-3" /></button>
+                <button onClick={() => copyText(m.model_id)} title="Copy id" className="text-white/30 hover:text-white"><Copy className="h-3 w-3" /></button>
               </div>
             </div>
             <button onClick={() => edit(m)} className="rounded p-1 text-white/40 hover:bg-white/10 hover:text-white"><Pencil className="h-3.5 w-3.5" /></button>

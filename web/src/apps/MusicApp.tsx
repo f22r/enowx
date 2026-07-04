@@ -28,6 +28,7 @@ import { musicApi, chatApi, type Track, type Playlist, type MusicShare } from ".
 import { useMusic, playInContext, playList, playFromQueue, enqueue, toggle, currentTrack, removeFromQueue, clearQueue } from "../os/musicBus";
 import { usedPlaylists } from "../os/musicPlaylists";
 import { useDiscover } from "../os/musicDiscover";
+import { copyText } from "../os/clipboard";
 
 type Tab = "home" | "playlists" | "queue";
 
@@ -342,7 +343,7 @@ function PlaylistDetail({ id, onBack }: { id: number; onBack: () => void }) {
   async function onShare() {
     try {
       const data = await musicApi.exportPlaylist(id);
-      await navigator.clipboard.writeText(JSON.stringify(data));
+      await copyText(JSON.stringify(data));
       await dialog.alert({
         title: "Playlist exported",
         message: `The playlist JSON (share code ${data.share_code}) was copied to your clipboard. Import it on another enowx instance.`,

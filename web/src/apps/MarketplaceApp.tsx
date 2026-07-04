@@ -9,6 +9,7 @@ import { openLightbox } from "../os/lightbox";
 import { openProfile } from "../os/profileViewer";
 import { useMarketplaceNav, consumeMarketplaceThread } from "../os/marketplaceNav";
 import { subscribeLive } from "../os/liveBus";
+import { copyText } from "../os/clipboard";
 
 type Kind = "community" | "official";
 type View = "browse" | "mine" | "deals" | "orders" | "payout";
@@ -854,7 +855,7 @@ function OrdersView() {
     return () => clearInterval(iv);
   }, [orders, load]);
 
-  const copy = (s: string) => { navigator.clipboard?.writeText(s); };
+  const copy = (s: string) => { copyText(s); };
 
   const badge = (s: string) => s === "delivered" ? "bg-emerald-500/20 text-emerald-300" : s === "pending" ? "bg-amber-500/20 text-amber-300" : "bg-red-500/20 text-red-300";
 

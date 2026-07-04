@@ -7,6 +7,7 @@ import { usePersisted } from "../os/usePersisted";
 import { useTunnel } from "../os/useTunnel";
 import { useKeys } from "../os/useKeys";
 import { tunnelApi } from "../lib/api";
+import { copyText } from "../os/clipboard";
 
 type Mode = "quick" | "named";
 
@@ -107,7 +108,7 @@ export function TunnelApp() {
 
   async function copyUrl() {
     try {
-      await navigator.clipboard.writeText(url);
+      await copyText(url);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {

@@ -32,6 +32,7 @@ import { Sparkline } from "../components/Sparkline";
 import { useKeys } from "./useKeys";
 import { useDialog } from "./dialog";
 import type { AppId } from "./types";
+import { copyText } from "./clipboard";
 
 const fmt = (n: number) => new Intl.NumberFormat().format(n);
 
@@ -272,7 +273,7 @@ function KeyRow({ apiKey }: { apiKey: ApiKey }) {
         <button
           onClick={(e) => {
             e.stopPropagation();
-            navigator.clipboard?.writeText(apiKey.secret);
+            copyText(apiKey.secret);
             setCopied(true);
             setTimeout(() => setCopied(false), 1200);
           }}
@@ -389,7 +390,7 @@ function CopyRow({ label, value }: { label: string; value: string }) {
     <div
       onClick={(e) => {
         e.stopPropagation();
-        navigator.clipboard?.writeText(value);
+        copyText(value);
         setCopied(true);
         setTimeout(() => setCopied(false), 1200);
       }}

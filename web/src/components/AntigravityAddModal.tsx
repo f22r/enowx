@@ -2,6 +2,7 @@ import { useState } from "react";
 import { X, ExternalLink, Copy, Check } from "lucide-react";
 import { ProviderIcon } from "./ProviderIcon";
 import { antigravityApi, type Provider } from "../lib/api";
+import { copyText } from "../os/clipboard";
 
 type Tab = "oauth" | "manual";
 const TABS: { id: Tab; label: string }[] = [
@@ -96,7 +97,7 @@ function OAuthTab({ onSaved }: { onSaved: () => void }) {
       <a href={url} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs text-white/70 hover:border-white/25">
         Open login again <ExternalLink className="h-3.5 w-3.5" />
       </a>
-      <div onClick={() => { navigator.clipboard?.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 1200); }} className="flex cursor-pointer items-center justify-between gap-2 rounded-lg border border-white/10 bg-black/30 px-3 py-2">
+      <div onClick={() => { copyText(url); setCopied(true); setTimeout(() => setCopied(false), 1200); }} className="flex cursor-pointer items-center justify-between gap-2 rounded-lg border border-white/10 bg-black/30 px-3 py-2">
         <span className="truncate font-mono text-[11px] text-white/60">{url}</span>
         {copied ? <Check className="h-3.5 w-3.5 text-emerald-300" /> : <Copy className="h-3.5 w-3.5 text-white/40" />}
       </div>
