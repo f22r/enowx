@@ -24,7 +24,7 @@ export function TerminalLayer({
         const visible = t.location === "center" ? t.id === activeCenter : true;
         return createPortal(
           <div className={`absolute inset-0 ${visible ? "" : "hidden"}`}>
-            <TerminalView />
+            <TerminalView sessionId={t.id} />
           </div>,
           host,
           `term-${t.id}`,

@@ -3,8 +3,10 @@ import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 
-// TerminalView attaches xterm.js to the PTY WebSocket at /api/terminal.
-export function TerminalView() {
+// TerminalView attaches xterm.js to the PTY WebSocket at /api/terminal. The
+// sessionId keys a server-side PTY that survives refreshes: on reconnect the
+// server replays this session's scrollback so the shell resumes as it was.
+export function TerminalView({ sessionId }: { sessionId: number }) {
   const host = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -29,7 +31,7 @@ export function TerminalView() {
     fit.fit();
 
     const proto = window.location.protocol === "https:" ? "wss" : "ws";
-    const ws = new WebSocket(`${proto}://${window.location.host}/api/terminal`);
+    const ws = new WebSocket(`${proto}://${window.location.host}/api/terminal?id=${sessionId}`);
     ws.binaryType = "arraybuffer";
 
     const sendResize = () => {
@@ -39,7 +41,9 @@ export function TerminalView() {
     };
 
     ws.onopen = () => {
-      term.writeln("\x1b[32mconnected to enx shell\x1b[0m");
+      // No banner: the server replays this session's scrollback on reconnect, so
+      // the shell's own prompt/history is the signal that it's live. A banner
+      // would print above the replayed history and look out of place.
       sendResize();
     };
     ws.onmessage = (e) => {
@@ -66,7 +70,7 @@ export function TerminalView() {
       ws.close();
       term.dispose();
     };
-  }, []);
+  }, [sessionId]);
 
   return (
     <div className="h-full w-full overflow-hidden bg-[#0b0c10] p-2">
