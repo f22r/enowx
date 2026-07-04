@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { Loader2, Users, Copy, ScrollText, BarChart3, ShieldCheck, ShieldOff, Search, MoreHorizontal, Ban, VolumeX, AlertTriangle, Plus, Minus, Boxes, Trash2, Pencil, RefreshCw, Ticket, Mail, Send, Bug, CheckCircle2, RotateCcw, Crown, Coins } from "lucide-react";
+import { Loader2, Users, Copy, ScrollText, BarChart3, ShieldCheck, ShieldOff, Search, MoreHorizontal, Ban, VolumeX, AlertTriangle, Plus, Minus, Boxes, Trash2, Pencil, RefreshCw, Ticket, Mail, Send, Bug, CheckCircle2, RotateCcw, Crown, Coins, Gift } from "lucide-react";
 import { openProfile } from "../os/profileViewer";
 import { tierClass, tierVars } from "../os/tier";
 import { useAdminEvents } from "../os/adminBus";
@@ -7,10 +7,10 @@ import { useProfile } from "../os/useProfile";
 import { useDialog } from "../os/dialog";
 import { FileSearch, X, Store, Check, Puzzle, ShoppingBag } from "lucide-react";
 import { Tooltip } from "../components/Tooltip";
-import { adminApi, modApi, searchApi, adminVipApi, couponAdminApi, inboxAdminApi, subscriptionApi, bugAdminApi, type FlaggedLink, type ModAction, type AdminStats, type ProviderModel, type PluginReview, type PluginReviewDetail, type AdminMarketPlugin, type VIPProduct, type VIPService, type Coupon, type InboxMessage, type InboxRole, type UserHit, type BugReport, type NickTier } from "../lib/api";
+import { adminApi, modApi, searchApi, adminVipApi, couponAdminApi, redeemAdminApi, inboxAdminApi, subscriptionApi, bugAdminApi, type FlaggedLink, type ModAction, type AdminStats, type ProviderModel, type PluginReview, type PluginReviewDetail, type AdminMarketPlugin, type VIPProduct, type VIPService, type Coupon, type RedeemCode, type InboxMessage, type InboxRole, type UserHit, type BugReport, type NickTier } from "../lib/api";
 import { copyText } from "../os/clipboard";
 
-type Tab = "stats" | "flags" | "users" | "models" | "market" | "store" | "scan" | "reviews" | "log" | "coupons" | "inbox" | "bugs";
+type Tab = "stats" | "flags" | "users" | "models" | "market" | "store" | "scan" | "reviews" | "log" | "coupons" | "redeem" | "inbox" | "bugs";
 
 // AdminApp is the moderator-only Admin Tools app. It only appears in the dock
 // for moderators (see apps registry), and every endpoint it calls is role-gated
@@ -30,6 +30,7 @@ export function AdminApp() {
     { id: "scan", label: "Plugin scan", icon: ShieldCheck },
     { id: "reviews", label: "Review log", icon: FileSearch },
     { id: "coupons", label: "Coupons", icon: Ticket, admin: true },
+    { id: "redeem", label: "Redeem codes", icon: Gift, admin: true },
     { id: "inbox", label: "Inbox", icon: Mail },
     { id: "bugs", label: "Bug reports", icon: Bug },
     { id: "log", label: "Mod log", icon: ScrollText },
@@ -72,6 +73,7 @@ export function AdminApp() {
         {tab === "scan" && <PluginScanTab />}
         {tab === "reviews" && <ReviewLogTab />}
         {tab === "coupons" && <CouponsTab />}
+        {tab === "redeem" && <RedeemCodesTab />}
         {tab === "inbox" && <InboxTab />}
         {tab === "bugs" && <BugReportsTab />}
         {tab === "log" && <LogTab />}
@@ -956,6 +958,92 @@ function CouponsTab() {
               <span className="text-white/40">{c.used_count}{c.max_uses ? `/${c.max_uses}` : ""} used</span>
               {!c.active && <span className="rounded bg-white/10 px-1 text-[9px] uppercase text-white/40">inactive</span>}
               <button onClick={() => couponAdminApi.remove(c.id).then(load)} className="ml-auto text-white/30 hover:text-red-300"><Trash2 className="h-3.5 w-3.5" /></button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// RedeemCodesTab mints codes that grant Premium directly (no payment).
+function RedeemCodesTab() {
+  const [rows, setRows] = useState<RedeemCode[] | null>(null);
+  const [code, setCode] = useState("");
+  const [days, setDays] = useState("30");
+  const [maxUses, setMaxUses] = useState("");
+  const [expires, setExpires] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+
+  const load = () => redeemAdminApi.list().then((r) => setRows(r.codes ?? [])).catch(() => setRows([]));
+  useEffect(() => { load(); }, []);
+
+  const randomCode = () => setCode(Array.from({ length: 10 }, () => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.floor(Math.random() * 32)]).join(""));
+
+  const create = async () => {
+    if (!code.trim() || !days.trim()) { setErr("Code and days are required."); return; }
+    setBusy(true); setErr("");
+    try {
+      await redeemAdminApi.create({
+        code: code.trim().toUpperCase(),
+        premium_days: Number(days),
+        max_uses: maxUses.trim() ? Number(maxUses) : null,
+        expires_at: expires ? new Date(expires).toISOString() : undefined,
+      });
+      setCode(""); setMaxUses(""); setExpires("");
+      await load();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "failed");
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <div>
+      <h2 className="mb-3 text-sm font-bold text-white">Redeem codes</h2>
+      <p className="mb-3 text-[11px] text-white/40">Codes grant Premium directly (no payment). A user can redeem a code once; max uses caps total redemptions.</p>
+      <div className="mb-4 flex flex-wrap items-end gap-2 rounded-xl border border-white/10 bg-white/[0.02] p-3">
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] uppercase text-white/35">Code</label>
+          <div className="flex gap-1">
+            <input value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="PREMIUM30" className="w-36 rounded-md border border-white/10 bg-black/30 px-2 py-1.5 font-mono text-xs uppercase text-white outline-none focus:border-white/25" />
+            <button onClick={randomCode} title="Random" className="rounded-md border border-white/10 bg-white/5 px-2 text-white/50 hover:bg-white/10 hover:text-white"><RefreshCw className="h-3.5 w-3.5" /></button>
+          </div>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] uppercase text-white/35">Premium days</label>
+          <input value={days} onChange={(e) => setDays(e.target.value.replace(/\D/g, ""))} placeholder="30" className="w-20 rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-xs text-white outline-none focus:border-white/25" />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] uppercase text-white/35">Max uses (opt)</label>
+          <input value={maxUses} onChange={(e) => setMaxUses(e.target.value.replace(/\D/g, ""))} placeholder="∞" className="w-20 rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-xs text-white outline-none focus:border-white/25" />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-[10px] uppercase text-white/35">Expires (opt)</label>
+          <input type="date" value={expires} onChange={(e) => setExpires(e.target.value)} className="rounded-md border border-white/10 bg-black/30 px-2 py-1.5 text-xs text-white outline-none focus:border-white/25" />
+        </div>
+        <button onClick={create} disabled={busy} className="flex items-center gap-1 rounded-md bg-white px-3 py-1.5 text-xs font-medium text-black hover:opacity-90 disabled:opacity-50">
+          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />} Create
+        </button>
+      </div>
+      {err && <div className="mb-3 text-xs text-red-300">{err}</div>}
+
+      {!rows ? (
+        <div className="flex justify-center py-8"><Loader2 className="h-4 w-4 animate-spin text-white/40" /></div>
+      ) : rows.length === 0 ? (
+        <div className="rounded-lg border border-white/10 bg-white/[0.02] p-4 text-center text-xs text-white/40">No redeem codes yet.</div>
+      ) : (
+        <div className="space-y-1.5">
+          {rows.map((c) => (
+            <div key={c.id} className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 text-xs">
+              <button onClick={() => copyText(c.code)} title="Copy code" className="flex items-center gap-1 font-mono font-semibold text-white hover:text-cyan-300">
+                {c.code} <Copy className="h-3 w-3 text-white/30" />
+              </button>
+              <span className="text-emerald-300">{c.premium_days}d Premium</span>
+              <span className="text-white/40">{c.used_count}{c.max_uses ? `/${c.max_uses}` : ""} used</span>
+              {c.expires_at && <span className="text-white/35">exp {new Date(c.expires_at).toLocaleDateString()}</span>}
+              {!c.active && <span className="rounded bg-white/10 px-1 text-[9px] uppercase text-white/40">inactive</span>}
+              <button onClick={() => redeemAdminApi.remove(c.id).then(load)} className="ml-auto text-white/30 hover:text-red-300"><Trash2 className="h-3.5 w-3.5" /></button>
             </div>
           ))}
         </div>

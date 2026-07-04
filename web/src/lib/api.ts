@@ -590,8 +590,24 @@ export const subscriptionApi = {
   subscribe: (coupon?: string) => api.post<SubscribeResult>("/api/subscription/subscribe", { coupon: coupon ?? "" }),
   validateCoupon: (code: string) => api.post<CouponPreview>("/api/subscription/validate-coupon", { code }),
   gift: (username: string) => api.post<SubscribeResult>("/api/subscription/gift", { username }),
+  redeem: (code: string) => api.post<{ ok: boolean; premium_days: number; premium_until?: string }>("/api/subscription/redeem", { code }),
   orderStatus: (ref: string) => api.get<{ status: string }>(`/api/subscription/order/${encodeURIComponent(ref)}`),
   searchUsers: (q: string) => api.get<{ users: UserHit[] }>(`/api/search-users?q=${encodeURIComponent(q)}`),
+};
+
+export interface RedeemCode {
+  id: number;
+  code: string;
+  premium_days: number;
+  max_uses: number | null;
+  used_count: number;
+  expires_at: string | null;
+  active: boolean;
+}
+export const redeemAdminApi = {
+  list: () => api.get<{ codes: RedeemCode[] }>("/api/admin/redeem-codes"),
+  create: (c: { code: string; premium_days: number; max_uses?: number | null; expires_at?: string }) => api.post<{ id: number }>("/api/admin/redeem-codes", c),
+  remove: (id: number) => api.del<{ ok: boolean }>(`/api/admin/redeem-codes/${id}`),
 };
 
 export interface UserHit {

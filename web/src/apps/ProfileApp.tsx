@@ -118,6 +118,7 @@ function SubscriptionCard() {
           <p className="text-xs text-white/60">You're Premium — full access to cloud features.</p>
           {sub.premium_until && <p className="mt-1 text-[11px] text-white/40">Expires {fmtDate(sub.premium_until)}</p>}
         </div>
+        <RedeemPremium onRedeemed={load} />
         <GiftPremium />
       </div>
     );
@@ -171,7 +172,47 @@ function SubscriptionCard() {
       {!sub.pay_enabled && !isFree && <p className="mt-1.5 text-[11px] text-white/35">Payment is not configured yet — use a coupon.</p>}
       {err && <p className="mt-1.5 text-[11px] text-red-300">{err}</p>}
 
+      <div className="mt-3 border-t border-white/5 pt-3"><RedeemPremium onRedeemed={load} /></div>
       <div className="mt-3 border-t border-white/5 pt-3"><GiftPremium /></div>
+    </div>
+  );
+}
+
+// RedeemPremium lets a user enter a redeem code to get Premium directly.
+function RedeemPremium({ onRedeemed }: { onRedeemed: () => void }) {
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const redeem = async () => {
+    if (!code.trim() || busy) return;
+    setBusy(true); setMsg(null);
+    try {
+      const r = await subscriptionApi.redeem(code.trim());
+      setMsg({ ok: true, text: `Redeemed! +${r.premium_days} days of Premium.` });
+      setCode("");
+      onRedeemed();
+    } catch (e) {
+      setMsg({ ok: false, text: e instanceof Error ? e.message : "invalid code" });
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <div>
+      <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-white/40">Redeem a code</p>
+      <div className="flex gap-1.5">
+        <input
+          value={code}
+          onChange={(e) => setCode(e.target.value.toUpperCase())}
+          onKeyDown={(e) => e.key === "Enter" && redeem()}
+          placeholder="Enter code"
+          className="min-w-0 flex-1 rounded-lg border border-white/10 bg-black/25 px-2.5 py-1.5 font-mono text-xs uppercase tracking-wide text-white/80 outline-none focus:border-white/25"
+        />
+        <button onClick={redeem} disabled={busy || !code.trim()} className="flex items-center gap-1 rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-black hover:opacity-90 disabled:opacity-40">
+          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Redeem"}
+        </button>
+      </div>
+      {msg && <p className={`mt-1.5 text-[11px] ${msg.ok ? "text-emerald-300" : "text-red-300"}`}>{msg.text}</p>}
     </div>
   );
 }

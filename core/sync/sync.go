@@ -845,6 +845,37 @@ func (m *Manager) DeleteCoupon(ctx context.Context, id string) error {
 	return m.call(ctx, http.MethodDelete, "/admin/coupons/"+id, nil, nil)
 }
 
+// --- redeem codes ---
+
+// RedeemCode redeems a premium code for the current user.
+func (m *Manager) RedeemCode(ctx context.Context, body any) (string, error) {
+	var raw json.RawMessage
+	if err := m.call(ctx, http.MethodPost, "/subscription/redeem", body, &raw); err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
+
+func (m *Manager) AdminRedeemCodes(ctx context.Context) (string, error) {
+	var raw json.RawMessage
+	if err := m.call(ctx, http.MethodGet, "/admin/redeem-codes", nil, &raw); err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
+
+func (m *Manager) CreateRedeemCode(ctx context.Context, body any) (string, error) {
+	var raw json.RawMessage
+	if err := m.call(ctx, http.MethodPost, "/admin/redeem-codes", body, &raw); err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
+
+func (m *Manager) DeleteRedeemCode(ctx context.Context, id string) error {
+	return m.call(ctx, http.MethodDelete, "/admin/redeem-codes/"+id, nil, nil)
+}
+
 // --- community filter templates ---
 
 // CommunityFilterTemplates browses the public template list.

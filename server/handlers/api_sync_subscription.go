@@ -69,3 +69,23 @@ func (h *Sync) DeleteCoupon(w http.ResponseWriter, r *http.Request) {
 	err := h.mgr.DeleteCoupon(r.Context(), chi.URLParam(r, "id"))
 	proxyJSON(w, "{\"ok\":true}", err)
 }
+
+func (h *Sync) Redeem(w http.ResponseWriter, r *http.Request) {
+	out, err := h.mgr.RedeemCode(r.Context(), readBody(r))
+	proxyJSON(w, out, err)
+}
+
+func (h *Sync) AdminRedeemCodes(w http.ResponseWriter, r *http.Request) {
+	out, err := h.mgr.AdminRedeemCodes(r.Context())
+	proxyJSON(w, out, err)
+}
+
+func (h *Sync) CreateRedeemCode(w http.ResponseWriter, r *http.Request) {
+	out, err := h.mgr.CreateRedeemCode(r.Context(), readBody(r))
+	proxyJSON(w, out, err)
+}
+
+func (h *Sync) DeleteRedeemCode(w http.ResponseWriter, r *http.Request) {
+	err := h.mgr.DeleteRedeemCode(r.Context(), chi.URLParam(r, "id"))
+	proxyJSON(w, "{\"ok\":true}", err)
+}
