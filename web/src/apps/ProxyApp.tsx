@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, Trash2, Wifi, Loader2, Power, RefreshCw, Globe2 } from "lucide-react";
+import { Plus, Trash2, Wifi, Loader2, Power, RefreshCw, Globe2, X } from "lucide-react";
 import { AppShell } from "./shell";
 import { proxyApi, providersApi, type ProxyItem, type ProxySettings, type Provider } from "../lib/api";
 
@@ -9,10 +9,8 @@ export function ProxyApp() {
   const [proxies, setProxies] = useState<ProxyItem[] | null>(null);
   const [settings, setSettings] = useState<ProxySettings | null>(null);
   const [providers, setProviders] = useState<Provider[]>([]);
-  const [draft, setDraft] = useState("");
-  const [adding, setAdding] = useState(false);
+  const [showAdd, setShowAdd] = useState(false);
   const [busy, setBusy] = useState<number | null>(null);
-  const [error, setError] = useState("");
 
   const load = () => {
     proxyApi.list().then((r) => setProxies(r.proxies)).catch(() => setProxies([]));
@@ -22,22 +20,6 @@ export function ProxyApp() {
     load();
     providersApi.list().then(setProviders).catch(() => {});
   }, []);
-
-  const add = async () => {
-    if (!draft.trim() || adding) return;
-    setAdding(true);
-    setError("");
-    try {
-      const r = await proxyApi.add(draft.trim());
-      if (r.errors && r.errors.length) setError(`${r.added} added · skipped: ${r.errors.join("; ")}`);
-      setDraft("");
-      load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "failed to add");
-    } finally {
-      setAdding(false);
-    }
-  };
 
   const act = async (id: number, fn: () => Promise<unknown>) => {
     setBusy(id);
@@ -119,26 +101,15 @@ export function ProxyApp() {
           </div>
         )}
 
-        {/* Add */}
-        <div className="flex flex-col gap-1.5">
-          <div className="flex gap-1.5">
-            <textarea
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) add(); }}
-              placeholder="Paste proxies — any format (host:port, socks5://user:pass@host:port, host:port:user:pass). One per line for bulk."
-              rows={2}
-              className="min-w-0 flex-1 resize-none rounded-lg border border-white/10 bg-black/20 px-2.5 py-1.5 font-mono text-[11px] text-white/80 outline-none focus:border-white/25"
-            />
-            <button
-              onClick={add}
-              disabled={adding || !draft.trim()}
-              className="flex shrink-0 items-center gap-1 self-stretch rounded-lg bg-white px-3 text-xs font-medium text-black hover:opacity-90 disabled:opacity-40"
-            >
-              {adding ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />} Add
-            </button>
-          </div>
-          {error && <p className="text-[10px] text-amber-300/80">{error}</p>}
+        {/* Pool header + Add button */}
+        <div className="flex items-center justify-between">
+          <span className="flex items-center gap-1 text-[11px] text-white/40"><Globe2 className="h-3 w-3" /> {proxies?.length ?? 0} proxies</span>
+          <button
+            onClick={() => setShowAdd(true)}
+            className="flex items-center gap-1 rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-black hover:opacity-90"
+          >
+            <Plus className="h-3.5 w-3.5" /> Add proxies
+          </button>
         </div>
 
         {/* List */}
@@ -173,12 +144,92 @@ export function ProxyApp() {
           )}
         </div>
 
-        <div className="flex items-center justify-between text-[10px] text-white/35">
-          <span className="flex items-center gap-1"><Globe2 className="h-3 w-3" /> {proxies?.length ?? 0} proxies</span>
+        <div className="flex items-center justify-end text-[10px] text-white/35">
           <button onClick={load} className="flex items-center gap-1 hover:text-white/60"><RefreshCw className="h-3 w-3" /> Refresh</button>
         </div>
       </div>
+
+      {showAdd && <AddModal onClose={() => setShowAdd(false)} onDone={load} />}
     </AppShell>
+  );
+}
+
+// AddModal collects a paste of proxies (any format, one per line for bulk) with
+// an option to test them immediately after adding.
+function AddModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+  const [text, setText] = useState("");
+  const [testAfter, setTestAfter] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [result, setResult] = useState<{ added: number; errors: string[] } | null>(null);
+
+  const submit = async () => {
+    if (!text.trim() || saving) return;
+    setSaving(true);
+    setResult(null);
+    try {
+      const r = await proxyApi.add(text.trim());
+      const errors = r.errors ?? [];
+      setResult({ added: r.added, errors });
+      onDone();
+      if (testAfter && r.added > 0) {
+        // Test the newly-added (any "unknown"/untested) proxies in the background.
+        const list = await proxyApi.list();
+        const fresh = list.proxies.filter((p) => p.status === "unknown");
+        await Promise.allSettled(fresh.map((p) => proxyApi.test(p.id)));
+        onDone();
+      }
+      if (errors.length === 0) {
+        onClose();
+      } else {
+        setText(""); // keep the modal open to show which lines were skipped
+      }
+    } catch (e) {
+      setResult({ added: 0, errors: [e instanceof Error ? e.message : "failed to add"] });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[11000] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div className="w-full max-w-md overflow-hidden rounded-2xl border border-white/10 bg-[#11131a] shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between border-b border-white/5 px-4 py-3">
+          <p className="text-sm font-semibold text-white">Add proxies</p>
+          <button onClick={onClose} className="rounded-md p-1 text-white/40 hover:bg-white/10 hover:text-white"><X className="h-4 w-4" /></button>
+        </div>
+        <div className="space-y-3 px-4 py-4">
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            autoFocus
+            placeholder={"One per line, any format:\nhost:port\nsocks5://user:pass@host:port\nhost:port:user:pass\nip:port"}
+            rows={6}
+            className="w-full resize-none rounded-lg border border-white/10 bg-black/25 px-2.5 py-2 font-mono text-[11px] text-white/80 outline-none focus:border-white/25"
+          />
+          <label className="flex cursor-pointer items-center gap-2 text-[11px] text-white/60">
+            <input type="checkbox" checked={testAfter} onChange={(e) => setTestAfter(e.target.checked)} className="h-3.5 w-3.5 accent-cyan-500" />
+            Test proxies right after adding
+          </label>
+          {result && result.errors.length > 0 && (
+            <div className="rounded-lg border border-amber-500/25 bg-amber-500/10 px-2.5 py-1.5 text-[10px] text-amber-200/90">
+              {result.added} added · {result.errors.length} skipped:
+              <ul className="mt-0.5 list-disc pl-4">{result.errors.slice(0, 6).map((e, i) => <li key={i}>{e}</li>)}</ul>
+            </div>
+          )}
+        </div>
+        <div className="flex justify-end gap-2 border-t border-white/5 px-4 py-3">
+          <button onClick={onClose} className="rounded-lg px-3 py-1.5 text-xs text-white/50 hover:bg-white/5 hover:text-white">Cancel</button>
+          <button
+            onClick={submit}
+            disabled={saving || !text.trim()}
+            className="flex items-center gap-1 rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-black hover:opacity-90 disabled:opacity-40"
+          >
+            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+            {testAfter ? "Add & test" : "Add"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
