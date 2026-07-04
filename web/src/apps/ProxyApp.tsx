@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, Trash2, Wifi, Loader2, Power, RefreshCw, Globe2, X } from "lucide-react";
+import { Plus, Trash2, Wifi, Loader2, Power, RefreshCw, Globe2, X, Settings } from "lucide-react";
 import { AppShell } from "./shell";
 import { proxyApi, providersApi, type ProxyItem, type ProxySettings, type Provider } from "../lib/api";
 
@@ -10,6 +10,7 @@ export function ProxyApp() {
   const [settings, setSettings] = useState<ProxySettings | null>(null);
   const [providers, setProviders] = useState<Provider[]>([]);
   const [showAdd, setShowAdd] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [busy, setBusy] = useState<number | null>(null);
 
   const load = () => {
@@ -49,67 +50,31 @@ export function ProxyApp() {
   return (
     <AppShell title="Proxy" subtitle="Outbound proxy pool">
       <div className="flex h-full flex-col gap-3">
-        {/* Routing settings */}
-        {settings && (
-          <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-white/80">Route requests through the pool</p>
-                <p className="text-[10px] text-white/40">When on, upstream calls to the selected providers go through a proxy.</p>
-              </div>
-              <button
-                onClick={() => saveSettings({ enabled: !settings.enabled })}
-                className={`relative h-5 w-9 rounded-full transition-colors ${settings.enabled ? "bg-emerald-500/80" : "bg-white/15"}`}
-              >
-                <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${settings.enabled ? "left-[18px]" : "left-0.5"}`} />
-              </button>
-            </div>
-            {settings.enabled && (
-              <div className="mt-3 space-y-2 border-t border-white/5 pt-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] text-white/50">Mode</span>
-                  {(["rotate", "random", "sticky"] as const).map((m) => (
-                    <button
-                      key={m}
-                      onClick={() => saveSettings({ mode: m })}
-                      className={`rounded-md px-2 py-0.5 text-[11px] ${settings.mode === m ? "bg-white/15 text-white" : "text-white/45 hover:bg-white/5"}`}
-                    >
-                      {m}
-                    </button>
-                  ))}
-                </div>
-                <div>
-                  <span className="text-[11px] text-white/50">Providers ({settings.providers.length === 0 ? "all" : settings.providers.length})</span>
-                  <div className="mt-1 flex flex-wrap gap-1">
-                    {providers.map((p) => {
-                      const on = settings.providers.includes(p.name);
-                      return (
-                        <button
-                          key={p.name}
-                          onClick={() => toggleProvider(p.name)}
-                          className={`rounded-md px-1.5 py-0.5 text-[10px] ${on ? "bg-indigo-500/25 text-indigo-200 ring-1 ring-inset ring-indigo-400/30" : "bg-white/5 text-white/40 hover:bg-white/10"}`}
-                        >
-                          {p.name}
-                        </button>
-                      );
-                    })}
-                    {settings.providers.length === 0 && <span className="text-[10px] text-white/30">none selected = all providers</span>}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Pool header + Add button */}
+        {/* Pool header: routing status + settings + add */}
         <div className="flex items-center justify-between">
-          <span className="flex items-center gap-1 text-[11px] text-white/40"><Globe2 className="h-3 w-3" /> {proxies?.length ?? 0} proxies</span>
-          <button
-            onClick={() => setShowAdd(true)}
-            className="flex items-center gap-1 rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-black hover:opacity-90"
-          >
-            <Plus className="h-3.5 w-3.5" /> Add proxies
-          </button>
+          <span className="flex items-center gap-1.5 text-[11px] text-white/40">
+            <Globe2 className="h-3 w-3" /> {proxies?.length ?? 0} proxies
+            {settings && (
+              <span className={`ml-1 rounded px-1.5 py-0.5 text-[9px] uppercase tracking-wide ${settings.enabled ? "bg-emerald-500/15 text-emerald-300" : "bg-white/5 text-white/35"}`}>
+                {settings.enabled ? `routing · ${settings.mode}` : "routing off"}
+              </span>
+            )}
+          </span>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setShowSettings(true)}
+              title="Routing settings"
+              className="rounded-lg border border-white/10 bg-white/[0.03] p-1.5 text-white/55 hover:bg-white/10 hover:text-white"
+            >
+              <Settings className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={() => setShowAdd(true)}
+              className="flex items-center gap-1 rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-black hover:opacity-90"
+            >
+              <Plus className="h-3.5 w-3.5" /> Add proxies
+            </button>
+          </div>
         </div>
 
         {/* List */}
@@ -150,6 +115,15 @@ export function ProxyApp() {
       </div>
 
       {showAdd && <AddModal onClose={() => setShowAdd(false)} onDone={load} />}
+      {showSettings && settings && (
+        <SettingsModal
+          settings={settings}
+          providers={providers}
+          onSave={saveSettings}
+          onToggleProvider={toggleProvider}
+          onClose={() => setShowSettings(false)}
+        />
+      )}
     </AppShell>
   );
 }
@@ -227,6 +201,89 @@ function AddModal({ onClose, onDone }: { onClose: () => void; onDone: () => void
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
             {testAfter ? "Add & test" : "Add"}
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// SettingsModal holds the routing config: master toggle, mode, and which
+// providers route through the pool.
+function SettingsModal({
+  settings,
+  providers,
+  onSave,
+  onToggleProvider,
+  onClose,
+}: {
+  settings: ProxySettings;
+  providers: Provider[];
+  onSave: (patch: Partial<ProxySettings>) => void;
+  onToggleProvider: (name: string) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-[11000] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div className="w-full max-w-md overflow-hidden rounded-2xl border border-white/10 bg-[#11131a] shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between border-b border-white/5 px-4 py-3">
+          <p className="text-sm font-semibold text-white">Routing settings</p>
+          <button onClick={onClose} className="rounded-md p-1 text-white/40 hover:bg-white/10 hover:text-white"><X className="h-4 w-4" /></button>
+        </div>
+        <div className="space-y-4 px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-medium text-white/80">Route requests through the pool</p>
+              <p className="text-[10px] text-white/40">Upstream calls to the selected providers go through a proxy.</p>
+            </div>
+            <button
+              onClick={() => onSave({ enabled: !settings.enabled })}
+              className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${settings.enabled ? "bg-emerald-500/80" : "bg-white/15"}`}
+            >
+              <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${settings.enabled ? "left-[18px]" : "left-0.5"}`} />
+            </button>
+          </div>
+
+          <div className={settings.enabled ? "" : "pointer-events-none opacity-40"}>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-white/50">Mode</span>
+              {(["rotate", "random", "sticky"] as const).map((m) => (
+                <button
+                  key={m}
+                  onClick={() => onSave({ mode: m })}
+                  className={`rounded-md px-2 py-0.5 text-[11px] ${settings.mode === m ? "bg-white/15 text-white" : "text-white/45 hover:bg-white/5"}`}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1 text-[10px] text-white/30">
+              {settings.mode === "rotate" && "Round-robin: cycle through proxies per request."}
+              {settings.mode === "random" && "Pick a random proxy each request."}
+              {settings.mode === "sticky" && "One proxy per provider, reused across requests."}
+            </p>
+
+            <div className="mt-3">
+              <span className="text-[11px] text-white/50">Providers ({settings.providers.length === 0 ? "all" : settings.providers.length})</span>
+              <div className="mt-1 flex flex-wrap gap-1">
+                {providers.map((p) => {
+                  const on = settings.providers.includes(p.name);
+                  return (
+                    <button
+                      key={p.name}
+                      onClick={() => onToggleProvider(p.name)}
+                      className={`rounded-md px-1.5 py-0.5 text-[10px] ${on ? "bg-indigo-500/25 text-indigo-200 ring-1 ring-inset ring-indigo-400/30" : "bg-white/5 text-white/40 hover:bg-white/10"}`}
+                    >
+                      {p.name}
+                    </button>
+                  );
+                })}
+              </div>
+              {settings.providers.length === 0 && <p className="mt-1 text-[10px] text-white/30">None selected = all providers routed.</p>}
+            </div>
+          </div>
+        </div>
+        <div className="flex justify-end border-t border-white/5 px-4 py-3">
+          <button onClick={onClose} className="rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-black hover:opacity-90">Done</button>
         </div>
       </div>
     </div>
