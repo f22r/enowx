@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Loader2, KeyRound, Phone, RefreshCw, Copy, Check, X, Wallet, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Loader2, KeyRound, Phone, RefreshCw, Copy, Check, X, Wallet, Trash2, ChevronDown, Search } from "lucide-react";
 import { AppShell } from "./shell";
 import { useDialog } from "../os/dialog";
 import { copyText } from "../os/clipboard";
@@ -160,20 +160,24 @@ function Rental({ onEditKey }: { onEditKey: () => void }) {
       {/* Rent form */}
       <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
         <div className="flex flex-wrap items-end gap-2">
-          <label className="min-w-[130px] flex-1">
+          <div className="min-w-[140px] flex-1">
             <span className="text-[10px] uppercase tracking-wide text-white/35">Service</span>
-            <select value={service} onChange={(e) => setService(e.target.value)} className="mt-0.5 w-full rounded-lg border border-white/10 bg-black/25 px-2 py-1.5 text-xs text-white/80 outline-none">
-              <option value="" className="bg-[#15161c]">Select…</option>
-              {services.map((s) => <option key={s.code} value={s.code} className="bg-[#15161c]">{s.name}</option>)}
-            </select>
-          </label>
-          <label className="min-w-[110px] flex-1">
+            <SearchSelect
+              value={service}
+              onChange={setService}
+              placeholder="Search service…"
+              options={services.map((s) => ({ value: s.code, label: s.name }))}
+            />
+          </div>
+          <div className="min-w-[120px] flex-1">
             <span className="text-[10px] uppercase tracking-wide text-white/35">Country</span>
-            <select value={country} onChange={(e) => setCountry(e.target.value)} className="mt-0.5 w-full rounded-lg border border-white/10 bg-black/25 px-2 py-1.5 text-xs text-white/80 outline-none">
-              <option value="" className="bg-[#15161c]">Select…</option>
-              {countries.map((c) => <option key={c.code} value={c.code} className="bg-[#15161c]">{c.name}</option>)}
-            </select>
-          </label>
+            <SearchSelect
+              value={country}
+              onChange={setCountry}
+              placeholder="Search country…"
+              options={countries.map((c) => ({ value: c.code, label: c.name }))}
+            />
+          </div>
           <button onClick={rent} disabled={!service || !country || renting} className="flex h-[34px] items-center gap-1 rounded-lg bg-white px-3 text-xs font-medium text-black hover:opacity-90 disabled:opacity-40">
             {renting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Phone className="h-3.5 w-3.5" />} Rent
           </button>
@@ -233,6 +237,75 @@ function OrderCard({ o, onFinish, onCancel, onAnother }: {
           {o.status === "waiting" && <button onClick={onCancel} title="Cancel (refund)" className="rounded-md p-1.5 text-white/40 hover:bg-red-500/30 hover:text-red-200"><X className="h-3.5 w-3.5" /></button>}
         </div>
       </div>
+    </div>
+  );
+}
+
+// SearchSelect is a compact searchable combobox: shows the chosen label, and
+// opens a filter input + list on click. Good for long service/country lists.
+function SearchSelect({ value, onChange, options, placeholder }: {
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string }[];
+  placeholder: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+  const selected = options.find((o) => o.value === value);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) { setOpen(false); setQuery(""); } };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
+
+  const filtered = query.trim()
+    ? options.filter((o) => o.label.toLowerCase().includes(query.toLowerCase()) || o.value.toLowerCase().includes(query.toLowerCase()))
+    : options;
+
+  return (
+    <div ref={ref} className="relative mt-0.5">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-1 rounded-lg border border-white/10 bg-black/25 px-2 py-1.5 text-left text-xs text-white/80 outline-none hover:border-white/20 focus:border-white/25"
+      >
+        <span className={`min-w-0 flex-1 truncate ${selected ? "" : "text-white/35"}`}>{selected ? selected.label : placeholder}</span>
+        <ChevronDown className="h-3.5 w-3.5 shrink-0 text-white/30" />
+      </button>
+      {open && (
+        <div className="absolute left-0 right-0 top-full z-[9000] mt-1 overflow-hidden rounded-lg border border-white/10 bg-[#15161c] shadow-2xl">
+          <div className="flex items-center gap-1.5 border-b border-white/5 px-2 py-1.5">
+            <Search className="h-3 w-3 shrink-0 text-white/30" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              autoFocus
+              placeholder={placeholder}
+              className="w-full bg-transparent text-xs text-white/80 outline-none placeholder:text-white/30"
+            />
+          </div>
+          <div className="max-h-52 overflow-auto py-1">
+            {filtered.length === 0 ? (
+              <div className="px-2.5 py-2 text-[11px] text-white/30">No matches</div>
+            ) : (
+              filtered.map((o) => (
+                <button
+                  key={o.value}
+                  type="button"
+                  onClick={() => { onChange(o.value); setOpen(false); setQuery(""); }}
+                  className={`flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs hover:bg-white/[0.06] ${o.value === value ? "text-cyan-300" : "text-white/75"}`}
+                >
+                  <span className="min-w-0 flex-1 truncate">{o.label}</span>
+                  {o.value === value && <Check className="h-3 w-3 shrink-0" />}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
