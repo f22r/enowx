@@ -68,6 +68,9 @@ export function AppsDrawer({
                     {app.badge}
                   </span>
                 )}
+                {app.notify && (
+                  <span className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full bg-rose-500 shadow ring-2 ring-[var(--window-bg)]" />
+                )}
               </span>
               <span className="text-[11px] text-white/70">{app.label}</span>
             </button>

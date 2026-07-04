@@ -79,6 +79,9 @@ export function SideDock({
                   {app.badge}
                 </span>
               )}
+              {app.notify && (
+                <span className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full bg-rose-500 shadow ring-2 ring-[var(--window-bg)]" />
+              )}
             </span>
             <span
               className={

@@ -18,6 +18,7 @@ import { useNotifNav, consumeNotifNav } from "./notifNav";
 import { openProfile } from "./profileViewer";
 import { openPost } from "./postViewer";
 import { findPost } from "./postsBus";
+import { useChatUnread } from "./chatBus";
 import { postsApi } from "../lib/api";
 import { useProfile } from "./useProfile";
 import { DocsApp } from "../apps/DocsApp";
@@ -61,8 +62,12 @@ export function Desktop() {
   const profile = useProfile();
   const isMod = profile.has("chat.moderate");
   const pluginApps = usePluginApps();
+  const chatUnread = useChatUnread();
   // Admin is a center view (not a docked app), so it's excluded from buildApps.
-  const apps = [...buildApps(), ...pluginApps];
+  // Badge the Community (chat) icon with a red dot when there are unread messages.
+  const apps = [...buildApps(), ...pluginApps].map((a) =>
+    a.id === "chat" && chatUnread ? { ...a, notify: true } : a,
+  );
   const { active, toggle, close } = usePanels();
   const [view, setView] = usePersisted<CenterView>("center-view", "widget");
 

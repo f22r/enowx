@@ -139,15 +139,22 @@ function ChatRoom() {
   async function submit() {
     const text = draft.trim();
     if ((!text && img.images.length === 0) || sending || img.uploading) return;
+    // Optimistic send: clear the composer immediately (the message appears at once
+    // via the temp entry) instead of blocking the input on the round-trip.
+    const images = img.images.length ? img.images : undefined;
+    const replyId = reply?.id;
+    const me = profile.user
+      ? { username: profile.user.username, display_name: profile.user.display_name, avatar_url: profile.user.avatar_url }
+      : undefined;
+    setDraft("");
+    setReply(null);
+    img.clear();
+    setTimeout(scrollToBottom, 50); // jump to my just-sent message
     setSending(true);
     try {
-      await sendChat(text, reply?.id, img.images.length ? img.images : undefined);
-      setDraft("");
-      setReply(null);
-      img.clear();
-      setTimeout(scrollToBottom, 50); // jump to my just-sent message
+      await sendChat(text, replyId, images, me);
     } catch {
-      /* keep the draft so the user can retry */
+      /* optimistic message is marked failed in the store */
     } finally {
       setSending(false);
     }
@@ -336,9 +343,10 @@ function MessageRow({
   }
 
   return (
-    <div className={`group relative flex gap-2.5 rounded-lg px-2 py-1 ${pingsMe ? "border-l-2 border-amber-400/70 bg-amber-400/[0.07] hover:bg-amber-400/10" : "hover:bg-white/[0.03]"}`}>
-      {/* Hover action menu (top-right). */}
-      <div className={`absolute -top-2 right-2 items-center gap-0.5 rounded-lg border border-white/10 bg-[#16181f] px-1 py-0.5 shadow-lg ${pickerOpen ? "flex" : "hidden group-hover:flex"}`}>
+    <div className={`group relative flex gap-2.5 rounded-lg px-2 py-1 ${m.pending ? "opacity-60" : ""} ${pingsMe ? "border-l-2 border-amber-400/70 bg-amber-400/[0.07] hover:bg-amber-400/10" : "hover:bg-white/[0.03]"}`}>
+      {/* Hover action menu (top-right). Hidden for optimistic (pending/failed)
+          messages — they have no real server id to act on yet. */}
+      <div className={`absolute -top-2 right-2 items-center gap-0.5 rounded-lg border border-white/10 bg-[#16181f] px-1 py-0.5 shadow-lg ${m.pending || m.failed ? "hidden" : pickerOpen ? "flex" : "hidden group-hover:flex"}`}>
         <div className="relative">
           <ActBtn label="React" onClick={() => setPickerOpen((v) => !v)}><SmilePlus className="h-3.5 w-3.5" /></ActBtn>
           {pickerOpen && (
@@ -413,6 +421,8 @@ function MessageRow({
             )}
             {m.images && m.images.length > 0 && <ImageGrid images={m.images} />}
             {m.music && <MusicCard m={m.music} onOpen={() => m.music && handleMusicClick(m.music, dialog)} />}
+            {m.pending && <span className="text-[10px] text-white/30">sending…</span>}
+            {m.failed && <span className="text-[10px] text-rose-400/80">failed to send</span>}
           </>
         )}
         {m.reactions && m.reactions.length > 0 && (

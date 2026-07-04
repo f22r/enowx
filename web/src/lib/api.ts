@@ -1159,6 +1159,8 @@ export interface ChatMessage {
   reactions?: Reaction[];
   channel?: string;
   music?: MusicShare;
+  pending?: boolean; // client-only: optimistic message awaiting the server echo
+  failed?: boolean; // client-only: send failed, offer retry
 }
 
 // MusicShare is the payload of a shared track/playlist card in the music channel.

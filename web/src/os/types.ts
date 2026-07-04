@@ -35,6 +35,7 @@ export interface DesktopApp {
   icon: ReactNode;
   accent: string; // tailwind gradient classes
   home: Location; // default location (dock side or drawer)
-  badge?: string; // small tag shown on the icon (e.g. "plugin")
+  badge?: string; // small text tag shown on the icon (e.g. "plugin")
+  notify?: boolean; // red unread dot on the icon (e.g. new community chat)
   render: () => ReactNode;
 }
