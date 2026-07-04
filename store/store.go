@@ -71,6 +71,7 @@ type Store interface {
 	Settings() SettingsStore
 	Aliases() AliasStore
 	ApiTest() ApiTestStore
+	Proxies() ProxyStore
 	Close() error
 }
 
@@ -314,6 +315,30 @@ type AccountStore interface {
 	SetLabel(ctx context.Context, id int64, label string) error
 	UpdateCreds(ctx context.Context, id int64, creds map[string]string) error
 	Delete(ctx context.Context, id int64) error
+}
+
+// Proxy is one outbound proxy in the pool.
+type Proxy struct {
+	ID          int64  `json:"id"`
+	Label       string `json:"label"`
+	Scheme      string `json:"scheme"` // http | https | socks5 | socks5h
+	Host        string `json:"host"`
+	Port        int    `json:"port"`
+	Username    string `json:"username"`
+	Password    string `json:"password"`
+	Enabled     bool   `json:"enabled"`
+	Status      string `json:"status"` // unknown | ok | dead
+	LatencyMS   int    `json:"latency_ms"`
+	LastChecked string `json:"last_checked,omitempty"`
+	CreatedAt   string `json:"created_at"`
+}
+
+type ProxyStore interface {
+	List(ctx context.Context) ([]Proxy, error)
+	Add(ctx context.Context, p Proxy) (int64, error)
+	Delete(ctx context.Context, id int64) error
+	SetEnabled(ctx context.Context, id int64, enabled bool) error
+	SetStatus(ctx context.Context, id int64, status string, latencyMS int) error
 }
 
 // LogSummary aggregates request_logs for the current day (server-local).
