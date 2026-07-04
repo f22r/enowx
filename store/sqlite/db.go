@@ -165,6 +165,12 @@ func migrate(db *sql.DB) error {
 	if err := ensureColumn(db, "request_logs", "source", "TEXT NOT NULL DEFAULT 'api'"); err != nil {
 		return err
 	}
+	if err := ensureColumn(db, "request_logs", "proxy_used", "TEXT NOT NULL DEFAULT ''"); err != nil {
+		return err
+	}
+	if err := ensureColumn(db, "request_logs", "account_label", "TEXT NOT NULL DEFAULT ''"); err != nil {
+		return err
+	}
 	if err := ensureColumn(db, "apitest_requests", "base_url", "TEXT NOT NULL DEFAULT ''"); err != nil {
 		return err
 	}
