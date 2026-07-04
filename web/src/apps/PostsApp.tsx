@@ -456,7 +456,9 @@ function CommentThread({ postId, myUsername, myDisplayName, canMod }: { postId: 
     setBusy(true);
     try {
       const c = await commentsApi.add(postId, draft.trim(), replyTo?.id);
-      setComments((cs) => [...(cs ?? []), c]);
+      // De-dupe: the comment_added SSE echo may have already appended this id
+      // (the broadcast can arrive before this POST's response resolves).
+      setComments((cs) => (cs && cs.some((x) => x.id === c.id) ? cs : [...(cs ?? []), c]));
       setDraft("");
       setReplyTo(null);
     } catch {
