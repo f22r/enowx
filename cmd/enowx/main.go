@@ -1,3 +1,11 @@
+// Go 1.23+ rejects X.509 certificates with a negative serial number at parse
+// time. Some upstreams we proxy to (notably Antigravity's Google cloudcode host)
+// still serve such certs, which surfaced as "tls: failed to parse certificate
+// from server: x509: negative serial number" and broke those chats. Restore the
+// pre-1.23 lenient parsing for this binary. (Serial-number sign isn't a security
+// property — chain verification is unaffected.)
+//go:debug x509negativeserial=1
+
 package main
 
 import (
