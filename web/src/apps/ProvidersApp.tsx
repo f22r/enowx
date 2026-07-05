@@ -78,7 +78,7 @@ export function ProvidersApp() {
       )}
 
       {loading ? (
-        <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))" }}>
+        <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))" }}>
           {[0, 1, 2, 3].map((i) => (
             <div key={i} className="h-[88px] animate-pulse rounded-2xl border border-white/5 bg-white/[0.02]" />
           ))}
@@ -88,7 +88,7 @@ export function ProvidersApp() {
           No providers match "{query}".
         </div>
       ) : (
-        <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))" }}>
+        <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))" }}>
           {filtered.map((p) => (
             <ProviderCard
               key={p.name}
