@@ -227,17 +227,16 @@ export function Desktop() {
         <p className="mb-3 text-[11px] text-white/40">Tap to open. Drag an app onto the bottom dock to pin it there.</p>
         <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6">
           {focusAllApps.map((a) => {
-            // Real apps can be pinned via drag; view apps aren't in the location system.
-            const pinnable = !a.id.startsWith("view:");
-            const pinned = pinnable && (locationOf(a.id) === "left" || locationOf(a.id) === "right");
+            // Every app (real + view) can be pinned — locations are keyed by id.
+            const pinned = locationOf(a.id) === "left" || locationOf(a.id) === "right";
             return (
               <button
                 key={a.id}
                 onClick={() => setFocusApp(a.id)}
-                draggable={pinnable}
-                onDragStart={pinnable ? (e) => e.dataTransfer.setData("text/app-id", a.id) : undefined}
+                draggable
+                onDragStart={(e) => e.dataTransfer.setData("text/app-id", a.id)}
                 className="relative flex flex-col items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.02] p-3 hover:bg-white/[0.06]"
-                title={pinnable ? "Tap to open · drag to the dock to pin" : "Tap to open"}
+                title="Tap to open · drag to the dock to pin"
               >
                 <span className={`flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br text-white shadow [&>svg]:!h-6 [&>svg]:!w-6 ${a.accent}`}>{a.icon}</span>
                 <span className="truncate text-[11px] text-white/70">{a.label}</span>
@@ -249,9 +248,10 @@ export function Desktop() {
       </div>
     ),
   };
+  // The dock: the Apps launcher + every app (real or view) pinned to a dock side.
   const focusDockApps: DesktopApp[] = [
     appsLauncher,
-    ...apps.filter((a) => locationOf(a.id) === "left" || locationOf(a.id) === "right"),
+    ...focusAllApps.filter((a) => locationOf(a.id) === "left" || locationOf(a.id) === "right"),
   ];
 
   if (layoutMode === "focus") {

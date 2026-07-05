@@ -96,9 +96,9 @@ export function FocusShell({
 
 function DockButton({ app, active, onClick }: { app: DesktopApp; active: boolean; onClick: () => void }) {
   const [hover, setHover] = useState(false);
-  // View apps (id starting with "view:") aren't draggable — they aren't part of
-  // the location system; only real apps can be moved between docks.
-  const draggable = !app.id.startsWith("view:");
+  // Every dock icon is draggable except the Apps launcher itself (it's always
+  // pinned first). Locations are keyed by id, so view apps move like real apps.
+  const draggable = app.id !== "view:apps";
   return (
     <button
       onClick={onClick}
