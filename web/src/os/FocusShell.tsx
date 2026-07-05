@@ -1,7 +1,23 @@
 import { useState } from "react";
 import { X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import type { DesktopApp, AppId } from "./types";
+import type { DesktopApp, AppId, Side } from "./types";
+
+// A drop zone that accepts an app dragged from another dock / the Apps drawer.
+function dropProps(onDrop: (id: AppId) => void) {
+  return {
+    onDragOver: (e: React.DragEvent) => {
+      if (e.dataTransfer.types.includes("text/app-id")) e.preventDefault();
+    },
+    onDrop: (e: React.DragEvent) => {
+      const id = e.dataTransfer.getData("text/app-id");
+      if (id) {
+        e.preventDefault();
+        onDrop(id as AppId);
+      }
+    },
+  };
+}
 
 // FocusShell is the alternative layout: the Workspace stays on the left, the
 // Widget board sits in the centre, and the app dock is a horizontal bar at the
@@ -19,6 +35,7 @@ export function FocusShell({
   activeApp,
   onOpenApp,
   onCloseApp,
+  onDropApp,
 }: {
   apps: DesktopApp[]; // apps shown in the bottom dock (already filtered)
   workspace: DesktopApp[]; // apps shown in the left vertical Workspace dock
@@ -27,6 +44,7 @@ export function FocusShell({
   activeApp: AppId | null;
   onOpenApp: (id: AppId) => void; // toggles: same id closes
   onCloseApp: () => void;
+  onDropApp: (id: AppId, side: Side) => void; // drag an app between the Workspace (left) and app (right/bottom) docks
 }) {
   const all = [...workspace, ...apps];
   const active = all.find((a) => a.id === activeApp) ?? null;
@@ -35,7 +53,7 @@ export function FocusShell({
     <>
       {/* Left Workspace dock (stays visible; covered by an open app). */}
       <div className="pointer-events-none absolute left-2 top-1/2 z-20 -translate-y-1/2">
-        <div className="pointer-events-auto flex flex-col items-center gap-1.5 rounded-2xl border border-white/10 bg-[var(--window-bg)]/85 px-1.5 py-2 shadow-xl backdrop-blur">
+        <div className="pointer-events-auto flex flex-col items-center gap-1.5 rounded-2xl border border-white/10 bg-[var(--window-bg)]/85 px-1.5 py-2 shadow-xl backdrop-blur" {...dropProps((id) => onDropApp(id, "left"))}>
           {workspace.map((a) => (
             <DockButton key={a.id} app={a} active={a.id === activeApp} onClick={() => onOpenApp(a.id)} />
           ))}
@@ -76,7 +94,7 @@ export function FocusShell({
 
       {/* Bottom app dock. */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-40 flex justify-center pb-2">
-        <div className="pointer-events-auto flex items-center gap-1.5 rounded-2xl border border-white/10 bg-[var(--window-bg)]/85 px-2 py-1.5 shadow-xl backdrop-blur">
+        <div className="pointer-events-auto flex items-center gap-1.5 rounded-2xl border border-white/10 bg-[var(--window-bg)]/85 px-2 py-1.5 shadow-xl backdrop-blur" {...dropProps((id) => onDropApp(id, "right"))}>
           {apps.map((a) => (
             <DockButton key={a.id} app={a} active={a.id === activeApp} onClick={() => onOpenApp(a.id)} />
           ))}
@@ -88,9 +106,14 @@ export function FocusShell({
 
 function DockButton({ app, active, onClick }: { app: DesktopApp; active: boolean; onClick: () => void }) {
   const [hover, setHover] = useState(false);
+  // View apps (id starting with "view:") aren't draggable — they aren't part of
+  // the location system; only real apps can be moved between docks.
+  const draggable = !app.id.startsWith("view:");
   return (
     <button
       onClick={onClick}
+      draggable={draggable}
+      onDragStart={draggable ? (e) => e.dataTransfer.setData("text/app-id", app.id) : undefined}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       className="relative flex h-10 w-10 items-center justify-center rounded-xl transition-transform hover:-translate-y-0.5"
