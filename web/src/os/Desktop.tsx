@@ -266,7 +266,7 @@ export function Desktop() {
           onCloseApp={() => setFocusApp(null)}
           onDropApp={(id, side) => move(id, side)}
           home={
-            <div className="mx-auto flex h-full max-w-3xl flex-col px-5 pb-2 pt-3">
+            <div className="flex h-full flex-col px-4 pb-2 pt-3">
               <div className="min-h-0 flex-1 overflow-auto">
                 <Widgets onOpen={openFocusApp} />
               </div>

@@ -79,8 +79,11 @@ export function Widgets({ onOpen }: { onOpen: (id: AppId) => void }) {
   }, []);
 
   return (
-    <div className="pointer-events-auto h-full w-full">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+    // @container: the widget grid responds to ITS OWN width, so it stays 1–2
+    // columns in the narrow Classic board and fans out to 3–4 columns in the
+    // full-width Focus board.
+    <div className="pointer-events-auto h-full w-full @container">
+      <div className="grid grid-cols-1 gap-4 @md:grid-cols-2 @4xl:grid-cols-3 @6xl:grid-cols-4">
         <CommunityStatsWidget stats={community} onOpen={onOpen} />
         <ApiKeyWidget keys={keys} onOpen={onOpen} />
         <UsageWidget summary={summary} />
@@ -89,7 +92,7 @@ export function Widgets({ onOpen }: { onOpen: (id: AppId) => void }) {
         <TopModelsWidget models={models} onOpen={onOpen} />
         <EndpointsWidget />
         <GatewayWidget settings={settings} healthy={healthy} onOpen={onOpen} />
-        <div className="sm:col-span-2">
+        <div className="@md:col-span-2 @4xl:col-span-3 @6xl:col-span-4">
           <CommunityWidget />
         </div>
       </div>
