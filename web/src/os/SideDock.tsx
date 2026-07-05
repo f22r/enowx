@@ -63,6 +63,10 @@ export function SideDock({
             onDragStart={(e) => {
               e.dataTransfer.setData("text/app-id", app.id);
               e.dataTransfer.effectAllowed = "move";
+              // Drag just the icon, not the tooltip. The icon wrapper is the
+              // last child (the tooltip span is first).
+              const icon = e.currentTarget.lastElementChild as HTMLElement | null;
+              if (icon) e.dataTransfer.setDragImage(icon, icon.offsetWidth / 2, icon.offsetHeight / 2);
             }}
             onClick={() => onOpen(side, app.id)}
             className="group relative flex items-center justify-center"

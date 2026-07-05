@@ -103,7 +103,11 @@ function DockButton({ app, active, onClick }: { app: DesktopApp; active: boolean
     <button
       onClick={onClick}
       draggable={draggable}
-      onDragStart={draggable ? (e) => e.dataTransfer.setData("text/app-id", app.id) : undefined}
+      onDragStart={draggable ? (e) => {
+        e.dataTransfer.setData("text/app-id", app.id);
+        const icon = e.currentTarget.firstElementChild as HTMLElement | null;
+        if (icon) e.dataTransfer.setDragImage(icon, icon.offsetWidth / 2, icon.offsetHeight / 2);
+      } : undefined}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       className="relative flex h-10 w-10 items-center justify-center rounded-xl transition-transform hover:-translate-y-0.5"

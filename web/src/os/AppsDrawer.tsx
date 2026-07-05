@@ -55,6 +55,9 @@ export function AppsDrawer({
               onDragStart={(e) => {
                 e.dataTransfer.setData("text/app-id", app.id);
                 e.dataTransfer.effectAllowed = "move";
+                // Drag just the icon (the wrapping span), not the whole tile.
+                const icon = e.currentTarget.firstElementChild as HTMLElement | null;
+                if (icon) e.dataTransfer.setDragImage(icon, icon.offsetWidth / 2, icon.offsetHeight / 2);
               }}
               onClick={() => onOpen(app.id)}
               className="flex flex-col items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.03] p-2 transition-colors hover:bg-white/[0.07]"

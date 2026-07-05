@@ -234,7 +234,13 @@ export function Desktop() {
                 key={a.id}
                 onClick={() => setFocusApp(a.id)}
                 draggable
-                onDragStart={(e) => e.dataTransfer.setData("text/app-id", a.id)}
+                onDragStart={(e) => {
+                  e.dataTransfer.setData("text/app-id", a.id);
+                  // Drag image = just the icon (the first child span), not the
+                  // whole bordered card + label.
+                  const icon = e.currentTarget.firstElementChild as HTMLElement | null;
+                  if (icon) e.dataTransfer.setDragImage(icon, icon.offsetWidth / 2, icon.offsetHeight / 2);
+                }}
                 className="relative flex flex-col items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.02] p-2 hover:bg-white/[0.06]"
                 title="Tap to open · drag to the dock to pin"
               >
