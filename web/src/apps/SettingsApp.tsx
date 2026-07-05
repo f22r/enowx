@@ -5,6 +5,7 @@ import { Tooltip } from "../components/Tooltip";
 import { useDialog } from "../os/dialog";
 import { authApi, settingsApi, syncApi, imageApi, bugApi, type AuthStatus, type Settings } from "../lib/api";
 import { useProfile } from "../os/useProfile";
+import { useLayoutMode, type LayoutMode } from "../os/useLayoutMode";
 
 export function SettingsApp() {
   const [info, setInfo] = useState<Settings | null>(null);
@@ -57,6 +58,7 @@ export function SettingsApp() {
 // localStorage, so this just clears them and reloads.
 function LayoutCard() {
   const dialog = useDialog();
+  const [mode, setMode] = useLayoutMode();
   const reset = async () => {
     const ok = await dialog.confirm({
       title: "Reset dock layout?",
@@ -67,15 +69,43 @@ function LayoutCard() {
     localStorage.removeItem("enx.app-locations");
     location.reload();
   };
+  const MODES: { id: LayoutMode; label: string; desc: string }[] = [
+    { id: "classic", label: "Classic", desc: "Two side docks — apps open in a panel." },
+    { id: "focus", label: "Focus", desc: "App dock at the bottom — apps open full-screen." },
+  ];
   return (
-    <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.02] p-3">
-      <div>
-        <div className="text-xs font-medium text-white">Dock layout</div>
-        <div className="text-[11px] text-white/45">Reset the left/right docks to the default apps.</div>
+    <div className="space-y-3">
+      {/* Layout mode picker. */}
+      <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
+        <div className="mb-2 text-xs font-medium text-white">Layout mode</div>
+        <div className="grid grid-cols-2 gap-2">
+          {MODES.map((m) => (
+            <button
+              key={m.id}
+              onClick={() => setMode(m.id)}
+              className={`rounded-lg border px-3 py-2 text-left transition-colors ${
+                mode === m.id ? "border-white/30 bg-white/10" : "border-white/10 bg-white/[0.02] hover:bg-white/5"
+              }`}
+            >
+              <div className="flex items-center gap-1.5 text-xs font-medium text-white">
+                {m.label}
+                {mode === m.id && <Check className="h-3.5 w-3.5 text-emerald-300" />}
+              </div>
+              <div className="mt-0.5 text-[10px] leading-snug text-white/45">{m.desc}</div>
+            </button>
+          ))}
+        </div>
       </div>
-      <button onClick={reset} className="flex shrink-0 items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[11px] text-white/70 hover:bg-white/10 hover:text-white">
-        <RefreshCw className="h-3.5 w-3.5" /> Reset
-      </button>
+      {/* Dock reset. */}
+      <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.02] p-3">
+        <div>
+          <div className="text-xs font-medium text-white">Dock layout</div>
+          <div className="text-[11px] text-white/45">Reset the docks to the default apps.</div>
+        </div>
+        <button onClick={reset} className="flex shrink-0 items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[11px] text-white/70 hover:bg-white/10 hover:text-white">
+          <RefreshCw className="h-3.5 w-3.5" /> Reset
+        </button>
+      </div>
     </div>
   );
 }

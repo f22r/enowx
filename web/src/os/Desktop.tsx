@@ -32,7 +32,9 @@ import { useAppLocations } from "./useSides";
 import { useShortcuts } from "./useShortcuts";
 import { useTerminals, type TermLocation } from "./useTerminals";
 import { usePluginApps } from "./usePluginApps";
-import type { AppId, Location, Side } from "./types";
+import { useLayoutMode } from "./useLayoutMode";
+import { FocusShell } from "./FocusShell";
+import type { AppId, DesktopApp, Location, Side } from "./types";
 
 type CenterView = "widget" | "terminal" | "chat" | "apitest" | "apps" | "marketplace" | "admin" | "docs";
 
@@ -70,6 +72,10 @@ export function Desktop() {
   );
   const { active, toggle, close } = usePanels();
   const [view, setView] = usePersisted<CenterView>("center-view", "widget");
+  const [layoutMode] = useLayoutMode();
+  // In Focus mode, a single app takes over full view. Persisted so it survives a
+  // reload like the classic panels do.
+  const [focusApp, setFocusApp] = usePersisted<AppId | null>("focus-app", null);
 
   const defaults = Object.fromEntries(apps.map((a) => [a.id, a.home])) as Record<AppId, Location>;
   const { locations, move } = useAppLocations(defaults);
@@ -191,6 +197,53 @@ export function Desktop() {
       </SidePanel>
     ) : null;
   };
+
+  // --- Focus mode ---------------------------------------------------------
+  // Former centre views (terminal, AI chat, api test, market, docs, admin)
+  // become full-view "apps" in the bottom dock. Widget stays the home board.
+  // buildApps() and Classic mode are untouched.
+  const viewApps: DesktopApp[] = [
+    { id: "view:terminal", label: "Terminal", icon: <SquareTerminal />, accent: "from-zinc-600 to-zinc-800", home: "drawer", render: () => <CenterTerminal term={term} setHost={setCenterHost} /> },
+    { id: "view:chat", label: "AI Chat", icon: <Bot />, accent: "from-teal-500 to-emerald-700", home: "drawer", render: () => <AiChatApp /> },
+    { id: "view:apitest", label: "API Test", icon: <FlaskConical />, accent: "from-orange-500 to-amber-700", home: "drawer", render: () => <ApiTestApp /> },
+    { id: "view:marketplace", label: "Market", icon: <Store />, accent: "from-yellow-500 to-orange-600", home: "drawer", render: () => <MarketplaceApp /> },
+    { id: "view:docs", label: "Docs", icon: <BookOpen />, accent: "from-blue-500 to-indigo-700", home: "drawer", render: () => <DocsApp /> },
+    ...(isMod ? [{ id: "view:admin" as AppId, label: "Admin", icon: <ShieldCheck />, accent: "from-red-500 to-rose-700", home: "drawer" as Location, render: () => <AdminApp /> }] : []),
+  ];
+  const openFocusApp = (id: AppId) => setFocusApp((cur) => (cur === id ? null : id));
+  // Workspace stays as a left vertical dock (the home:left apps); the bottom dock
+  // holds the other apps (right + drawer) plus the view-apps.
+  const workspaceApps = apps.filter((a) => locationOf(a.id) === "left");
+  const focusBottomApps: DesktopApp[] = [
+    ...apps.filter((a) => locationOf(a.id) !== "left"),
+    ...viewApps,
+  ];
+
+  if (layoutMode === "focus") {
+    return (
+      <div className="wallpaper fixed inset-0 select-none overflow-hidden">
+        <TopBar nav={null} />
+        <FocusShell
+          apps={focusBottomApps}
+          workspace={workspaceApps}
+          activeApp={focusApp}
+          onOpenApp={openFocusApp}
+          onCloseApp={() => setFocusApp(null)}
+          home={
+            <div className="mx-auto flex h-full max-w-3xl flex-col px-5 pb-2 pt-3">
+              <div className="min-h-0 flex-1 overflow-auto">
+                <Widgets onOpen={openFocusApp} />
+              </div>
+            </div>
+          }
+        />
+        <ProfileViewer />
+        <Lightbox />
+        <NotifBanner />
+        <TerminalLayer terms={term.terms} activeCenter={term.activeCenter} hosts={hosts} />
+      </div>
+    );
+  }
 
   return (
     <div className="wallpaper fixed inset-0 select-none overflow-hidden">
