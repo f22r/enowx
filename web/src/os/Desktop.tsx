@@ -33,6 +33,7 @@ import { useShortcuts } from "./useShortcuts";
 import { useTerminals, type TermLocation } from "./useTerminals";
 import { usePluginApps } from "./usePluginApps";
 import { useLayoutMode } from "./useLayoutMode";
+import { useFocusDockHidden } from "./useFocusDock";
 import { FocusShell } from "./FocusShell";
 import type { AppId, DesktopApp, Location, Side } from "./types";
 
@@ -73,6 +74,7 @@ export function Desktop() {
   const { active, toggle, close } = usePanels();
   const [view, setView] = usePersisted<CenterView>("center-view", "widget");
   const [layoutMode] = useLayoutMode();
+  const [focusHidden] = useFocusDockHidden();
   // In Focus mode, a single app takes over full view. Persisted so it survives a
   // reload like the classic panels do.
   const [focusApp, setFocusApp] = usePersisted<AppId | null>("focus-app", null);
@@ -217,7 +219,7 @@ export function Desktop() {
   const focusBottomApps: DesktopApp[] = [
     ...apps.filter((a) => locationOf(a.id) !== "left"),
     ...viewApps,
-  ];
+  ].filter((a) => !focusHidden.includes(a.id));
 
   if (layoutMode === "focus") {
     return (

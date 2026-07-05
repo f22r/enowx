@@ -6,6 +6,8 @@ import { useDialog } from "../os/dialog";
 import { authApi, settingsApi, syncApi, imageApi, bugApi, type AuthStatus, type Settings } from "../lib/api";
 import { useProfile } from "../os/useProfile";
 import { useLayoutMode, type LayoutMode } from "../os/useLayoutMode";
+import { useFocusDockHidden } from "../os/useFocusDock";
+import { buildApps } from "./index";
 
 export function SettingsApp() {
   const [info, setInfo] = useState<Settings | null>(null);
@@ -96,6 +98,8 @@ function LayoutCard() {
           ))}
         </div>
       </div>
+      {/* Focus-mode bottom dock apps (only relevant in Focus). */}
+      {mode === "focus" && <FocusDockCard />}
       {/* Dock reset. */}
       <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.02] p-3">
         <div>
@@ -105,6 +109,46 @@ function LayoutCard() {
         <button onClick={reset} className="flex shrink-0 items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[11px] text-white/70 hover:bg-white/10 hover:text-white">
           <RefreshCw className="h-3.5 w-3.5" /> Reset
         </button>
+      </div>
+    </div>
+  );
+}
+
+// FocusDockCard toggles which apps appear in the Focus-mode bottom dock. The
+// Workspace (left dock) always shows all its apps, so only the non-Workspace
+// apps + the view apps are listed here.
+function FocusDockCard() {
+  const [hidden, setHidden] = useFocusDockHidden();
+  // Non-left apps (right/drawer) + the synthetic view apps that Focus adds.
+  const dockApps = [
+    ...buildApps().filter((a) => a.home !== "left").map((a) => ({ id: a.id, label: a.label })),
+    { id: "view:terminal", label: "Terminal" },
+    { id: "view:chat", label: "AI Chat" },
+    { id: "view:apitest", label: "API Test" },
+    { id: "view:marketplace", label: "Market" },
+    { id: "view:docs", label: "Docs" },
+  ];
+  const toggle = (id: string) =>
+    setHidden((h) => (h.includes(id) ? h.filter((x) => x !== id) : [...h, id]));
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
+      <div className="mb-1 text-xs font-medium text-white">Bottom dock apps</div>
+      <div className="mb-2 text-[10px] text-white/45">Pick which apps show in the Focus dock. Workspace keeps all its apps.</div>
+      <div className="flex flex-wrap gap-1.5">
+        {dockApps.map((a) => {
+          const on = !hidden.includes(a.id);
+          return (
+            <button
+              key={a.id}
+              onClick={() => toggle(a.id)}
+              className={`rounded-lg border px-2 py-1 text-[11px] transition-colors ${
+                on ? "border-white/25 bg-white/10 text-white" : "border-white/10 bg-white/[0.02] text-white/40 line-through"
+              }`}
+            >
+              {a.label}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
