@@ -314,6 +314,36 @@ export const otpApi = {
   stats: () => api.get<OtpStats>("/api/otp/stats"),
 };
 
+// --- MCP & Skill registry ---
+export type RegistryKind = "mcp" | "skill";
+export interface RegistryItem {
+  id: number;
+  kind: RegistryKind;
+  slug: string;
+  name: string;
+  description: string;
+  author: string;
+  version: string;
+  downloads: number;
+  created_at: string;
+  download_url: string;
+}
+export interface RegistryPublishResult {
+  status: "approved" | "rejected";
+  reason?: string;
+  id?: number;
+  kind?: RegistryKind;
+  slug?: string;
+  download_url?: string;
+}
+export const registryApi = {
+  list: (kind: RegistryKind, q = "") =>
+    api.get<{ items: RegistryItem[] }>(`/api/registry?kind=${kind}${q ? `&q=${encodeURIComponent(q)}` : ""}`),
+  get: (id: number) => api.get<RegistryItem>(`/api/registry/${id}`),
+  publish: (form: FormData) => postForm<RegistryPublishResult>("/api/registry/publish", form),
+  remove: (id: number) => api.del<{ ok: boolean }>(`/api/admin/registry/${id}`),
+};
+
 export const proxyApi = {
   list: () => api.get<{ proxies: ProxyItem[] }>("/api/proxies"),
   add: (text: string) => api.post<{ added: number; errors: string[] | null }>("/api/proxies", { text }),
@@ -761,6 +791,12 @@ export const communityApi = {
 async function uploadFile<T>(path: string, file: File): Promise<T> {
   const fd = new FormData();
   fd.append("file", file);
+  return postForm<T>(path, fd);
+}
+
+// postForm posts an arbitrary multipart FormData (file + fields) and unwraps
+// { data, error }.
+async function postForm<T>(path: string, fd: FormData): Promise<T> {
   const res = await fetch(path, { method: "POST", body: fd });
   const body = (await res.json().catch(() => ({}))) as { data?: T; error?: string };
   if (!res.ok) throw new Error(body.error || `upload failed (${res.status})`);

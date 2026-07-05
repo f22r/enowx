@@ -431,6 +431,60 @@ func (m *Manager) PublishPlugin(ctx context.Context, fields map[string]string, z
 	return string(raw), nil
 }
 
+// --- MCP & Skill registry ---
+
+// RegistryPublish uploads an MCP/Skill bundle (zip) + fields; the cloud scans it
+// and, if it passes, commits it to the enowX-Skill repo.
+func (m *Manager) RegistryPublish(ctx context.Context, fields map[string]string, zipBytes []byte) (string, error) {
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	for k, v := range fields {
+		_ = mw.WriteField(k, v)
+	}
+	fw, _ := mw.CreateFormFile("file", "bundle.zip")
+	_, _ = fw.Write(zipBytes)
+	_ = mw.Close()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, m.ServerURL(ctx)+"/registry/publish", &buf)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Authorization", "Bearer "+m.get(ctx, keyToken))
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	resp, err := m.http.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<16))
+	if resp.StatusCode >= 400 {
+		return "", errors.New(strings.TrimSpace(string(raw)))
+	}
+	return string(raw), nil
+}
+
+// RegistryList browses published MCP/Skill items.
+func (m *Manager) RegistryList(ctx context.Context, kind, query string) (string, error) {
+	var raw json.RawMessage
+	path := "/registry?kind=" + url.QueryEscape(kind)
+	if query != "" {
+		path += "&q=" + url.QueryEscape(query)
+	}
+	if err := m.call(ctx, http.MethodGet, path, nil, &raw); err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
+
+// RegistryGet returns one item's detail (and counts a download).
+func (m *Manager) RegistryGet(ctx context.Context, id string) (string, error) {
+	var raw json.RawMessage
+	if err := m.call(ctx, http.MethodGet, "/registry/"+id, nil, &raw); err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
+
 // MarketPlugins lists published plugins.
 func (m *Manager) MarketPlugins(ctx context.Context, query string) (string, error) {
 	var raw json.RawMessage

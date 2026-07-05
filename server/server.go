@@ -98,6 +98,7 @@ func New(addr string, d Deps) *Server {
 	customProv := handlers.NewCustomProviders(dash, d.CustomProv, d.Accounts)
 	filters := handlers.NewFilters(dash, d.Filters, d.Sync)
 	otp := handlers.NewOTP(dash, d.Sync)
+	registryH := handlers.NewRegistry(dash, d.Sync)
 	proxies := handlers.NewProxy(d.Proxies, d.SettingsKV)
 	if d.Sync != nil {
 		proxies.SetSyncPush(func() { _, _, _ = d.Sync.Sync(context.Background()) })
@@ -217,6 +218,11 @@ func New(addr string, d Deps) *Server {
 
 		// OTP (Warpize SMS): everything under /api/otp/* forwards to the cloud.
 		r.HandleFunc("/otp/*", otp.Proxy)
+
+		// Community MCP & Skill registry.
+		r.Get("/registry", registryH.List)
+		r.Get("/registry/{id}", registryH.Get)
+		r.Post("/registry/publish", registryH.Publish)
 
 		// Outbound proxy pool.
 		r.Get("/proxies", proxies.List)
