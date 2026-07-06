@@ -3,7 +3,7 @@ import { Loader2, KeyRound, Phone, RefreshCw, Copy, Check, X, Wallet, Trash2, Ch
 import { AppShell } from "./shell";
 import { useDialog } from "../os/dialog";
 import { copyText } from "../os/clipboard";
-import { otpApi, type OtpConfig, type OtpService, type OtpCountry, type OtpOrder } from "../lib/api";
+import { otpApi, type OtpConfig, type OtpService, type OtpCountry, type OtpOrder, type OtpPrice } from "../lib/api";
 
 const idr = (n: number) => `Rp${(n ?? 0).toLocaleString("id-ID")}`;
 
@@ -116,6 +116,8 @@ function Rental({ onEditKey }: { onEditKey: () => void }) {
   const [orders, setOrders] = useState<OtpOrder[]>([]);
   const [renting, setRenting] = useState(false);
   const [error, setError] = useState("");
+  const [price, setPrice] = useState<OtpPrice | null>(null);
+  const [pricing, setPricing] = useState(false);
   // When each local-only (just-rented) order was first seen, so loadOrders can
   // keep it briefly until the cloud list catches up.
   const localSeen = useRef<Record<string, number>>({});
@@ -182,6 +184,24 @@ function Rental({ onEditKey }: { onEditKey: () => void }) {
     try { await fn(); loadOrders(); loadBalance(); } catch { /* ignore */ }
   };
 
+  // Look up the price whenever a service + country are both chosen, so the cost is
+  // shown before renting.
+  useEffect(() => {
+    if (!service || !country) { setPrice(null); return; }
+    let alive = true;
+    setPricing(true); setPrice(null);
+    otpApi
+      .prices(service, country)
+      .then((res) => {
+        if (!alive) return;
+        // Response is per-country, keyed by country code.
+        setPrice(res.prices?.[country] ?? null);
+      })
+      .catch(() => alive && setPrice(null))
+      .finally(() => alive && setPricing(false));
+    return () => { alive = false; };
+  }, [service, country]);
+
   return (
     <div className="flex h-full flex-col gap-3">
       {/* Header: balance + settings */}
@@ -216,10 +236,31 @@ function Rental({ onEditKey }: { onEditKey: () => void }) {
               options={countries.map((c) => ({ value: c.code, label: c.name }))}
             />
           </div>
-          <button onClick={rent} disabled={!service || !country || renting} className="flex h-[34px] items-center gap-1 rounded-lg bg-white px-3 text-xs font-medium text-black hover:opacity-90 disabled:opacity-40">
+          <button onClick={rent} disabled={!service || !country || renting || price?.available === 0} className="flex h-[34px] items-center gap-1 rounded-lg bg-white px-3 text-xs font-medium text-black hover:opacity-90 disabled:opacity-40">
             {renting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Phone className="h-3.5 w-3.5" />} Rent
           </button>
         </div>
+        {/* Price + stock preview for the chosen service + country. */}
+        {service && country && (
+          <p className="mt-2 text-[11px] text-white/50">
+            {pricing ? (
+              <span className="text-white/35">Checking price…</span>
+            ) : price ? (
+              price.available === 0 ? (
+                <span className="text-amber-300">Out of stock for this service/country</span>
+              ) : (
+                <>
+                  Price: <span className="font-medium text-white/80">{idr(price.price)}</span>
+                  {typeof price.available === "number" && (
+                    <span className="text-white/35"> · {price.available.toLocaleString()} available</span>
+                  )}
+                </>
+              )
+            ) : (
+              <span className="text-white/35">Price unavailable</span>
+            )}
+          </p>
+        )}
         {error && <p className="mt-2 text-[11px] text-red-300">{error}</p>}
       </div>
 

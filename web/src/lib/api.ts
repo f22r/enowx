@@ -287,7 +287,10 @@ export interface ProxySettings {
 export interface OtpConfig { has_key: boolean; preview?: string }
 export interface OtpService { code: string; name: string }
 export interface OtpCountry { code: string; name: string }
-export interface OtpPrice { price: number; currency: string; available?: boolean }
+// available is the number of numbers in stock (0 = none available now).
+export interface OtpPrice { price: number; currency: string; available?: number }
+// The prices endpoint returns per-country prices for a service, keyed by country.
+export interface OtpPrices { service: string; prices: Record<string, OtpPrice> }
 export interface OtpOrder {
   id: string;
   service: string;
@@ -310,7 +313,7 @@ export const otpApi = {
   services: () => api.get<{ services: OtpService[] }>("/api/otp/services"),
   countries: () => api.get<{ countries: OtpCountry[] }>("/api/otp/countries"),
   prices: (service: string, country: string) =>
-    api.get<Record<string, OtpPrice>>(`/api/otp/prices?service=${encodeURIComponent(service)}&country=${encodeURIComponent(country)}`),
+    api.get<OtpPrices>(`/api/otp/prices?service=${encodeURIComponent(service)}&country=${encodeURIComponent(country)}`),
   balance: () => api.get<{ balance: number; currency: string }>("/api/otp/balance"),
   rent: (service: string, country: string) => api.post<OtpOrder>("/api/otp/numbers", { service, country }),
   list: () => api.get<{ orders: OtpOrder[] }>("/api/otp/numbers"),
