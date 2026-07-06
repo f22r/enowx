@@ -421,6 +421,15 @@ func (m *Manager) applyAlias(ctx context.Context, ri item) bool {
 		_ = m.aliases.Delete(ctx, al.Alias)
 		return true
 	}
+	if m.combos != nil {
+		if combos, err := m.combos.List(ctx); err == nil {
+			for _, c := range combos {
+				if c.Name == al.Alias {
+					return true // name collides with an existing combo locally — skip, don't clobber
+				}
+			}
+		}
+	}
 	_ = m.aliases.Set(ctx, al.Alias, al.Target)
 	return true
 }
@@ -436,6 +445,15 @@ func (m *Manager) applyCombo(ctx context.Context, ri item) bool {
 	if ri.Deleted {
 		_ = m.combos.DeleteByName(ctx, c.Name)
 		return true
+	}
+	if m.aliases != nil {
+		if aliases, err := m.aliases.List(ctx); err == nil {
+			for _, a := range aliases {
+				if a.Alias == c.Name {
+					return true // name collides with an existing alias locally — skip, don't clobber
+				}
+			}
+		}
 	}
 	_ = m.combos.SetByName(ctx, c.Name, c.Targets, c.Strategy)
 	return true
