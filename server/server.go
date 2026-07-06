@@ -234,6 +234,12 @@ func New(addr string, d Deps) *Server {
 
 		r.Get("/files", files.List)
 		r.Get("/files/watch", files.Watch)
+
+		// Terminal profiles (per-terminal credential isolation via HOME).
+		termProfiles := handlers.NewTermProfiles(dash)
+		r.Get("/term-profiles", termProfiles.List)
+		r.Post("/term-profiles", termProfiles.Create)
+		r.Delete("/term-profiles/{slug}", termProfiles.Delete)
 		r.Get("/files/read", files.Read)
 		r.Get("/files/raw", files.Raw)
 
