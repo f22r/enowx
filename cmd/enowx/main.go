@@ -151,6 +151,7 @@ func runServer() {
 		Music:      db.Music(),
 		SettingsKV: db.Settings(),
 		Aliases:    db.Aliases(),
+		Combos:     db.Combos(),
 		ApiTest:    db.ApiTest(),
 		Tunnel:     tun,
 		Plugins:    pluginMgr,
