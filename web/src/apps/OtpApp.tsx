@@ -116,8 +116,11 @@ function Rental({ onEditKey }: { onEditKey: () => void }) {
   const [orders, setOrders] = useState<OtpOrder[]>([]);
   const [renting, setRenting] = useState(false);
   const [error, setError] = useState("");
-  const [price, setPrice] = useState<OtpPrice | null>(null);
+  // Prices for every country of the selected service (one lookup), so each
+  // country in the dropdown can show its price and be sorted cheapest-first.
+  const [priceMap, setPriceMap] = useState<Record<string, OtpPrice>>({});
   const [pricing, setPricing] = useState(false);
+  const price = country ? priceMap[country] ?? null : null;
   // When each local-only (just-rented) order was first seen, so loadOrders can
   // keep it briefly until the cloud list catches up.
   const localSeen = useRef<Record<string, number>>({});
@@ -184,23 +187,38 @@ function Rental({ onEditKey }: { onEditKey: () => void }) {
     try { await fn(); loadOrders(); loadBalance(); } catch { /* ignore */ }
   };
 
-  // Look up the price whenever a service + country are both chosen, so the cost is
-  // shown before renting.
+  // Load prices for ALL countries as soon as a service is picked (one call), so
+  // the country dropdown can show each price and sort cheapest-first.
   useEffect(() => {
-    if (!service || !country) { setPrice(null); return; }
+    if (!service) { setPriceMap({}); return; }
     let alive = true;
-    setPricing(true); setPrice(null);
+    setPricing(true); setPriceMap({});
     otpApi
-      .prices(service, country)
-      .then((res) => {
-        if (!alive) return;
-        // Response is per-country, keyed by country code.
-        setPrice(res.prices?.[country] ?? null);
-      })
-      .catch(() => alive && setPrice(null))
+      .prices(service, country || "0")
+      .then((res) => { if (alive) setPriceMap(res.prices ?? {}); })
+      .catch(() => alive && setPriceMap({}))
       .finally(() => alive && setPricing(false));
     return () => { alive = false; };
-  }, [service, country]);
+  }, [service]);
+
+  // Country options carry their price + stock and are sorted cheapest-first
+  // (out-of-stock sink to the bottom, disabled). Sorting only kicks in once
+  // prices are loaded; before that they stay in the original (alphabetical) order.
+  const havePrices = Object.keys(priceMap).length > 0;
+  const countryOptions: SelectOption[] = countries
+    .map((c) => {
+      const p = priceMap[c.code];
+      const sort = !p ? Infinity : p.available === 0 ? Infinity : p.price;
+      return {
+        value: c.code,
+        label: c.name,
+        hint: p ? (p.available === 0 ? "out of stock" : idr(p.price)) : undefined,
+        disabled: p?.available === 0,
+        sort,
+      };
+    })
+    .sort((a, b) => (havePrices ? a.sort - b.sort : 0))
+    .map(({ sort: _sort, ...o }) => o);
 
   return (
     <div className="flex h-full flex-col gap-3">
@@ -232,8 +250,8 @@ function Rental({ onEditKey }: { onEditKey: () => void }) {
             <SearchSelect
               value={country}
               onChange={setCountry}
-              placeholder="Search country…"
-              options={countries.map((c) => ({ value: c.code, label: c.name }))}
+              placeholder={service ? "Search country…" : "Pick a service first"}
+              options={countryOptions}
             />
           </div>
           <button onClick={rent} disabled={!service || !country || renting || price?.available === 0} className="flex h-[34px] items-center gap-1 rounded-lg bg-white px-3 text-xs font-medium text-black hover:opacity-90 disabled:opacity-40">
@@ -322,10 +340,17 @@ function OrderCard({ o, onFinish, onCancel, onAnother }: {
 
 // SearchSelect is a compact searchable combobox: shows the chosen label, and
 // opens a filter input + list on click. Good for long service/country lists.
+interface SelectOption {
+  value: string;
+  label: string;
+  hint?: string; // right-aligned secondary text (e.g. price)
+  disabled?: boolean;
+}
+
 function SearchSelect({ value, onChange, options, placeholder }: {
   value: string;
   onChange: (v: string) => void;
-  options: { value: string; label: string }[];
+  options: SelectOption[];
   placeholder: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -374,10 +399,12 @@ function SearchSelect({ value, onChange, options, placeholder }: {
                 <button
                   key={o.value}
                   type="button"
+                  disabled={o.disabled}
                   onClick={() => { onChange(o.value); setOpen(false); setQuery(""); }}
-                  className={`flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs hover:bg-white/[0.06] ${o.value === value ? "text-cyan-300" : "text-white/75"}`}
+                  className={`flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs hover:bg-white/[0.06] disabled:opacity-40 disabled:hover:bg-transparent ${o.value === value ? "text-cyan-300" : "text-white/75"}`}
                 >
                   <span className="min-w-0 flex-1 truncate">{o.label}</span>
+                  {o.hint && <span className="shrink-0 text-[11px] text-white/40">{o.hint}</span>}
                   {o.value === value && <Check className="h-3 w-3 shrink-0" />}
                 </button>
               ))
