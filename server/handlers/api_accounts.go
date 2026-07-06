@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -17,9 +18,17 @@ type Accounts struct {
 	store   store.AccountStore
 	warmer  Warmer
 	onWrite func() // fire-and-forget: push local changes to the cloud now
+	// donate hands an account's creds to the cloud Free-AI pool; returns the
+	// cloud's raw JSON reply (nil disables the feature — not syncing).
+	donate func(ctx context.Context, provider string, creds map[string]string, models []string) (string, error)
 }
 
 func NewAccounts(s store.AccountStore) *Accounts { return &Accounts{store: s} }
+
+// SetDonate wires the Free-AI donation call (via the sync manager).
+func (h *Accounts) SetDonate(f func(ctx context.Context, provider string, creds map[string]string, models []string) (string, error)) {
+	h.donate = f
+}
 
 // SetWarmer enables automatic warmup of newly-added accounts.
 func (h *Accounts) SetWarmer(w Warmer) { h.warmer = w }
@@ -156,6 +165,69 @@ func (h *Accounts) SetDisabled(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeData(w, map[string]any{"ok": true})
+}
+
+// Donate hands a local account's credentials to the cloud Free-AI pool, then —
+// on success — deletes it locally (it now lives in the shared pool). The client
+// supplies the models this account should serve.
+func (h *Accounts) Donate(w http.ResponseWriter, r *http.Request) {
+	if h.donate == nil {
+		writeAPIErr(w, http.StatusServiceUnavailable, "sign in to the cloud to donate accounts")
+		return
+	}
+	id, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		writeAPIErr(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	var in struct {
+		Models []string `json:"models"`
+	}
+	body, _ := io.ReadAll(io.LimitReader(r.Body, 1<<14))
+	_ = json.Unmarshal(body, &in)
+
+	// Find the account (with creds) by id.
+	rows, err := h.store.List(r.Context(), "")
+	if err != nil {
+		writeAPIErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	var acc *store.Account
+	for i := range rows {
+		if rows[i].ID == id {
+			acc = &rows[i]
+			break
+		}
+	}
+	if acc == nil {
+		writeAPIErr(w, http.StatusNotFound, "account not found")
+		return
+	}
+	// Assemble the credential map (secret folds into api_key for single-token).
+	creds := map[string]string{}
+	for k, v := range acc.Creds {
+		creds[k] = v
+	}
+	if acc.Secret != "" {
+		if _, ok := creds["api_key"]; !ok {
+			creds["api_key"] = acc.Secret
+		}
+	}
+	raw, err := h.donate(r.Context(), acc.Provider, creds, in.Models)
+	if err != nil {
+		writeAPIErr(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	// Success → remove locally so it only lives in the shared pool.
+	if err := h.store.Delete(r.Context(), id); err != nil {
+		writeAPIErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if h.onWrite != nil {
+		go h.onWrite()
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write([]byte(`{"data":` + raw + `}`))
 }
 
 func (h *Accounts) Delete(w http.ResponseWriter, r *http.Request) {

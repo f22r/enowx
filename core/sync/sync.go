@@ -466,6 +466,19 @@ func (m *Manager) FreeAIDonate(ctx context.Context, body []byte) (string, error)
 	return m.rawPost(ctx, "/free-ai/donate", body)
 }
 
+// DonateLocalAccount hands a local account's provider + creds (+ models) to the
+// cloud Free-AI pool. For native providers the cloud validates them; the caller
+// deletes the local account on success.
+func (m *Manager) DonateLocalAccount(ctx context.Context, provider string, creds map[string]string, models []string) (string, error) {
+	body, _ := json.Marshal(map[string]any{
+		"provider": provider,
+		"label":    provider,
+		"creds":    creds,
+		"models":   models,
+	})
+	return m.rawPost(ctx, "/free-ai/donate", body)
+}
+
 // FreeAIDonations lists the caller's donated accounts.
 func (m *Manager) FreeAIDonations(ctx context.Context) (string, error) {
 	var raw json.RawMessage

@@ -157,6 +157,8 @@ export const accountsApi = {
   setDisabled: (id: number, disabled: boolean) =>
     api.patch<{ ok: boolean }>(`/api/accounts/${id}/disabled`, { disabled }),
   remove: (id: number) => api.del<{ ok: boolean }>(`/api/accounts/${id}`),
+  // Donate an account to the community Free AI pool (deletes it locally on success).
+  donate: (id: number, models: string[] = []) => api.post<{ ok?: boolean; id?: number; reason?: string }>(`/api/accounts/${id}/donate`, { models }),
   usage: (id: number) => api.get<{ supported: boolean; usage?: Usage }>(`/api/accounts/${id}/usage`),
   models: (id: number) => api.get<{ provider: string; source: string; models: ProviderModel[] }>(`/api/accounts/${id}/models`),
   allModels: () => api.get<{ models: ProviderModel[] }>("/api/models"),

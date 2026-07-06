@@ -89,6 +89,7 @@ func New(addr string, d Deps) *Server {
 	// can't resurrect the account.
 	if d.Sync != nil {
 		accounts.SetSyncPush(func() { _, _, _ = d.Sync.Sync(context.Background()) })
+		accounts.SetDonate(d.Sync.DonateLocalAccount)
 	}
 	kiro.SetWarmer(warmup)
 	codex.SetWarmer(warmup)
@@ -188,6 +189,7 @@ func New(addr string, d Deps) *Server {
 		r.Get("/warmup-logs", warmup.List)
 		r.Delete("/warmup-logs", warmup.Clear)
 		r.Delete("/accounts/{id}", accounts.Delete)
+		r.Post("/accounts/{id}/donate", accounts.Donate)
 		r.Get("/requests", requests.List)
 		r.Delete("/requests", requests.Clear)
 		r.Get("/requests/summary", requests.Summary)
