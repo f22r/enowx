@@ -133,7 +133,7 @@ func runServer() {
 
 	// Full cloud sync: let the sync manager snapshot/apply accounts, gateway
 	// keys, aliases, and custom providers (custom providers register live).
-	syncMgr.SetFullSync(db.Accounts(), db.Keys(), db.Aliases(), db.CustomProviders(), db.Proxies(),
+	syncMgr.SetFullSync(db.Accounts(), db.Keys(), db.Aliases(), db.Combos(), db.CustomProviders(), db.Proxies(),
 		customMgr.RegisterOne, customMgr.UnregisterOne)
 	// Maintain the live channel (pull side) and the automatic push side. Both
 	// are no-ops until logged in; auto-push also obeys the global toggle.

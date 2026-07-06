@@ -21,6 +21,7 @@ const (
 	typeAPIKey         = "apikey"
 	typeAlias          = "alias"
 	typeProxy          = "proxy"
+	typeCombo          = "combo"
 )
 
 func shortHash(s string) string {
@@ -31,7 +32,7 @@ func shortHash(s string) string {
 // gatedItemID reports whether a sync item id belongs to a gated (full-sync) type,
 // so tombstoning only touches those (not playlists).
 func gatedItemID(id string) bool {
-	for _, t := range []string{typeCustomProvider, typeAccount, typeAPIKey, typeAlias, typeProxy} {
+	for _, t := range []string{typeCustomProvider, typeAccount, typeAPIKey, typeAlias, typeProxy, typeCombo} {
 		if strings.HasPrefix(id, t+":") {
 			return true
 		}
@@ -153,6 +154,18 @@ func (m *Manager) fullSyncItems(ctx context.Context, out map[string]item) {
 			}
 		}
 	}
+
+	// Model combos (plaintext) — keyed by name. last_index (the round-robin
+	// cursor) is device-local runtime state and is intentionally not synced.
+	if m.combos != nil {
+		if list, err := m.combos.List(ctx); err == nil {
+			for _, c := range list {
+				payload, _ := json.Marshal(syncCombo{Name: c.Name, Targets: c.Targets, Strategy: c.Strategy})
+				id := typeCombo + ":" + c.Name
+				out[id] = item{ItemID: id, Type: typeCombo, Version: 1, UpdatedAt: nowMillis(), Payload: string(payload)}
+			}
+		}
+	}
 }
 
 // syncAccount / syncKey are the on-the-wire (encrypted) shapes.
@@ -183,6 +196,12 @@ type syncProxy struct {
 	Enabled  bool   `json:"enabled"`
 }
 
+type syncCombo struct {
+	Name     string              `json:"name"`
+	Targets  []string            `json:"targets"`
+	Strategy store.ComboStrategy `json:"strategy"`
+}
+
 // --- apply: pulled items → local rows ---
 
 // applyFullItem applies one non-playlist pulled item. Returns true if handled.
@@ -198,6 +217,8 @@ func (m *Manager) applyFullItem(ctx context.Context, ri item) bool {
 		return m.applyProxy(ctx, ri)
 	case typeAlias:
 		return m.applyAlias(ctx, ri)
+	case typeCombo:
+		return m.applyCombo(ctx, ri)
 	}
 	return false
 }
@@ -401,5 +422,21 @@ func (m *Manager) applyAlias(ctx context.Context, ri item) bool {
 		return true
 	}
 	_ = m.aliases.Set(ctx, al.Alias, al.Target)
+	return true
+}
+
+func (m *Manager) applyCombo(ctx context.Context, ri item) bool {
+	if m.combos == nil {
+		return false
+	}
+	var c syncCombo
+	if json.Unmarshal([]byte(ri.Payload), &c) != nil {
+		return false
+	}
+	if ri.Deleted {
+		_ = m.combos.DeleteByName(ctx, c.Name)
+		return true
+	}
+	_ = m.combos.SetByName(ctx, c.Name, c.Targets, c.Strategy)
 	return true
 }
