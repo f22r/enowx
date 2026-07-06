@@ -106,6 +106,7 @@ func New(addr string, d Deps) *Server {
 	filters := handlers.NewFilters(dash, d.Filters, d.Sync)
 	otp := handlers.NewOTP(dash, d.Sync)
 	registryH := handlers.NewRegistry(dash, d.Sync)
+	freeAI := handlers.NewFreeAI(dash, d.Sync)
 	proxies := handlers.NewProxy(d.Proxies, d.SettingsKV)
 	if d.Sync != nil {
 		proxies.SetSyncPush(func() { _, _, _ = d.Sync.Sync(context.Background()) })
@@ -235,6 +236,11 @@ func New(addr string, d Deps) *Server {
 		r.Get("/registry", registryH.List)
 		r.Get("/registry/{id}", registryH.Get)
 		r.Post("/registry/publish", registryH.Publish)
+
+		// Free AI — account donation.
+		r.Post("/free-ai/donate", freeAI.Donate)
+		r.Get("/free-ai/donations", freeAI.List)
+		r.Delete("/free-ai/donations/{id}", freeAI.Withdraw)
 
 		// Outbound proxy pool.
 		r.Get("/proxies", proxies.List)

@@ -1,4 +1,4 @@
-import { KeyRound, ScrollText, Boxes, Settings, BarChart3, FolderOpen, Flame, KeySquare, Music, Globe, UserCircle, MessagesSquare, ShoppingBag, Newspaper, Puzzle, Shuffle, Network, Smartphone, Sparkles, Layers } from "lucide-react";
+import { KeyRound, ScrollText, Boxes, Settings, BarChart3, FolderOpen, Flame, KeySquare, Music, Globe, UserCircle, MessagesSquare, ShoppingBag, Newspaper, Puzzle, Shuffle, Network, Smartphone, Sparkles, Layers, HeartHandshake } from "lucide-react";
 import type { DesktopApp } from "../os/types";
 import { AccountsApp } from "./AccountsApp";
 import { RequestsApp } from "./RequestsApp";
@@ -20,6 +20,7 @@ import { ProxyApp } from "./ProxyApp";
 import { OtpApp } from "./OtpApp";
 import { CombosApp } from "./CombosApp";
 import { SkillApp } from "./SkillApp";
+import { FreeAiApp } from "./FreeAiApp";
 
 // `home` is the default location: a dock side or the Apps drawer. The dock
 // starts minimal (core apps); everything else lives in the Apps drawer and the
@@ -40,6 +41,7 @@ export function buildApps(): DesktopApp[] {
     { id: "chat", label: "Community", icon: <MessagesSquare />, accent: "from-fuchsia-500 to-purple-600", home: "right", render: () => <ChatApp /> },
     { id: "otp", label: "OTP", icon: <Smartphone />, accent: "from-cyan-500 to-teal-600", home: "right", render: () => <OtpApp /> },
     { id: "skills", label: "Skills", icon: <Sparkles />, accent: "from-indigo-500 to-blue-600", home: "left", render: () => <SkillApp /> },
+    { id: "free-ai", label: "Free AI", icon: <HeartHandshake />, accent: "from-violet-500 to-fuchsia-600", home: "left", render: () => <FreeAiApp /> },
     { id: "settings", label: "Settings", icon: <Settings />, accent: "from-slate-500 to-slate-700", home: "right", render: () => <SettingsApp /> },
     // Drawer: everything situational (open from the Apps drawer or drag onto a dock).
     { id: "files", label: "Files", icon: <FolderOpen />, accent: "from-amber-500 to-orange-600", home: "drawer", render: () => <FilesApp /> },

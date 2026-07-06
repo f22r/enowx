@@ -458,6 +458,52 @@ func (m *Manager) RegistryPublish(ctx context.Context, body []byte) (string, err
 	return string(raw), nil
 }
 
+// --- Free AI donation (proxy to cloud) ---
+
+// FreeAIDonate forwards a donation (JSON body) to the cloud, which health-checks
+// then stores it. Returns the raw JSON response.
+func (m *Manager) FreeAIDonate(ctx context.Context, body []byte) (string, error) {
+	return m.rawPost(ctx, "/free-ai/donate", body)
+}
+
+// FreeAIDonations lists the caller's donated accounts.
+func (m *Manager) FreeAIDonations(ctx context.Context) (string, error) {
+	var raw json.RawMessage
+	if err := m.call(ctx, http.MethodGet, "/free-ai/donations", nil, &raw); err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
+
+// FreeAIWithdraw removes one of the caller's donated accounts.
+func (m *Manager) FreeAIWithdraw(ctx context.Context, id string) (string, error) {
+	var raw json.RawMessage
+	if err := m.call(ctx, http.MethodDelete, "/free-ai/donations/"+id, nil, &raw); err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
+
+// rawPost sends a raw JSON body with the auth token and returns the raw response.
+func (m *Manager) rawPost(ctx context.Context, path string, body []byte) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, m.ServerURL(ctx)+path, bytes.NewReader(body))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Authorization", "Bearer "+m.get(ctx, keyToken))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := m.http.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<16))
+	if resp.StatusCode >= 400 {
+		return "", errors.New(strings.TrimSpace(string(raw)))
+	}
+	return string(raw), nil
+}
+
 // RegistryList browses published MCP/Skill items.
 func (m *Manager) RegistryList(ctx context.Context, kind, query string) (string, error) {
 	var raw json.RawMessage

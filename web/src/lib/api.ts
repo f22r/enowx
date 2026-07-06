@@ -892,6 +892,25 @@ export const kleosApi = {
   daily: () => api.post<DailyClaim>("/api/kleos/daily", {}),
 };
 
+// --- Free AI: donate accounts to the community pool ---
+export interface DonatedAccount {
+  id: number;
+  provider: string;
+  label: string;
+  model: string;
+  status: string;
+  error_count: number;
+  last_used_at?: string;
+  created_at: string;
+}
+export interface DonateResult { ok: boolean; id?: number; model?: string; reason?: string }
+export const freeAiApi = {
+  donate: (body: { provider: string; label: string; creds: { endpoint: string; api_key: string; model: string } }) =>
+    api.post<DonateResult>("/api/free-ai/donate", body),
+  donations: () => api.get<{ items: DonatedAccount[] }>("/api/free-ai/donations"),
+  withdraw: (id: number) => api.del<{ ok: boolean }>(`/api/free-ai/donations/${id}`),
+};
+
 export const shopApi = {
   get: () => api.get<ShopState>("/api/shop"),
   buy: (item_id: string) => api.post<{ kleos: number; owned: string[] }>("/api/shop/buy", { item_id }),
