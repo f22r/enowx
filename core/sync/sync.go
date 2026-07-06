@@ -1330,6 +1330,10 @@ type item struct {
 	Encrypted bool   `json:"encrypted"`
 	Payload   string `json:"payload,omitempty"`
 	Nonce     string `json:"nonce,omitempty"`
+	// KeyHash is a non-secret sha256 of a gateway API key's secret, sent for
+	// apikey items so the cloud can authenticate Free-AI requests by matching the
+	// bearer's hash — without ever seeing the key (the payload stays E2E-encrypted).
+	KeyHash string `json:"key_hash,omitempty"`
 }
 
 type manifestEntry struct {

@@ -1,8 +1,59 @@
 import { useEffect, useRef, useState } from "react";
-import { Loader2, Gift, Trash2, Plus, X, Check, Sparkles } from "lucide-react";
+import { Loader2, Gift, Trash2, Plus, X, Check, Sparkles, Copy } from "lucide-react";
 import { AppShell } from "./shell";
 import { useProfile } from "../os/useProfile";
+import { copyText } from "../os/clipboard";
 import { freeAiApi, accountsApi, type DonatedAccount, type FreeAiModel } from "../lib/api";
+
+// CopyBtn is a small inline copy button that flips to a check for a moment.
+function CopyBtn({ text, title }: { text: string; title: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); copyText(text); setCopied(true); setTimeout(() => setCopied(false), 1200); }}
+      className="shrink-0 rounded p-1 text-white/40 hover:bg-white/10 hover:text-white/80"
+      title={title}
+    >
+      {copied ? <Check className="h-3 w-3 text-emerald-300" /> : <Copy className="h-3 w-3" />}
+    </button>
+  );
+}
+
+// EndpointBox shows how to call Free AI: the OpenAI-compatible endpoint + auth.
+function EndpointBox() {
+  const url = `${location.origin}/api/ai/v1/chat/completions`;
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3 text-[11px]">
+      <div className="mb-1.5 font-medium text-white/70">How to use</div>
+      <p className="mb-2 text-white/45">OpenAI-compatible. Send a chat completion to this endpoint from your gateway, authenticated with one of your gateway API keys (from the API keys app). You're charged Kleos per request based on the model.</p>
+      <div className="flex items-center gap-2 rounded-lg bg-black/30 px-2.5 py-1.5">
+        <span className="shrink-0 rounded bg-emerald-500/15 px-1.5 py-0.5 font-mono text-[9px] font-semibold text-emerald-300">POST</span>
+        <code className="flex-1 truncate font-mono text-white/80">{url}</code>
+        <CopyBtn text={url} title="Copy endpoint" />
+      </div>
+      <div className="mt-1.5 flex items-center gap-2 rounded-lg bg-black/30 px-2.5 py-1.5">
+        <code className="flex-1 truncate font-mono text-white/55">Authorization: Bearer &lt;your-api-key&gt;</code>
+        <CopyBtn text="Authorization: Bearer <your-api-key>" title="Copy header" />
+      </div>
+    </div>
+  );
+}
+
+// ModelRow shows one available model: id + copy + clear input/output Kleos price.
+function ModelRow({ m }: { m: FreeAiModel }) {
+  return (
+    <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 text-xs hover:bg-white/5">
+      <Sparkles className="h-3.5 w-3.5 shrink-0 text-indigo-300" />
+      <span className="flex-1 truncate font-mono text-white/85" title={m.id}>{m.id}</span>
+      <CopyBtn text={m.id} title="Copy model id" />
+      <div className="flex shrink-0 items-center gap-2 text-[10px]">
+        <span className="rounded bg-white/5 px-1.5 py-0.5 text-white/45" title="Kleos per 1M input tokens">in {m.kleos_per_1m_in.toLocaleString()}</span>
+        <span className="rounded bg-white/5 px-1.5 py-0.5 text-white/45" title="Kleos per 1M output tokens">out {m.kleos_per_1m_out.toLocaleString()}</span>
+        <span className="text-white/25">Kleos/1M</span>
+      </div>
+    </div>
+  );
+}
 
 // Provider templates: pre-fill the endpoint so donors only paste key + model.
 const TEMPLATES: { id: string; label: string; endpoint: string }[] = [
@@ -56,7 +107,7 @@ export function FreeAiApp() {
                 <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search models…" className="w-40 rounded-md border border-white/10 bg-black/25 px-2 py-1 text-[11px] text-white/80 outline-none focus:border-white/25" />
               )}
             </div>
-            <p className="text-[11px] text-white/40">Models the community pool can serve right now — each one is backed by a donated account. Use them from your gateway, paying Kleos per request.</p>
+            <EndpointBox />
             <div className="min-h-0 flex-1 overflow-auto">
               {models === null ? (
                 <div className="flex h-24 items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-white/30" /></div>
@@ -65,13 +116,9 @@ export function FreeAiApp() {
                   No models available yet — the pool is empty. Donate an account to add some.
                 </div>
               ) : (
-                <div className="space-y-1">
+                <div className="space-y-1.5">
                   {models.filter((m) => !q || m.id.toLowerCase().includes(q.toLowerCase())).map((m) => (
-                    <div key={m.id} className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 text-xs hover:bg-white/5">
-                      <Sparkles className="h-3.5 w-3.5 shrink-0 text-indigo-300" />
-                      <span className="flex-1 truncate font-mono text-white/85">{m.id}</span>
-                      <span className="shrink-0 text-[10px] text-white/40" title="Kleos per 1M tokens (in / out)">{m.kleos_per_1m_in} / {m.kleos_per_1m_out} Kleos/1M</span>
-                    </div>
+                    <ModelRow key={m.id} m={m} />
                   ))}
                 </div>
               )}

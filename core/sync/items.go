@@ -29,6 +29,13 @@ func shortHash(s string) string {
 	return hex.EncodeToString(h[:])[:16]
 }
 
+// fullHash is the full sha256 hex of a string (non-reversible), used as the
+// cloud-side lookup key for a gateway API key.
+func fullHash(s string) string {
+	h := sha256.Sum256([]byte(s))
+	return hex.EncodeToString(h[:])
+}
+
 // gatedItemID reports whether a sync item id belongs to a gated (full-sync) type,
 // so tombstoning only touches those (not playlists).
 func gatedItemID(id string) bool {
@@ -121,7 +128,7 @@ func (m *Manager) fullSyncItems(ctx context.Context, out map[string]item) {
 					continue
 				}
 				id := typeAPIKey + ":" + shortHash(k.Secret)
-				out[id] = item{ItemID: id, Type: typeAPIKey, Version: 1, UpdatedAt: nowMillis(), Encrypted: true, Payload: payload, Nonce: nonce}
+				out[id] = item{ItemID: id, Type: typeAPIKey, Version: 1, UpdatedAt: nowMillis(), Encrypted: true, Payload: payload, Nonce: nonce, KeyHash: fullHash(k.Secret)}
 			}
 		}
 	}
