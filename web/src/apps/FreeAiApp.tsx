@@ -75,12 +75,16 @@ function DonationRow({ item, onGone }: { item: DonatedAccount; onGone: () => voi
     await freeAiApi.withdraw(item.id).catch(() => {});
     onGone();
   };
+  const models = item.models ?? [];
   return (
     <div className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 text-xs">
       <Sparkles className="h-3.5 w-3.5 shrink-0 text-indigo-300" />
       <div className="min-w-0 flex-1">
-        <div className="truncate font-medium text-white">{item.label || item.model}</div>
-        <div className="text-[10px] text-white/40">{item.provider} · {item.model}</div>
+        <div className="truncate font-medium text-white">{item.label || item.provider}</div>
+        <div className="truncate text-[10px] text-white/40">
+          {item.provider} · {models.length} model{models.length === 1 ? "" : "s"}
+          {models.length > 0 && <span className="text-white/30"> · {models.slice(0, 3).join(", ")}{models.length > 3 ? "…" : ""}</span>}
+        </div>
       </div>
       <span className={`text-[10px] ${statusColor}`}>{item.status}</span>
       <button onClick={withdraw} disabled={busy} className="text-white/30 hover:text-red-300" title="Withdraw from pool">
@@ -90,27 +94,52 @@ function DonationRow({ item, onGone }: { item: DonatedAccount; onGone: () => voi
   );
 }
 
+// parseModels splits a comma/newline-separated model list, trimmed + de-duped.
+function parseModels(s: string): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const m of s.split(/[\n,]/).map((x) => x.trim())) {
+    if (m && !seen.has(m)) { seen.add(m); out.push(m); }
+  }
+  return out;
+}
+
 function DonateModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
   const [tpl, setTpl] = useState(TEMPLATES[0]);
   const [endpoint, setEndpoint] = useState("");
   const [apiKey, setApiKey] = useState("");
-  const [model, setModel] = useState("");
+  const [modelsText, setModelsText] = useState("");
   const [label, setLabel] = useState("");
   const [busy, setBusy] = useState(false);
+  const [fetching, setFetching] = useState(false);
   const [err, setErr] = useState("");
   const keyRef = useRef<HTMLInputElement>(null);
 
   const pickTemplate = (t: typeof TEMPLATES[number]) => { setTpl(t); setEndpoint(t.endpoint); };
+  const ep = () => (tpl.id === "custom" ? endpoint : tpl.endpoint).trim();
+  const models = parseModels(modelsText);
+
+  const fetchModels = async () => {
+    if (!ep() || !apiKey.trim()) { setErr("Enter the endpoint + API key first."); return; }
+    setFetching(true); setErr("");
+    try {
+      const r = await freeAiApi.fetchModels({ endpoint: ep(), api_key: apiKey.trim() });
+      if (!r.ok || !r.models?.length) { setErr(r.reason || "Couldn't fetch models — add them manually."); return; }
+      setModelsText(r.models.join("\n"));
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "fetch failed");
+    } finally { setFetching(false); }
+  };
 
   const submit = async () => {
-    const ep = (tpl.id === "custom" ? endpoint : tpl.endpoint).trim();
-    if (!ep || !apiKey.trim() || !model.trim() || busy) return;
+    if (!ep() || !apiKey.trim() || models.length === 0 || busy) return;
     setBusy(true); setErr("");
     try {
       const r = await freeAiApi.donate({
         provider: tpl.id,
         label: label.trim(),
-        creds: { endpoint: ep, api_key: apiKey.trim(), model: model.trim() },
+        creds: { endpoint: ep(), api_key: apiKey.trim() },
+        models,
       });
       if (!r.ok) { setErr(r.reason || "Account rejected."); return; }
       onDone();
@@ -127,7 +156,7 @@ function DonateModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
           <button onClick={onClose} className="rounded-lg p-1 text-white/40 hover:bg-white/10 hover:text-white"><X className="h-4 w-4" /></button>
         </div>
         <div className="space-y-3 p-4">
-          <p className="text-[11px] text-white/40">We'll send one tiny request to verify it works before adding it to the pool.</p>
+          <p className="text-[11px] text-white/40">One account can serve many models. Fetch the model list automatically, or add them yourself. We verify the account works before adding it to the pool.</p>
           <div>
             <label className="mb-1 block text-[11px] text-white/50">Provider</label>
             <select
@@ -142,12 +171,22 @@ function DonateModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
             <input value={endpoint} onChange={(e) => setEndpoint(e.target.value)} placeholder="Endpoint (https://…/v1)" className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-xs text-white outline-none focus:border-white/25" />
           )}
           <input ref={keyRef} value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="API key" type="password" className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 font-mono text-xs text-white outline-none focus:border-white/25" />
-          <input value={model} onChange={(e) => setModel(e.target.value)} placeholder="Model (e.g. gpt-4o-mini)" className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-xs text-white outline-none focus:border-white/25" />
+
+          <div>
+            <div className="mb-1 flex items-center justify-between">
+              <label className="text-[11px] text-white/50">Models {models.length > 0 && <span className="text-white/30">({models.length})</span>}</label>
+              <button onClick={fetchModels} disabled={fetching || !ep() || !apiKey.trim()} className="flex items-center gap-1 rounded-md border border-white/10 px-2 py-0.5 text-[10px] text-white/60 hover:bg-white/5 disabled:opacity-40">
+                {fetching ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />} Fetch from endpoint
+              </button>
+            </div>
+            <textarea value={modelsText} onChange={(e) => setModelsText(e.target.value)} placeholder="One model per line (or comma-separated), e.g.&#10;gpt-4o-mini&#10;gpt-4o" rows={4} className="w-full resize-none rounded-lg border border-white/10 bg-black/30 px-3 py-2 font-mono text-[11px] text-white outline-none focus:border-white/25" />
+          </div>
+
           <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Label (optional)" className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-xs text-white outline-none focus:border-white/25" />
           {err && <p className="text-[11px] text-red-300">{err}</p>}
           <div className="flex justify-end gap-2 pt-1">
             <button onClick={onClose} className="rounded-lg px-3 py-1.5 text-xs text-white/50 hover:bg-white/5">Cancel</button>
-            <button onClick={submit} disabled={busy || !apiKey.trim() || !model.trim()} className="flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-black hover:opacity-90 disabled:opacity-40">
+            <button onClick={submit} disabled={busy || !apiKey.trim() || models.length === 0} className="flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-black hover:opacity-90 disabled:opacity-40">
               {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />} {busy ? "Checking…" : "Donate"}
             </button>
           </div>

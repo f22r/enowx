@@ -897,15 +897,18 @@ export interface DonatedAccount {
   id: number;
   provider: string;
   label: string;
-  model: string;
+  models: string[];
   status: string;
   error_count: number;
   last_used_at?: string;
   created_at: string;
 }
-export interface DonateResult { ok: boolean; id?: number; model?: string; reason?: string }
+export interface DonateResult { ok: boolean; id?: number; models?: string[]; reason?: string }
+export interface FetchModelsResult { ok: boolean; models?: string[]; reason?: string }
 export const freeAiApi = {
-  donate: (body: { provider: string; label: string; creds: { endpoint: string; api_key: string; model: string } }) =>
+  fetchModels: (creds: { endpoint: string; api_key: string }) =>
+    api.post<FetchModelsResult>("/api/free-ai/models", creds),
+  donate: (body: { provider: string; label: string; creds: { endpoint: string; api_key: string }; models: string[] }) =>
     api.post<DonateResult>("/api/free-ai/donate", body),
   donations: () => api.get<{ items: DonatedAccount[] }>("/api/free-ai/donations"),
   withdraw: (id: number) => api.del<{ ok: boolean }>(`/api/free-ai/donations/${id}`),
