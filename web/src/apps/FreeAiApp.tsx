@@ -15,6 +15,7 @@ const TEMPLATES: { id: string; label: string; endpoint: string }[] = [
 // time. Serving from the pool (spending Kleos) is a separate feature.
 export function FreeAiApp() {
   const profile = useProfile();
+  const [tab, setTab] = useState<"browse" | "donate">("browse");
   const [items, setItems] = useState<DonatedAccount[] | null>(null);
   const [models, setModels] = useState<FreeAiModel[] | null>(null);
   const [adding, setAdding] = useState(false);
@@ -28,66 +29,81 @@ export function FreeAiApp() {
 
   if (!profile.loggedIn) {
     return (
-      <AppShell title="Free AI" subtitle="Donate an AI account to the community pool">
-        <div className="flex h-40 items-center justify-center text-sm text-white/55">Sign in to donate.</div>
+      <AppShell title="Free AI" subtitle="Community AI pool, paid with Kleos">
+        <div className="flex h-40 items-center justify-center text-sm text-white/55">Sign in to use Free AI.</div>
       </AppShell>
     );
   }
 
   return (
-    <AppShell title="Free AI" subtitle="Donate an AI account to the community pool">
+    <AppShell title="Free AI" subtitle="Community AI pool, paid with Kleos">
       <div className="flex h-full flex-col gap-3">
-        <div className="rounded-xl border border-indigo-400/15 bg-indigo-400/[0.04] px-3 py-2.5 text-[11px] text-white/60">
-          Donate an AI account and everyone can use it for free (paid with Kleos). Your credentials are
-          health-checked, stored encrypted, used only to serve requests — and you can withdraw any time.
-        </div>
-
-        {/* Available models — only models that have a live donated account. */}
-        <div>
-          <div className="mb-1.5 flex items-center justify-between">
-            <span className="text-xs font-medium text-white/70">Available now {models ? `(${models.length})` : ""}</span>
-            {models && models.length > 6 && (
-              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search models…" className="w-40 rounded-md border border-white/10 bg-black/25 px-2 py-1 text-[11px] text-white/80 outline-none focus:border-white/25" />
-            )}
-          </div>
-          {models === null ? (
-            <div className="flex h-14 items-center justify-center"><Loader2 className="h-4 w-4 animate-spin text-white/30" /></div>
-          ) : models.length === 0 ? (
-            <div className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-3 text-center text-[11px] text-white/40">
-              No models available yet — the pool is empty. Donate an account to add some.
-            </div>
-          ) : (
-            <div className="max-h-40 overflow-auto rounded-lg border border-white/10 bg-white/[0.02] p-1">
-              {models.filter((m) => !q || m.id.toLowerCase().includes(q.toLowerCase())).map((m) => (
-                <div key={m.id} className="flex items-center gap-2 rounded px-2 py-1 text-[11px] hover:bg-white/5">
-                  <span className="flex-1 truncate font-mono text-white/85">{m.id}</span>
-                  <span className="shrink-0 text-white/35" title="Kleos per 1M tokens (in / out)">{m.kleos_per_1m_in} / {m.kleos_per_1m_out} K</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-medium text-white/70">Your donations {items ? `(${items.length})` : ""}</span>
-          <button onClick={() => setAdding(true)} className="flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-black hover:opacity-90">
-            <Plus className="h-3.5 w-3.5" /> Donate account
+        {/* Two pages: Browse available models · Donate + manage your donations. */}
+        <div className="flex rounded-lg border border-white/10 bg-white/[0.02] p-0.5 text-xs">
+          <button onClick={() => setTab("browse")} className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 font-medium ${tab === "browse" ? "bg-white/10 text-white" : "text-white/50 hover:text-white/80"}`}>
+            <Sparkles className="h-3.5 w-3.5" /> Browse models
+          </button>
+          <button onClick={() => setTab("donate")} className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 font-medium ${tab === "donate" ? "bg-white/10 text-white" : "text-white/50 hover:text-white/80"}`}>
+            <Gift className="h-3.5 w-3.5" /> Donate {items && items.length > 0 ? `(${items.length})` : ""}
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-auto">
-          {items === null ? (
-            <div className="flex h-24 items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-white/30" /></div>
-          ) : items.length === 0 ? (
-            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-8 text-center text-xs text-white/40">
-              You haven't donated any accounts yet.
+        {tab === "browse" ? (
+          <div className="flex min-h-0 flex-1 flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-white/70">Available now {models ? `(${models.length})` : ""}</span>
+              {models && models.length > 6 && (
+                <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search models…" className="w-40 rounded-md border border-white/10 bg-black/25 px-2 py-1 text-[11px] text-white/80 outline-none focus:border-white/25" />
+              )}
             </div>
-          ) : (
-            <div className="space-y-1.5">
-              {items.map((it) => <DonationRow key={it.id} item={it} onGone={load} />)}
+            <p className="text-[11px] text-white/40">Models the community pool can serve right now — each one is backed by a donated account. Use them from your gateway, paying Kleos per request.</p>
+            <div className="min-h-0 flex-1 overflow-auto">
+              {models === null ? (
+                <div className="flex h-24 items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-white/30" /></div>
+              ) : models.length === 0 ? (
+                <div className="rounded-xl border border-white/10 bg-white/[0.02] p-8 text-center text-xs text-white/40">
+                  No models available yet — the pool is empty. Donate an account to add some.
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  {models.filter((m) => !q || m.id.toLowerCase().includes(q.toLowerCase())).map((m) => (
+                    <div key={m.id} className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.02] px-3 py-2 text-xs hover:bg-white/5">
+                      <Sparkles className="h-3.5 w-3.5 shrink-0 text-indigo-300" />
+                      <span className="flex-1 truncate font-mono text-white/85">{m.id}</span>
+                      <span className="shrink-0 text-[10px] text-white/40" title="Kleos per 1M tokens (in / out)">{m.kleos_per_1m_in} / {m.kleos_per_1m_out} Kleos/1M</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className="flex min-h-0 flex-1 flex-col gap-2">
+            <div className="rounded-xl border border-indigo-400/15 bg-indigo-400/[0.04] px-3 py-2.5 text-[11px] text-white/60">
+              Donate an AI account and everyone can use it for free (paid with Kleos). Credentials are
+              health-checked, stored encrypted, used only to serve requests — withdraw any time.
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-white/70">Your donations {items ? `(${items.length})` : ""}</span>
+              <button onClick={() => setAdding(true)} className="flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-black hover:opacity-90">
+                <Plus className="h-3.5 w-3.5" /> Donate account
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-auto">
+              {items === null ? (
+                <div className="flex h-24 items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-white/30" /></div>
+              ) : items.length === 0 ? (
+                <div className="rounded-xl border border-white/10 bg-white/[0.02] p-8 text-center text-xs text-white/40">
+                  You haven't donated any accounts yet.
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  {items.map((it) => <DonationRow key={it.id} item={it} onGone={load} />)}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {adding && <DonateModal onClose={() => setAdding(false)} onDone={() => { setAdding(false); load(); }} />}
