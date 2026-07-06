@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"strings"
 	"net/http"
 	"strconv"
 
@@ -213,14 +214,9 @@ func (h *Accounts) Donate(w http.ResponseWriter, r *http.Request) {
 			creds["api_key"] = acc.Secret
 		}
 	}
-	raw, err := h.donate(r.Context(), acc.Provider, creds, in.Models)
+	raw, err := h.donateOne(r.Context(), acc, in.Models)
 	if err != nil {
 		writeAPIErr(w, http.StatusBadGateway, err.Error())
-		return
-	}
-	// Success → remove locally so it only lives in the shared pool.
-	if err := h.store.Delete(r.Context(), id); err != nil {
-		writeAPIErr(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	if h.onWrite != nil {
@@ -228,6 +224,89 @@ func (h *Accounts) Donate(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_, _ = w.Write([]byte(`{"data":` + raw + `}`))
+}
+
+// donateOne hands one account's creds to the pool and, on success, deletes it
+// locally. Returns the cloud's raw JSON reply.
+func (h *Accounts) donateOne(ctx context.Context, acc *store.Account, models []string) (string, error) {
+	creds := map[string]string{}
+	for k, v := range acc.Creds {
+		creds[k] = v
+	}
+	if acc.Secret != "" {
+		if _, ok := creds["api_key"]; !ok {
+			creds["api_key"] = acc.Secret
+		}
+	}
+	raw, err := h.donate(ctx, acc.Provider, creds, models)
+	if err != nil {
+		return "", err
+	}
+	if err := h.store.Delete(ctx, acc.ID); err != nil {
+		return "", err
+	}
+	return raw, nil
+}
+
+// DonateBulk donates up to `quantity` LIVE accounts of a provider from the local
+// pool: it warms (health-checks) each candidate and donates the ones that come
+// back active, until the quantity is met. The user just picks a provider + count.
+func (h *Accounts) DonateBulk(w http.ResponseWriter, r *http.Request) {
+	if h.donate == nil {
+		writeAPIErr(w, http.StatusServiceUnavailable, "sign in to the cloud to donate accounts")
+		return
+	}
+	var in struct {
+		Provider string `json:"provider"`
+		Quantity int    `json:"quantity"`
+	}
+	body, _ := io.ReadAll(io.LimitReader(r.Body, 1<<14))
+	_ = json.Unmarshal(body, &in)
+	provider := strings.TrimSpace(in.Provider)
+	if provider == "" || in.Quantity < 1 {
+		writeAPIErr(w, http.StatusBadRequest, "provider and a positive quantity are required")
+		return
+	}
+	if in.Quantity > 100 {
+		in.Quantity = 100
+	}
+
+	rows, err := h.store.List(r.Context(), provider)
+	if err != nil {
+		writeAPIErr(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	donated, checked, failed := 0, 0, 0
+	var lastErr string
+	for i := range rows {
+		if donated >= in.Quantity {
+			break
+		}
+		acc := rows[i]
+		if acc.Disabled {
+			continue
+		}
+		checked++
+		// Health check: warm the account; only donate if it comes back active.
+		if h.warmer != nil {
+			status, _ := h.warmer.WarmAccount(r.Context(), &acc)
+			if status != "" && status != "active" {
+				failed++
+				continue
+			}
+		}
+		if _, err := h.donateOne(r.Context(), &acc, nil); err != nil {
+			failed++
+			lastErr = err.Error()
+			continue
+		}
+		donated++
+	}
+	if h.onWrite != nil {
+		go h.onWrite()
+	}
+	writeData(w, map[string]any{"donated": donated, "checked": checked, "failed": failed, "last_error": lastErr})
 }
 
 func (h *Accounts) Delete(w http.ResponseWriter, r *http.Request) {

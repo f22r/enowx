@@ -190,6 +190,7 @@ func New(addr string, d Deps) *Server {
 		r.Delete("/warmup-logs", warmup.Clear)
 		r.Delete("/accounts/{id}", accounts.Delete)
 		r.Post("/accounts/{id}/donate", accounts.Donate)
+		r.Post("/accounts/donate-bulk", accounts.DonateBulk)
 		r.Get("/requests", requests.List)
 		r.Delete("/requests", requests.Clear)
 		r.Get("/requests/summary", requests.Summary)

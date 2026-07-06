@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Loader2, Gift, Trash2, Plus, X, Check, Sparkles } from "lucide-react";
 import { AppShell } from "./shell";
 import { useProfile } from "../os/useProfile";
-import { freeAiApi, type DonatedAccount } from "../lib/api";
+import { freeAiApi, accountsApi, type DonatedAccount } from "../lib/api";
 
 // Provider templates: pre-fill the endpoint so donors only paste key + model.
 const TEMPLATES: { id: string; label: string; endpoint: string }[] = [
@@ -101,7 +101,16 @@ function parseModels(s: string): string[] {
   return out;
 }
 
+// Native providers that can be donated straight from your local accounts.
+const NATIVE_PROVIDERS = [
+  { id: "codebuddy", label: "CodeBuddy" },
+  { id: "codebuddy-cn", label: "CodeBuddy CN" },
+  { id: "kiro", label: "Kiro" },
+  { id: "codex", label: "Codex" },
+];
+
 function DonateModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+  const [mode, setMode] = useState<"manual" | "local">("local");
   const [tpl, setTpl] = useState(TEMPLATES[0]);
   const [endpoint, setEndpoint] = useState("");
   const [apiKey, setApiKey] = useState("");
@@ -111,6 +120,25 @@ function DonateModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
   const [fetching, setFetching] = useState(false);
   const [err, setErr] = useState("");
   const keyRef = useRef<HTMLInputElement>(null);
+
+  // Local-accounts donation: pick a provider + how many to donate.
+  const [localProvider, setLocalProvider] = useState(NATIVE_PROVIDERS[0].id);
+  const [quantity, setQuantity] = useState(1);
+
+  const submitLocal = async () => {
+    if (busy) return;
+    setBusy(true); setErr("");
+    try {
+      const r = await accountsApi.donateBulk(localProvider, quantity);
+      if (r.donated === 0) {
+        setErr(r.last_error || `No live ${localProvider} accounts to donate (checked ${r.checked}).`);
+        return;
+      }
+      onDone();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "donation failed");
+    } finally { setBusy(false); }
+  };
 
   const pickTemplate = (t: typeof TEMPLATES[number]) => { setTpl(t); setEndpoint(t.endpoint); };
   const ep = () => (tpl.id === "custom" ? endpoint : tpl.endpoint).trim();
@@ -153,6 +181,35 @@ function DonateModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
           <button onClick={onClose} className="rounded-lg p-1 text-white/40 hover:bg-white/10 hover:text-white"><X className="h-4 w-4" /></button>
         </div>
         <div className="space-y-3 p-4">
+          {/* Source: donate from your local accounts, or add a manual endpoint. */}
+          <div className="flex rounded-lg border border-white/10 bg-white/[0.02] p-0.5 text-xs">
+            <button onClick={() => { setMode("local"); setErr(""); }} className={`flex-1 rounded-md px-2 py-1.5 font-medium ${mode === "local" ? "bg-white/10 text-white" : "text-white/50 hover:text-white/80"}`}>From my accounts</button>
+            <button onClick={() => { setMode("manual"); setErr(""); }} className={`flex-1 rounded-md px-2 py-1.5 font-medium ${mode === "manual" ? "bg-white/10 text-white" : "text-white/50 hover:text-white/80"}`}>Manual (endpoint)</button>
+          </div>
+
+          {mode === "local" ? (
+            <>
+              <p className="text-[11px] text-white/40">Donate accounts you already added (Kiro/Codex/CodeBuddy). Pick a provider and how many — we auto-pick the active ones, verify each works, then move them to the pool.</p>
+              <div>
+                <label className="mb-1 block text-[11px] text-white/50">Provider</label>
+                <select value={localProvider} onChange={(e) => setLocalProvider(e.target.value)} className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-xs text-white outline-none focus:border-white/25">
+                  {NATIVE_PROVIDERS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-[11px] text-white/50">How many</label>
+                <input type="number" min={1} max={100} value={quantity} onChange={(e) => setQuantity(Math.min(100, Math.max(1, Number(e.target.value) || 1)))} className="w-28 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-xs text-white outline-none focus:border-white/25" />
+              </div>
+              {err && <p className="text-[11px] text-red-300">{err}</p>}
+              <div className="flex justify-end gap-2 pt-1">
+                <button onClick={onClose} className="rounded-lg px-3 py-1.5 text-xs text-white/50 hover:bg-white/5">Cancel</button>
+                <button onClick={submitLocal} disabled={busy} className="flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-xs font-medium text-black hover:opacity-90 disabled:opacity-40">
+                  {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Gift className="h-3.5 w-3.5" />} {busy ? "Checking…" : `Donate ${quantity}`}
+                </button>
+              </div>
+            </>
+          ) : (
+          <>
           <p className="text-[11px] text-white/40">One account can serve many models. Fetch the model list automatically, or add them yourself. We verify the account works before adding it to the pool.</p>
           <div>
             <label className="mb-1 block text-[11px] text-white/50">Provider</label>
@@ -187,6 +244,8 @@ function DonateModal({ onClose, onDone }: { onClose: () => void; onDone: () => v
               {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />} {busy ? "Checking…" : "Donate"}
             </button>
           </div>
+          </>
+          )}
         </div>
       </div>
     </div>
