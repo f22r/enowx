@@ -80,7 +80,10 @@ type LiveEvent struct {
 func New(settings store.SettingsStore, music store.MusicStore, logs store.LogStore) *Manager {
 	return &Manager{
 		settings: settings, music: music, logs: logs,
-		http: &http.Client{Timeout: 30 * time.Second},
+		// 60s (was 30): a first full sync of a large account pool can take a while
+		// over a remote DB; the server batches the upsert in one tx, but give the
+		// client headroom so a big initial push doesn't time out.
+		http: &http.Client{Timeout: 60 * time.Second},
 		subs: map[int]chan LiveEvent{},
 	}
 }
