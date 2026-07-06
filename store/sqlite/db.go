@@ -30,6 +30,7 @@ type DB struct {
 	custom   *customProviderStore
 	filters  *filterStore
 	proxies  *proxyStore
+	combos   *comboStore
 }
 
 func Open(path string) (*DB, error) {
@@ -65,6 +66,7 @@ func Open(path string) (*DB, error) {
 	d.custom = &customProviderStore{db: db}
 	d.filters = &filterStore{db: db}
 	d.proxies = &proxyStore{db: db}
+	d.combos = &comboStore{db: db}
 	seedApiTest(db)
 	backfillApiTest(db)
 	return d, nil
@@ -163,6 +165,7 @@ func (d *DB) ApiTest() store.ApiTestStore   { return d.apitest }
 func (d *DB) CustomProviders() store.CustomProviderStore { return d.custom }
 func (d *DB) Filters() store.FilterStore                 { return d.filters }
 func (d *DB) Proxies() store.ProxyStore                  { return d.proxies }
+func (d *DB) Combos() store.ComboStore                    { return d.combos }
 func (d *DB) Close() error                  { return d.db.Close() }
 
 func migrate(db *sql.DB) error {
