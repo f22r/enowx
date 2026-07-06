@@ -240,7 +240,8 @@ func New(addr string, d Deps) *Server {
 		r.Get("/registry/{id}", registryH.Get)
 		r.Post("/registry/publish", registryH.Publish)
 
-		// Free AI — account donation.
+		// Free AI — account donation + available models.
+		r.Get("/ai/models", freeAI.Models)
 		r.Post("/free-ai/donate", freeAI.Donate)
 		r.Get("/free-ai/donations", freeAI.List)
 		r.Delete("/free-ai/donations/{id}", freeAI.Withdraw)

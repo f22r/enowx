@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Loader2, Gift, Trash2, Plus, X, Check, Sparkles } from "lucide-react";
 import { AppShell } from "./shell";
 import { useProfile } from "../os/useProfile";
-import { freeAiApi, accountsApi, type DonatedAccount } from "../lib/api";
+import { freeAiApi, accountsApi, type DonatedAccount, type FreeAiModel } from "../lib/api";
 
 // Provider templates: pre-fill the endpoint so donors only paste key + model.
 const TEMPLATES: { id: string; label: string; endpoint: string }[] = [
@@ -16,9 +16,14 @@ const TEMPLATES: { id: string; label: string; endpoint: string }[] = [
 export function FreeAiApp() {
   const profile = useProfile();
   const [items, setItems] = useState<DonatedAccount[] | null>(null);
+  const [models, setModels] = useState<FreeAiModel[] | null>(null);
   const [adding, setAdding] = useState(false);
+  const [q, setQ] = useState("");
 
-  const load = () => freeAiApi.donations().then((r) => setItems(r.items ?? [])).catch(() => setItems([]));
+  const load = () => {
+    freeAiApi.donations().then((r) => setItems(r.items ?? [])).catch(() => setItems([]));
+    freeAiApi.models().then((r) => setModels(r.data ?? [])).catch(() => setModels([]));
+  };
   useEffect(() => { if (profile.loggedIn) load(); }, [profile.loggedIn]);
 
   if (!profile.loggedIn) {
@@ -35,6 +40,32 @@ export function FreeAiApp() {
         <div className="rounded-xl border border-indigo-400/15 bg-indigo-400/[0.04] px-3 py-2.5 text-[11px] text-white/60">
           Donate an AI account and everyone can use it for free (paid with Kleos). Your credentials are
           health-checked, stored encrypted, used only to serve requests — and you can withdraw any time.
+        </div>
+
+        {/* Available models — only models that have a live donated account. */}
+        <div>
+          <div className="mb-1.5 flex items-center justify-between">
+            <span className="text-xs font-medium text-white/70">Available now {models ? `(${models.length})` : ""}</span>
+            {models && models.length > 6 && (
+              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search models…" className="w-40 rounded-md border border-white/10 bg-black/25 px-2 py-1 text-[11px] text-white/80 outline-none focus:border-white/25" />
+            )}
+          </div>
+          {models === null ? (
+            <div className="flex h-14 items-center justify-center"><Loader2 className="h-4 w-4 animate-spin text-white/30" /></div>
+          ) : models.length === 0 ? (
+            <div className="rounded-lg border border-white/10 bg-white/[0.02] px-3 py-3 text-center text-[11px] text-white/40">
+              No models available yet — the pool is empty. Donate an account to add some.
+            </div>
+          ) : (
+            <div className="max-h-40 overflow-auto rounded-lg border border-white/10 bg-white/[0.02] p-1">
+              {models.filter((m) => !q || m.id.toLowerCase().includes(q.toLowerCase())).map((m) => (
+                <div key={m.id} className="flex items-center gap-2 rounded px-2 py-1 text-[11px] hover:bg-white/5">
+                  <span className="flex-1 truncate font-mono text-white/85">{m.id}</span>
+                  <span className="shrink-0 text-white/35" title="Kleos per 1M tokens (in / out)">{m.kleos_per_1m_in} / {m.kleos_per_1m_out} K</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="flex items-center justify-between">

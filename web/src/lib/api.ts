@@ -910,7 +910,15 @@ export interface DonatedAccount {
 }
 export interface DonateResult { ok: boolean; id?: number; models?: string[]; reason?: string }
 export interface FetchModelsResult { ok: boolean; models?: string[]; reason?: string }
+export interface FreeAiModel {
+  id: string;
+  owned_by: string;
+  kleos_per_1m_in: number;
+  kleos_per_1m_out: number;
+}
 export const freeAiApi = {
+  // Models the pool can currently serve (only models with a live donated account).
+  models: () => api.get<{ data: FreeAiModel[] }>("/api/ai/models"),
   fetchModels: (creds: { endpoint: string; api_key: string }) =>
     api.post<FetchModelsResult>("/api/free-ai/models", creds),
   donate: (body: { provider: string; label: string; creds: { endpoint: string; api_key: string }; models: string[] }) =>

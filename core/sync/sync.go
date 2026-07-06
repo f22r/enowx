@@ -488,6 +488,15 @@ func (m *Manager) FreeAIDonations(ctx context.Context) (string, error) {
 	return string(raw), nil
 }
 
+// FreeAIModels lists the models the pool can currently serve (with Kleos prices).
+func (m *Manager) FreeAIModels(ctx context.Context) (string, error) {
+	var raw json.RawMessage
+	if err := m.call(ctx, http.MethodGet, "/ai/models", nil, &raw); err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
+
 // FreeAIWithdraw removes one of the caller's donated accounts.
 func (m *Manager) FreeAIWithdraw(ctx context.Context, id string) (string, error) {
 	var raw json.RawMessage

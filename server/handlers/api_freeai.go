@@ -45,6 +45,20 @@ func (h *FreeAI) Donate(w http.ResponseWriter, r *http.Request) {
 	h.rawJSON(w, raw)
 }
 
+// GET /api/ai/models — models the pool can currently serve.
+func (h *FreeAI) Models(w http.ResponseWriter, r *http.Request) {
+	if !h.dash.Authorized(r) {
+		writeAPIErr(w, http.StatusForbidden, "requires the dashboard login when accessed remotely")
+		return
+	}
+	raw, err := h.sync.FreeAIModels(r.Context())
+	if err != nil {
+		writeAPIErr(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	h.rawJSON(w, raw)
+}
+
 // GET /api/free-ai/donations
 func (h *FreeAI) List(w http.ResponseWriter, r *http.Request) {
 	if !h.dash.Authorized(r) {
