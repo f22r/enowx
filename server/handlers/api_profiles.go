@@ -54,6 +54,11 @@ var sharedPaths = []string{
 	// ~/.local/bin/claude → ~/.local/share/claude), so a profile without these
 	// reports "command missing or broken". State (.local/state) is NOT shared.
 	".local/bin", ".local/share",
+	// macOS login keychain. Its path is $HOME-relative, so a profile without it
+	// gets "A keychain cannot be found to store ..." and tools (incl. Claude Code)
+	// fail/log out. Share the real keychain — Claude Code's own login stays in a
+	// file per profile (via CLAUDE_CONFIG_DIR), so this doesn't leak that login.
+	"Library/Keychains",
 	// Config that's identity/settings, not a login secret.
 	".gitconfig",
 	".claude.json", // MCP servers + non-secret state
