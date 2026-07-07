@@ -207,9 +207,7 @@ function ProviderCard({
         >
           <Plus className="h-3.5 w-3.5" /> Add account
         </button>
-        {provider.name === "claudecode" && (
-          <button onClick={() => setRotOpen(true)} title="Account rotation" className="shrink-0 rounded-lg border border-white/10 bg-white/5 p-1.5 text-white/40 hover:bg-white/10 hover:text-white/80"><Settings className="h-3.5 w-3.5" /></button>
-        )}
+        <button onClick={() => setRotOpen(true)} title="Account rotation" className="shrink-0 rounded-lg border border-white/10 bg-white/5 p-1.5 text-white/40 hover:bg-white/10 hover:text-white/80"><Settings className="h-3.5 w-3.5" /></button>
         {onDelete && (
           <button onClick={onDelete} title="Delete provider" className="shrink-0 rounded-lg border border-white/10 bg-white/5 p-1.5 text-white/40 hover:bg-red-500/20 hover:text-red-200"><Trash2 className="h-3.5 w-3.5" /></button>
         )}
@@ -220,8 +218,9 @@ function ProviderCard({
 }
 
 // RotationModal is a popup to pick sticky vs round-robin account selection for a
-// ban-sensitive provider. Sticky keeps one account until it dies; round-robin
-// spreads requests across accounts so no single one carries all the traffic.
+// provider. Sticky keeps one account until it dies; round-robin spreads requests
+// across accounts so no single one carries all the traffic (useful for ban-
+// sensitive providers). Available for every provider, including custom ones.
 function RotationModal({ provider, onClose }: { provider: string; onClose: () => void }) {
   const [mode, setMode] = useState<"sticky" | "round-robin" | null>(null);
   useEffect(() => { rotationApi.get(provider).then((r) => setMode(r.mode === "round-robin" ? "round-robin" : "sticky")).catch(() => setMode("sticky")); }, [provider]);
