@@ -4,6 +4,7 @@ import { AppShell } from "./shell";
 import { ProviderIcon } from "../components/ProviderIcon";
 import { AddAccountModal } from "../components/AddAccountModal";
 import { KiroAddModal } from "../components/KiroAddModal";
+import { ClaudeAddModal } from "../components/ClaudeAddModal";
 import { CodexAddModal } from "../components/CodexAddModal";
 import { AntigravityAddModal } from "../components/AntigravityAddModal";
 import { LeonardoAddModal } from "../components/LeonardoAddModal";
@@ -146,7 +147,17 @@ export function ProvidersApp() {
           }}
         />
       )}
-      {adding && adding.name !== "kiro" && adding.name !== "codex" && adding.name !== "antigravity" && adding.name !== "leonardo" && (
+      {adding && adding.name === "claudecode" && (
+        <ClaudeAddModal
+          provider={adding}
+          onClose={() => setAdding(null)}
+          onSaved={() => {
+            setAdding(null);
+            load();
+          }}
+        />
+      )}
+      {adding && adding.name !== "kiro" && adding.name !== "codex" && adding.name !== "claudecode" && adding.name !== "antigravity" && adding.name !== "leonardo" && (
         <AddAccountModal
           provider={adding}
           onClose={() => setAdding(null)}

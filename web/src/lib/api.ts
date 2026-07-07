@@ -203,6 +203,12 @@ export const kiroApi = {
     api.post<{ id: number }>("/api/accounts/kiro/oauth/exchange", { session, code }),
 };
 
+export const claudeApi = {
+  oauthStart: () => api.post<{ session: string; authorize_url: string }>("/api/accounts/claude/oauth/start"),
+  oauthExchange: (session: string, code: string, label?: string) =>
+    api.post<{ id: number }>("/api/accounts/claude/oauth/exchange", { session, code, label }),
+};
+
 export const codexApi = {
   oauthStart: () => api.post<{ session: string; authorize_url: string }>("/api/accounts/codex/oauth/start"),
   // code may be a raw code or the full callback URL — backend extracts it.

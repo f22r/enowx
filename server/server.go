@@ -73,6 +73,7 @@ func New(addr string, d Deps) *Server {
 	docs := handlers.NewDocs(d.Settings.Version)
 	kiro := handlers.NewKiro(d.Doer, d.Accounts)
 	codex := handlers.NewCodex(d.Doer, d.Accounts)
+	claude := handlers.NewClaude(d.Doer, d.Accounts)
 	antigravity := handlers.NewAntigravity(d.Doer, d.Accounts)
 	leonardoAcc := handlers.NewLeonardo(d.Accounts, d.Doer)
 	local := handlers.NewLocal(d.Accounts)
@@ -97,6 +98,7 @@ func New(addr string, d Deps) *Server {
 	}
 	kiro.SetWarmer(warmup)
 	codex.SetWarmer(warmup)
+	claude.SetWarmer(warmup)
 	antigravity.SetWarmer(warmup)
 	leonardoAcc.SetWarmer(warmup)
 	local.SetWarmer(warmup)
@@ -215,6 +217,8 @@ func New(addr string, d Deps) *Server {
 		r.Get("/accounts/kiro/aws/poll", kiro.AWSPoll)
 		r.Post("/accounts/kiro/oauth/start", kiro.OAuthStart)
 		r.Post("/accounts/kiro/oauth/exchange", kiro.OAuthExchange)
+		r.Post("/accounts/claude/oauth/start", claude.OAuthStart)
+		r.Post("/accounts/claude/oauth/exchange", claude.OAuthExchange)
 
 		r.Post("/accounts/codex/oauth/start", codex.OAuthStart)
 		r.Post("/accounts/codex/oauth/exchange", codex.OAuthExchange)
