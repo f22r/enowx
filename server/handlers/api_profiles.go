@@ -146,8 +146,18 @@ func (h *TermProfiles) save(list []termProfile) error {
 	return os.WriteFile(p, b, 0o600)
 }
 
-// ensureLinks (re)creates the shared symlinks inside a profile home so it
-// self-heals. Idempotent: existing correct links are left alone.
+// writableDirs are per-profile directories that must exist as REAL dirs (not
+// symlinks) because the tool writes into them at runtime. Claude Code creates a
+// shell snapshot / session state on startup and errors ("Bun could not find a
+// file") if these are missing, so we pre-create them per profile.
+var writableDirs = []string{
+	".claude/shell-snapshots", ".claude/sessions", ".claude/session-env",
+	".claude/cache", ".claude/projects", ".claude/todos", ".claude/statsig",
+	".config", ".cache", ".local/state",
+}
+
+// ensureLinks (re)creates the shared symlinks + per-profile writable dirs inside
+// a profile home so it self-heals. Idempotent: existing entries are left alone.
 func ensureLinks(profileDir string) {
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -164,6 +174,10 @@ func ensureLinks(profileDir string) {
 		}
 		_ = os.MkdirAll(filepath.Dir(dst), 0o755)
 		_ = os.Symlink(src, dst)
+	}
+	// Real, writable per-profile dirs (must exist before the tool starts).
+	for _, rel := range writableDirs {
+		_ = os.MkdirAll(filepath.Join(profileDir, rel), 0o755)
 	}
 }
 
