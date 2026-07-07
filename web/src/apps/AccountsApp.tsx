@@ -757,10 +757,15 @@ function AccountMenu({
               )}
             </>
           )}
-          <div className="my-1 border-t border-white/5" />
-          <button className={`${item} text-violet-200 hover:bg-violet-500/20`} onClick={run(onDonate)}>
-            <HeartHandshake className="h-3.5 w-3.5" /> Donate to Free AI
-          </button>
+          {/* Claude Code accounts are ban-prone when shared — no donate. */}
+          {account.provider !== "claudecode" && (
+            <>
+              <div className="my-1 border-t border-white/5" />
+              <button className={`${item} text-violet-200 hover:bg-violet-500/20`} onClick={run(onDonate)}>
+                <HeartHandshake className="h-3.5 w-3.5" /> Donate to Free AI
+              </button>
+            </>
+          )}
           <div className="my-1 border-t border-white/5" />
           <button className={item} onClick={run(onToggle)}>
             {account.disabled ? <Power className="h-3.5 w-3.5" /> : <PowerOff className="h-3.5 w-3.5" />}

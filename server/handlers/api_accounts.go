@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"encoding/json"
 	"io"
 	"strings"
@@ -226,9 +227,16 @@ func (h *Accounts) Donate(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte(`{"data":` + raw + `}`))
 }
 
+// nonDonatable are providers that must never be donated to the community pool
+// (e.g. Claude Code — its accounts are ban-prone when shared).
+var nonDonatable = map[string]bool{"claudecode": true}
+
 // donateOne hands one account's creds to the pool and, on success, deletes it
 // locally. Returns the cloud's raw JSON reply.
 func (h *Accounts) donateOne(ctx context.Context, acc *store.Account, models []string) (string, error) {
+	if nonDonatable[acc.Provider] {
+		return "", fmt.Errorf("%s accounts cannot be donated", acc.Provider)
+	}
 	creds := map[string]string{}
 	for k, v := range acc.Creds {
 		creds[k] = v
