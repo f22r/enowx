@@ -135,6 +135,7 @@ func New(addr string, d Deps) *Server {
 	music := handlers.NewMusic(d.Music)
 	sunoMusic := handlers.NewSuno(d.Accounts, d.Proxy, suno.New(d.Doer))
 	tun := handlers.NewTunnel(d.Tunnel, d.Keys)
+	integ := handlers.NewIntegrations(d.Keys, d.Tunnel, d.Settings.Port)
 	syncH := handlers.NewSync(d.Sync)
 	authH := handlers.NewAuth(dash)
 	auth := middleware.NewAuth(d.Keys)
@@ -220,6 +221,13 @@ func New(addr string, d Deps) *Server {
 		r.Get("/keys", keys.List)
 		r.Post("/keys", keys.Add)
 		r.Delete("/keys/{id}", keys.Delete)
+
+		// Integrations: connect local CLI coding tools to this gateway.
+		r.Get("/integrations", integ.List)
+		r.Get("/integrations/info", integ.Info)
+		r.Post("/integrations/{tool}", integ.Apply)
+		r.Delete("/integrations/{tool}", integ.Reset)
+		r.Post("/integrations/{tool}/snippet", integ.Snippet)
 		r.Get("/settings", settings.Get)
 		r.Get("/version", versionH.Get)
 		r.Post("/update", versionH.Update)

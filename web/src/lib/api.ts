@@ -639,6 +639,32 @@ export const rotationApi = {
   set: (provider: string, mode: string) => api.put<{ ok: boolean; mode: string }>(`/api/providers/${provider}/rotation`, { mode }),
 };
 
+export interface Integration {
+  key: string;
+  name: string;
+  binary: string;
+  config_paths: string[];
+  multi_model: boolean;
+  anthropic: boolean;
+  installed: boolean;
+  connected: boolean;
+  paths: string[];
+  models: string[];
+  message?: string;
+}
+export interface IntegrationSnippet { path: string; content: string; format: string }
+
+export const integrationsApi = {
+  list: () => api.get<Integration[]>("/api/integrations"),
+  info: () => api.get<{ base_url: string; api_key: string }>("/api/integrations/info"),
+  apply: (tool: string, body: { model?: string; models?: string[]; base_url?: string; api_key?: string }) =>
+    api.post<Integration>(`/api/integrations/${tool}`, body),
+  reset: (tool: string) => api.del<Integration>(`/api/integrations/${tool}`),
+  snippet: (tool: string, body: { model?: string; models?: string[]; base_url?: string; api_key?: string }) =>
+    api.post<{ snippets: IntegrationSnippet[] }>(`/api/integrations/${tool}/snippet`, body),
+};
+
+
 
 export interface InboxMessage {
   id: number;
