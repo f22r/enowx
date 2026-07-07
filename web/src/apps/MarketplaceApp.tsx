@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Store, ShieldCheck, Plus, X, Search, RefreshCw, Loader2, Trash2, ImagePlus, ArrowLeft, Tag, Handshake, Send, Check, CircleDollarSign, ShoppingCart, ExternalLink, Copy, Wallet, AlertTriangle, Star, Boxes, Pencil, Mail} from "lucide-react";
+import { Store, ShieldCheck, Plus, X, Search, RefreshCw, Loader2, Trash2, ImagePlus, ArrowLeft, Tag, Handshake, Send, Check, CircleDollarSign, ShoppingCart, ExternalLink, Copy, Wallet, AlertTriangle, Star, Boxes, Pencil, Mail, Clock} from "lucide-react";
 import QRCode from "qrcode";
 import { copyText } from "../os/clipboard";
 import { marketplaceApi, gmailStoreApi, rekberApi, orderApi, officialApi, payoutApi, reviewApi, type Listing, type ListingInput, type ListingCategory, type RekberThread, type RekberMessage, type Order, type OfficialProduct, type RekberOrder, type PayoutAccount, type GmailAccount } from "../lib/api";
@@ -1084,7 +1084,7 @@ function RekberAccountEditor() {
 }
 
 // GmailStoreCard sells Gmail accounts from stock, paid with Duitku (IDR).
-interface GmailInfo { price_per_account: number; available: number; min_order: number; order_step: number }
+interface GmailInfo { price_per_account: number; available: number; min_order: number; order_step: number; account_ttl_hours: number; last_restock?: string }
 
 function GmailStoreCard() {
   const [qr, setQr] = useState("");
@@ -1120,6 +1120,7 @@ function GmailStoreCard() {
   const maxQty = Math.floor(available / step) * step;
   const soldOut = !!info && available < min;
   const total = price * qty;
+  const ttlHours = info?.account_ttl_hours ?? 24;
 
   const setQtyClamped = (v: number) => setQty(Math.max(min, Math.min(maxQty || min, Math.round(v / step) * step)));
 
@@ -1161,11 +1162,21 @@ function GmailStoreCard() {
         </div>
       </div>
 
+      {/* Validity + last restock */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 pt-2 text-[10.5px]">
+        <span className="flex items-center gap-1 text-amber-300/80">
+          <Clock className="h-3 w-3" /> Active {ttlHours}h after restock
+        </span>
+        {info?.last_restock && (
+          <span className="text-white/40">Last restock: {relTime(info.last_restock)}</span>
+        )}
+      </div>
+
       <div className="p-4 pt-3">
         {accounts ? (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <p className="text-[11px] font-medium text-emerald-300">{accounts.length} accounts delivered — save these now</p>
+              <p className="text-[11px] font-medium text-emerald-300">{accounts.length} delivered — use within {ttlHours}h</p>
               <button onClick={copyAll} className="flex items-center gap-1 rounded-md bg-white/10 px-2 py-1 text-[10px] text-white/70 hover:bg-white/15"><Copy className="h-3 w-3" /> Copy all</button>
             </div>
             <div className="max-h-52 space-y-1 overflow-auto rounded-lg bg-black/25 p-2">

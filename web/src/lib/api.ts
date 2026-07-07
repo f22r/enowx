@@ -684,7 +684,7 @@ export const subscriptionApi = {
   searchUsers: (q: string) => api.get<{ users: UserHit[] }>(`/api/search-users?q=${encodeURIComponent(q)}`),
 };
 
-export interface GmailStoreInfo { price_per_account: number; available: number; min_order: number; order_step: number }
+export interface GmailStoreInfo { price_per_account: number; available: number; min_order: number; order_step: number; account_ttl_hours: number; last_restock?: string }
 export interface GmailAccount { email: string; password: string; recovery?: string }
 export interface GmailStockRow { id: string; email: string; recovery?: string; status: string; created_at: string; sold_at?: string }
 export interface GmailOrderRow { id: string; username?: string; quantity: number; price_idr: number; order_ref: string; status: string; delivered_at?: string; created_at: string }
