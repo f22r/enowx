@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { Loader2, Users, Copy, ScrollText, BarChart3, ShieldCheck, ShieldOff, Search, MoreHorizontal, Ban, VolumeX, AlertTriangle, Plus, Minus, Boxes, Trash2, Pencil, RefreshCw, Ticket, Mail, Send, Bug, CheckCircle2, RotateCcw, Crown, Coins, Gift, Info, Sparkles } from "lucide-react";
+import { Loader2, Users, Copy, ScrollText, BarChart3, ShieldCheck, ShieldOff, Search, MoreHorizontal, Ban, VolumeX, AlertTriangle, Plus, Minus, Boxes, Trash2, Pencil, RefreshCw, Ticket, Mail, Send, Bug, CheckCircle2, RotateCcw, Crown, Coins, Gift, Info, Sparkles, Upload} from "lucide-react";
 import { openProfile } from "../os/profileViewer";
 import { tierClass, tierVars } from "../os/tier";
 import { useAdminEvents } from "../os/adminBus";
@@ -1388,9 +1388,26 @@ function GmailStockPanel() {
         <button onClick={savePrice} className="rounded-md bg-white/10 px-2 py-1 text-[11px] text-white/80 hover:bg-white/15">Save</button>
       </div>
 
+      <div className="mb-1.5 flex items-center gap-2">
+        <label className="flex cursor-pointer items-center gap-1.5 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-white/70 hover:bg-white/10">
+          <Upload className="h-3 w-3" /> Upload file
+          <input
+            type="file" accept=".txt,.csv,text/plain" className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              const reader = new FileReader();
+              reader.onload = () => setText((prev) => (prev ? prev + "\n" : "") + String(reader.result ?? ""));
+              reader.readAsText(file);
+              e.target.value = "";
+            }}
+          />
+        </label>
+        <span className="text-[10px] text-white/30">or paste below — any of : | ; , tab works; email auto-detected</span>
+      </div>
       <textarea
         value={text} onChange={(e) => setText(e.target.value)} rows={4}
-        placeholder="Paste accounts, one per line:&#10;email@gmail.com:password&#10;email2@gmail.com:password:recovery@x.com"
+        placeholder="Paste or upload accounts, one per line:&#10;email@gmail.com:password&#10;email2@gmail.com | password | recovery@x.com"
         className="w-full rounded-lg border border-white/10 bg-black/25 px-2.5 py-2 font-mono text-[11px] text-white/80 outline-none focus:border-white/25"
       />
       <div className="mt-2 flex items-center gap-2">
