@@ -49,6 +49,11 @@ var sharedPaths = []string{
 	".zshrc", ".zprofile", ".zshenv", ".bashrc", ".bash_profile", ".profile",
 	// Tool env files that rc scripts source by $HOME-relative path (rust, nvm, …).
 	".cargo", ".rustup", ".nvm", ".bun", ".deno", ".sdkman", ".asdf",
+	// Locally-installed binaries + their payloads. Many tools install here and
+	// detect themselves relative to $HOME (e.g. Claude Code native install at
+	// ~/.local/bin/claude → ~/.local/share/claude), so a profile without these
+	// reports "command missing or broken". State (.local/state) is NOT shared.
+	".local/bin", ".local/share",
 	// Config that's identity/settings, not a login secret.
 	".gitconfig",
 	".claude.json", // MCP servers + non-secret state
