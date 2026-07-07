@@ -918,8 +918,13 @@ export interface DailyClaim {
   balance: number;
   already_claimed: boolean;
 }
+export interface DailyStatus {
+  amount: number;
+  already_claimed: boolean;
+}
 export const kleosApi = {
   daily: () => api.post<DailyClaim>("/api/kleos/daily", {}),
+  dailyStatus: () => api.get<DailyStatus>("/api/kleos/daily"),
 };
 
 // --- Free AI: donate accounts to the community pool ---

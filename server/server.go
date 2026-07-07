@@ -389,6 +389,8 @@ func New(addr string, d Deps) *Server {
 		r.Get("/search", syncH.Search)
 		r.Get("/notifications", syncH.Notifications)
 		r.Get("/community/stats", syncH.CommunityStats)
+		r.Get("/kleos/daily", syncH.KleosDailyStatus)
+		r.Post("/kleos/daily", syncH.KleosDaily)
 		r.Get("/legacy/accounts", syncH.LegacyAccounts)
 		r.Post("/notifications/read", syncH.NotificationsRead)
 

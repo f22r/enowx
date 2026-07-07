@@ -1170,6 +1170,24 @@ func (m *Manager) CommunityStats(ctx context.Context) (string, error) {
 	return string(raw), nil
 }
 
+// KleosDailyStatus peeks at today's daily-login reward (amount + already claimed).
+func (m *Manager) KleosDailyStatus(ctx context.Context) (string, error) {
+	var raw json.RawMessage
+	if err := m.call(ctx, http.MethodGet, "/kleos/daily", nil, &raw); err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
+
+// KleosDaily claims the daily-login Kleos.
+func (m *Manager) KleosDaily(ctx context.Context) (string, error) {
+	var raw json.RawMessage
+	if err := m.call(ctx, http.MethodPost, "/kleos/daily", map[string]any{}, &raw); err != nil {
+		return "", err
+	}
+	return string(raw), nil
+}
+
 // LegacyAccounts proxies the account-restore migration lookup (decrypted old
 // provider accounts for the logged-in user).
 func (m *Manager) LegacyAccounts(ctx context.Context) (string, error) {
