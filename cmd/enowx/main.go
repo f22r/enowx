@@ -47,6 +47,14 @@ import (
 var version = "dev"
 
 func main() {
+	// Hidden subcommand: the elevated MITM proxy child. Spawned (with an admin
+	// prompt) by the main process so only this small child runs as root — it binds
+	// :443, installs the CA + hosts entries, and serves the intercept proxy.
+	if len(os.Args) > 1 && os.Args[1] == "__mitm-serve" {
+		mitm.RunElevatedServe(os.Args[2:])
+		return
+	}
+
 	// The detached daemon child (ENOWX_DAEMON=1) always runs the server.
 	if daemon.IsDaemon() {
 		runServer()

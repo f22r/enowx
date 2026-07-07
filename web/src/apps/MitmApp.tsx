@@ -58,7 +58,7 @@ export function MitmApp() {
                 <button onClick={load} title="Refresh" className="rounded-lg border border-white/10 p-1.5 text-white/40 hover:bg-white/5 hover:text-white"><RefreshCw className="h-3.5 w-3.5" /></button>
               </div>
             </div>
-            <p className="mt-2 text-[10px] text-white/35">CA: {st.ca_cert_path}. If starting the proxy fails, run enx with admin/root — port 443 and the hosts file need elevated privileges.</p>
+            <p className="mt-2 text-[10px] text-white/35">Starting the proxy asks for your admin password once — it launches a privileged helper that installs the CA, redirects the IDE's hosts, and listens on port 443. You don't need to restart enx.</p>
           </div>
 
           {/* Per-tool cards */}

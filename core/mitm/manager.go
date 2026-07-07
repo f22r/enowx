@@ -3,6 +3,7 @@ package mitm
 import (
 	"encoding/json"
 	"errors"
+	"time"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,7 +20,6 @@ type Manager struct {
 
 	mu       sync.Mutex
 	ca       *CA
-	srv      *Server
 	aliases  map[string]map[string]string // tool -> ideModel -> gatewayModel
 	enabled  map[string]bool              // tool -> DNS enabled
 }
@@ -92,7 +92,7 @@ type ToolStatus struct {
 func (m *Manager) Status() Status {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	st := Status{Running: m.srv != nil && m.srv.Live()}
+	st := Status{Running: m.elevatedRunning()}
 	if m.ca != nil {
 		st.Trusted = m.ca.Trusted()
 		st.CACertPath = m.ca.CertPath()
@@ -118,58 +118,74 @@ func (m *Manager) InstallTrust() error {
 	return ca.InstallCA()
 }
 
-// Start brings up the proxy (loads CA, listens on :443).
+// Start brings up the proxy. It launches a privileged child (via an admin
+// prompt) that binds :443, installs the CA, and applies the hosts entries for
+// every currently-enabled tool — so the user never has to restart enx as root.
 func (m *Manager) Start() error {
 	m.mu.Lock()
-	defer m.mu.Unlock()
-	ca, err := m.ensureCA()
-	if err != nil {
-		return err
+	hosts := m.enabledHosts()
+	m.mu.Unlock()
+	if m.elevatedRunning() {
+		return nil // already up
 	}
-	if m.srv == nil {
-		m.srv = NewServer(ca, m.gatewayURL, m.apiKeyFn(), m.resolveModel)
-	}
-	return m.srv.Start()
+	return m.StartElevated(hosts)
 }
 
-// Stop tears down the proxy and removes all hosts-file redirects.
+// Stop signals the privileged child to exit and clean up the hosts entries.
 func (m *Manager) Stop() {
 	m.mu.Lock()
-	defer m.mu.Unlock()
-	if m.srv != nil {
-		m.srv.Stop()
-	}
-	_ = DisableHosts()
+	m.StopElevated()
 	for k := range m.enabled {
 		m.enabled[k] = false
 	}
 	m.save()
+	m.mu.Unlock()
 }
 
-// EnableTool redirects a tool's hosts to us (starts the proxy first if needed).
-func (m *Manager) EnableTool(key string, on bool) error {
-	if _, ok := ToolByKey(key); !ok {
-		return errUnknownTool
-	}
-	m.mu.Lock()
-	m.enabled[key] = on
-	// Rebuild the hosts block from every currently-enabled tool.
+// enabledHosts returns the hosts of every enabled tool (caller holds the lock).
+func (m *Manager) enabledHosts() []string {
 	var hosts []string
 	for _, t := range tools {
 		if m.enabled[t.Key] {
 			hosts = append(hosts, t.Hosts...)
 		}
 	}
+	return hosts
+}
+
+// EnableTool toggles a tool's intercept. Enabling (re)starts the privileged child
+// with the updated host set; disabling the last tool stops it.
+func (m *Manager) EnableTool(key string, on bool) error {
+	if _, ok := ToolByKey(key); !ok {
+		return errUnknownTool
+	}
+	m.mu.Lock()
+	m.enabled[key] = on
+	hosts := m.enabledHosts()
 	m.save()
 	m.mu.Unlock()
 
 	if len(hosts) == 0 {
-		return DisableHosts()
+		m.StopElevated()
+		return nil
 	}
-	if err := m.Start(); err != nil {
-		return err
+	// (Re)launch the child with the new host set. If it's already running we stop
+	// it first so the new hosts take effect.
+	if m.elevatedRunning() {
+		m.StopElevated()
+		waitForStop(m)
 	}
-	return EnableHosts(hosts)
+	return m.StartElevated(hosts)
+}
+
+// waitForStop briefly waits for the elevated child to exit after a stop signal.
+func waitForStop(m *Manager) {
+	for i := 0; i < 30; i++ {
+		if !m.elevatedRunning() {
+			return
+		}
+		sleep100ms()
+	}
 }
 
 // SetAliases replaces a tool's model map.
@@ -217,3 +233,5 @@ func (m *Manager) save() {
 }
 
 var errUnknownTool = errors.New("unknown tool")
+
+func sleep100ms() { time.Sleep(100 * time.Millisecond) }
