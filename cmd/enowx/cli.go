@@ -215,9 +215,13 @@ func updateCmd(args []string) {
 		return
 	}
 	fmt.Println("downloading + installing…")
-	if _, code, err := httpJSON(http.MethodPost, base(cfg)+"/api/update"); err != nil || code >= 300 {
+	data, code, err := httpJSON(http.MethodPost, base(cfg)+"/api/update")
+	if err != nil || code >= 300 {
 		fmt.Fprintf(os.Stderr, "update failed (%d): %v\n", code, err)
 		os.Exit(1)
+	}
+	if note, _ := data["note"].(string); note != "" {
+		fmt.Println("\n" + note)
 	}
 	fmt.Println("update applied — enx will restart itself")
 }
