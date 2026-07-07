@@ -251,7 +251,7 @@ function AddProviderModal({ onClose, onSaved }: { onClose: () => void; onSaved: 
   };
 
   return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={onClose}>
+    <div className="fixed inset-0 z-[11000] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={onClose}>
       <div className="flex max-h-[90%] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#11131a] shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-2 border-b border-white/5 px-4 py-3">
           <div className="flex-1 text-sm font-semibold text-white">Add custom provider</div>
