@@ -17,6 +17,8 @@ interface Channel {
   quality: string | null;
   ua: string | null;
   ref: string | null;
+  source: "iptv" | "events";
+  group?: string;
 }
 
 // proxied builds the gateway proxy URL for a stream (CORS fallback).
@@ -34,6 +36,8 @@ export function TVApp() {
   const [error, setError] = useState("");
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("all");
+  const [tab, setTab] = useState<"live" | "channels">("channels");
+  const [tabTouched, setTabTouched] = useState(false);
   const [playing, setPlaying] = useState<Channel | null>(null);
 
   // Poll the gateway for the online channel list; it fills in as probing
@@ -67,33 +71,57 @@ export function TVApp() {
     return ["all", "sports", ...all.filter((x) => x !== "sports")];
   }, [channels]);
 
+  const liveCount = useMemo(() => (channels ?? []).filter((c) => c.source === "events").length, [channels]);
+
+  // Prefer the Live-matches tab automatically when live fixtures are available
+  // (unless the user picked a tab). When none are online (source down), stay on
+  // Channels so the app is never empty.
+  useEffect(() => {
+    if (!tabTouched && liveCount > 0) setTab("live");
+  }, [liveCount, tabTouched]);
+
   const filtered = useMemo(() => {
     if (!channels) return [];
     const query = q.trim().toLowerCase();
     return channels.filter((ch) => {
-      if (cat !== "all" && !ch.categories.includes(cat)) return false;
-      if (query && !ch.name.toLowerCase().includes(query) && !ch.country.toLowerCase().includes(query)) return false;
+      // Tab: live matches (events) vs 24/7 channels.
+      if (tab === "live" && ch.source !== "events") return false;
+      if (tab === "channels" && ch.source !== "iptv") return false;
+      if (tab === "channels" && cat !== "all" && !ch.categories.includes(cat)) return false;
+      if (query && !ch.name.toLowerCase().includes(query) && !(ch.group ?? "").toLowerCase().includes(query) && !ch.country.toLowerCase().includes(query)) return false;
       return true;
     }).slice(0, 600); // cap the rendered grid
-  }, [channels, q, cat]);
+  }, [channels, q, cat, tab]);
 
   return (
     <div className="flex h-full flex-col gap-3 p-4">
       {playing && <Player channel={playing} onClose={() => setPlaying(null)} />}
+
+      {/* Live matches (fixtures) vs 24/7 channels. */}
+      <div className="flex rounded-xl border border-white/10 bg-white/[0.02] p-0.5 text-xs">
+        <button onClick={() => { setTab("live"); setTabTouched(true); }} className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 font-medium ${tab === "live" ? "bg-emerald-500/15 text-emerald-200" : "text-white/50 hover:text-white/80"}`}>
+          <SignalHigh className="h-3.5 w-3.5" /> Live matches{liveCount > 0 ? ` (${liveCount})` : ""}
+        </button>
+        <button onClick={() => { setTab("channels"); setTabTouched(true); }} className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 font-medium ${tab === "channels" ? "bg-white/10 text-white" : "text-white/50 hover:text-white/80"}`}>
+          <Tv className="h-3.5 w-3.5" /> Channels
+        </button>
+      </div>
 
       <div className="flex items-center gap-2">
         <div className="flex flex-1 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
           <Search className="h-4 w-4 text-white/30" />
           <input
             value={q} onChange={(e) => setQ(e.target.value)}
-            placeholder="Search channels or country (e.g. bein, sports, ID)…"
+            placeholder={tab === "live" ? "Search matches (e.g. soccer, madrid, ligue)…" : "Search channels or country (e.g. bein, sports, ID)…"}
             className="w-full bg-transparent text-sm text-white placeholder:text-white/30 focus:outline-none"
           />
         </div>
-        <select value={cat} onChange={(e) => setCat(e.target.value)}
-          className="rounded-xl border border-white/10 bg-[#15161c] px-3 py-2 text-sm text-white/80 outline-none">
-          {cats.map((c) => <option key={c} value={c}>{c === "all" ? "All categories" : c}</option>)}
-        </select>
+        {tab === "channels" && (
+          <select value={cat} onChange={(e) => setCat(e.target.value)}
+            className="rounded-xl border border-white/10 bg-[#15161c] px-3 py-2 text-sm text-white/80 outline-none">
+            {cats.map((c) => <option key={c} value={c}>{c === "all" ? "All categories" : c}</option>)}
+          </select>
+        )}
       </div>
 
       {error ? (
@@ -119,7 +147,11 @@ export function TVApp() {
           <div className="grid min-h-0 flex-1 grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2 overflow-auto">
             {filtered.map((ch) => <ChannelCard key={ch.id} ch={ch} onPlay={() => setPlaying(ch)} />)}
             {filtered.length === 0 && (
-              <div className="col-span-full py-10 text-center text-sm text-white/35">No channels match.</div>
+              <div className="col-span-full py-10 text-center text-sm text-white/35">
+                {tab === "live" && liveCount === 0
+                  ? "No live matches available right now (the events source may be down). Try the Channels tab."
+                  : "No channels match."}
+              </div>
             )}
           </div>
         </>
@@ -144,7 +176,9 @@ function ChannelCard({ ch, onPlay }: { ch: Channel; onPlay: () => void }) {
       </div>
       <div className="min-w-0">
         <p className="truncate text-xs font-medium text-white/85">{ch.name}</p>
-        <p className="text-[10px] text-white/35">{ch.country}{ch.quality ? ` · ${ch.quality}` : ""}</p>
+        <p className="truncate text-[10px] text-white/35">
+          {ch.source === "events" ? (ch.group ?? "Live") : `${ch.country}${ch.quality ? ` · ${ch.quality}` : ""}`}
+        </p>
       </div>
     </button>
   );
@@ -191,7 +225,9 @@ function Player({ channel, onClose }: { channel: Channel; onClose: () => void })
     };
 
     setStatus("loading");
-    attach(false);
+    // Event streams (DaddyLive) need forwarded Referer/User-Agent + usually block
+    // CORS, so go straight through the proxy; 24/7 channels try direct first.
+    attach(channel.source === "events");
     return () => { cancelled = true; if (hls) hls.destroy(); };
   }, [channel]);
 

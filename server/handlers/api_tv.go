@@ -29,7 +29,8 @@ type TV struct {
 	checked  int // how many channels probed at least once (progress)
 }
 
-// tvChannel is one channel: metadata + its stream URL and any headers it needs.
+// tvChannel is one channel/event: metadata + its stream URL and any headers it
+// needs. Source is "iptv" (24/7 channels) or "events" (live fixtures).
 type tvChannel struct {
 	ID         string   `json:"id"`
 	Name       string   `json:"name"`
@@ -40,6 +41,8 @@ type tvChannel struct {
 	Quality    string   `json:"quality,omitempty"`
 	UA         string   `json:"ua,omitempty"`
 	Ref        string   `json:"ref,omitempty"`
+	Source     string   `json:"source"`          // "iptv" | "events"
+	Group      string   `json:"group,omitempty"` // M3U group-title (e.g. "ALL SOCCER EVENTS")
 }
 
 func NewTV(dash *middleware.Dashboard) *TV {
@@ -156,7 +159,7 @@ func (h *TV) load() error {
 		c := tvChannel{
 			ID: *s.Channel, Name: m.Name, Country: m.Country, Categories: m.Categories,
 			URL: s.URL, Quality: str(s.Quality), UA: str(s.UserAgent), Ref: str(s.Referrer),
-			Logo: m.Logo,
+			Logo: m.Logo, Source: "iptv",
 		}
 		isSport := false
 		for _, cat := range m.Categories {
@@ -172,11 +175,92 @@ func (h *TV) load() error {
 		}
 	}
 
+	// Live-event sources (M3U): DaddyLive-derived fixtures. These carry the actual
+	// live matches (soccer etc.) for e.g. World Cup, unlike the 24/7 channels.
+	// Grey-legal + flaky, so they're best-effort: failures don't block iptv-org.
+	events := h.loadEvents()
+
 	h.mu.Lock()
-	h.channels = append(sports, rest...) // sports first → probed first
+	// Order: live events first, then sports channels, then the rest — so the most
+	// relevant (live matches + sports) get probed first.
+	h.channels = append(append(events, sports...), rest...)
 	h.loaded = true
 	h.mu.Unlock()
 	return nil
+}
+
+// eventSources are M3U playlists of live sports fixtures (best-effort).
+var eventSources = []string{
+	"https://raw.githubusercontent.com/jamie-203/daddylivehd-m3u/main/daddylive-events.m3u8",
+}
+
+// loadEvents fetches + parses the live-event M3U playlists into channels.
+func (h *TV) loadEvents() []tvChannel {
+	var out []tvChannel
+	seen := map[string]bool{}
+	for _, src := range eventSources {
+		resp, err := h.client.Get(src)
+		if err != nil {
+			continue
+		}
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 16<<20))
+		resp.Body.Close()
+		for _, e := range parseM3U(string(body)) {
+			key := e.Name + "|" + e.URL
+			if seen[key] || e.URL == "" {
+				continue
+			}
+			seen[key] = true
+			out = append(out, e)
+		}
+	}
+	return out
+}
+
+// parseM3U parses an M3U playlist into channels, reading group-title, tvg-logo,
+// and any #EXTVLCOPT http-referrer/http-user-agent lines.
+func parseM3U(m3u string) []tvChannel {
+	var out []tvChannel
+	var cur tvChannel
+	have := false
+	attr := func(line, key string) string {
+		i := strings.Index(line, key+`="`)
+		if i < 0 {
+			return ""
+		}
+		i += len(key) + 2
+		j := strings.Index(line[i:], `"`)
+		if j < 0 {
+			return ""
+		}
+		return line[i : i+j]
+	}
+	for _, line := range strings.Split(m3u, "\n") {
+		line = strings.TrimSpace(line)
+		switch {
+		case strings.HasPrefix(line, "#EXTINF"):
+			cur = tvChannel{Source: "events"}
+			cur.Logo = attr(line, "tvg-logo")
+			cur.Group = attr(line, "group-title")
+			cur.Categories = []string{"sports"}
+			if c := strings.LastIndex(line, ","); c >= 0 {
+				cur.Name = strings.TrimSpace(line[c+1:])
+			}
+			cur.ID = "ev:" + cur.Name
+			have = true
+		case strings.HasPrefix(line, "#EXTVLCOPT:http-referrer="):
+			cur.Ref = strings.TrimPrefix(line, "#EXTVLCOPT:http-referrer=")
+		case strings.HasPrefix(line, "#EXTVLCOPT:http-user-agent="):
+			cur.UA = strings.TrimPrefix(line, "#EXTVLCOPT:http-user-agent=")
+		case line == "" || strings.HasPrefix(line, "#"):
+			// skip other tags
+		case have:
+			cur.URL = line
+			out = append(out, cur)
+			have = false
+		}
+	}
+	return out
 }
 
 // probeAll probes every channel with bounded concurrency, updating online status
@@ -214,30 +298,73 @@ func (h *TV) probeAll() {
 	wg.Wait()
 }
 
-// probe fetches the first bytes of a stream and checks it's a valid m3u8.
+// probe verifies a stream is actually PLAYABLE, not just that a playlist exists:
+// it walks master → media playlist → first segment and confirms the segment
+// returns real bytes. This filters channels whose playlist is up but whose video
+// segments are 404/geo-blocked (the "playable? no" case).
 func (h *TV) probe(raw, ua, ref string) bool {
-	client := &http.Client{Timeout: 6 * time.Second}
-	req, err := http.NewRequest(http.MethodGet, raw, nil)
-	if err != nil {
-		return false
-	}
+	client := &http.Client{Timeout: 7 * time.Second}
 	if ua == "" {
 		ua = "Mozilla/5.0 (VLC)"
 	}
-	req.Header.Set("User-Agent", ua)
-	if ref != "" {
-		req.Header.Set("Referer", ref)
+	get := func(u string) (*http.Response, error) {
+		req, err := http.NewRequest(http.MethodGet, u, nil)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("User-Agent", ua)
+		if ref != "" {
+			req.Header.Set("Referer", ref)
+		}
+		return client.Do(req)
 	}
-	resp, err := client.Do(req)
+
+	base, err := url.Parse(raw)
 	if err != nil {
 		return false
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode >= 400 {
-		return false
+	// Follow up to 2 playlist levels (master → media), then require a segment.
+	cur := raw
+	for level := 0; level < 3; level++ {
+		resp, err := get(cur)
+		if err != nil || resp.StatusCode >= 400 {
+			if resp != nil {
+				resp.Body.Close()
+			}
+			return false
+		}
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 256<<10))
+		resp.Body.Close()
+		if !bytes.Contains(body, []byte("#EXTM3U")) {
+			// Not a playlist — this is the media segment itself; it loaded, so OK.
+			return len(body) > 0
+		}
+		// Find the first URI line (a child playlist or a segment).
+		next := firstURI(string(body))
+		if next == "" {
+			return false // playlist with no playable entries
+		}
+		abs, err := base.Parse(next)
+		if err != nil {
+			return false
+		}
+		base = abs
+		cur = abs.String()
 	}
-	head, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
-	return bytes.Contains(head, []byte("#EXTM3U"))
+	return false
+}
+
+// firstURI returns the first non-comment URI line from an m3u8 (a segment or a
+// child playlist), or "" if none.
+func firstURI(m3u8 string) string {
+	for _, line := range strings.Split(m3u8, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		return line
+	}
+	return ""
 }
 
 func (h *TV) getJSON(url string, dst any) error {
