@@ -1,0 +1,239 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import Hls from "hls.js";
+import { Search, Tv, Loader2, X, SignalHigh } from "lucide-react";
+
+// TVApp is a live-TV browser over the iptv-org public dataset. It merges the
+// streams list (playable URLs) with channel metadata (name, logo, category,
+// country), lets you filter/search, and plays HLS in the center workspace. It
+// tries direct playback first and falls back to the enx gateway proxy when a
+// stream blocks cross-origin (CORS).
+
+const API = "https://iptv-org.github.io/api";
+
+interface RawStream {
+  channel: string | null;
+  title: string | null;
+  url: string;
+  quality: string | null;
+  user_agent: string | null;
+  referrer: string | null;
+}
+interface RawChannel {
+  id: string;
+  name: string;
+  logo?: string;
+  country: string;
+  categories: string[];
+}
+interface Channel {
+  id: string;
+  name: string;
+  logo: string;
+  country: string;
+  categories: string[];
+  url: string;
+  quality: string | null;
+  ua: string | null;
+  ref: string | null;
+}
+
+// proxied builds the gateway proxy URL for a stream (CORS fallback).
+function proxied(url: string, ua?: string | null, ref?: string | null) {
+  const q = new URLSearchParams({ url });
+  if (ua) q.set("ua", ua);
+  if (ref) q.set("ref", ref);
+  return `/api/tv/proxy?${q.toString()}`;
+}
+
+export function TVApp() {
+  const [channels, setChannels] = useState<Channel[] | null>(null);
+  const [error, setError] = useState("");
+  const [q, setQ] = useState("");
+  const [cat, setCat] = useState("all");
+  const [playing, setPlaying] = useState<Channel | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    Promise.all([
+      fetch(`${API}/streams.json`).then((r) => r.json()) as Promise<RawStream[]>,
+      fetch(`${API}/channels.json`).then((r) => r.json()) as Promise<RawChannel[]>,
+    ])
+      .then(([streams, chans]) => {
+        if (!alive) return;
+        const meta = new Map(chans.map((c) => [c.id, c]));
+        // One entry per channel that has both a stream + metadata.
+        const seen = new Set<string>();
+        const list: Channel[] = [];
+        for (const s of streams) {
+          if (!s.channel || !s.url || seen.has(s.channel)) continue;
+          const m = meta.get(s.channel);
+          if (!m) continue;
+          seen.add(s.channel);
+          list.push({
+            id: m.id, name: m.name, logo: m.logo ?? "", country: m.country,
+            categories: m.categories ?? [], url: s.url, quality: s.quality,
+            ua: s.user_agent, ref: s.referrer,
+          });
+        }
+        list.sort((a, b) => a.name.localeCompare(b.name));
+        setChannels(list);
+      })
+      .catch(() => alive && setError("Couldn't load the channel list."));
+    return () => { alive = false; };
+  }, []);
+
+  const cats = useMemo(() => {
+    if (!channels) return [];
+    const c = new Set<string>();
+    for (const ch of channels) ch.categories.forEach((x) => c.add(x));
+    // Put sports first (World Cup), then the rest alphabetical.
+    const all = [...c].sort();
+    return ["all", "sports", ...all.filter((x) => x !== "sports")];
+  }, [channels]);
+
+  const filtered = useMemo(() => {
+    if (!channels) return [];
+    const query = q.trim().toLowerCase();
+    return channels.filter((ch) => {
+      if (cat !== "all" && !ch.categories.includes(cat)) return false;
+      if (query && !ch.name.toLowerCase().includes(query) && !ch.country.toLowerCase().includes(query)) return false;
+      return true;
+    }).slice(0, 600); // cap the rendered grid
+  }, [channels, q, cat]);
+
+  return (
+    <div className="flex h-full flex-col gap-3 p-4">
+      {playing && <Player channel={playing} onClose={() => setPlaying(null)} />}
+
+      <div className="flex items-center gap-2">
+        <div className="flex flex-1 items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2">
+          <Search className="h-4 w-4 text-white/30" />
+          <input
+            value={q} onChange={(e) => setQ(e.target.value)}
+            placeholder="Search channels or country (e.g. bein, sports, ID)…"
+            className="w-full bg-transparent text-sm text-white placeholder:text-white/30 focus:outline-none"
+          />
+        </div>
+        <select value={cat} onChange={(e) => setCat(e.target.value)}
+          className="rounded-xl border border-white/10 bg-[#15161c] px-3 py-2 text-sm text-white/80 outline-none">
+          {cats.map((c) => <option key={c} value={c}>{c === "all" ? "All categories" : c}</option>)}
+        </select>
+      </div>
+
+      {error ? (
+        <div className="flex flex-1 items-center justify-center text-sm text-white/40">{error}</div>
+      ) : channels === null ? (
+        <div className="flex flex-1 items-center justify-center gap-2 text-sm text-white/40">
+          <Loader2 className="h-4 w-4 animate-spin" /> Loading channels…
+        </div>
+      ) : (
+        <>
+          <div className="text-[11px] text-white/35">
+            {filtered.length}{filtered.length >= 600 ? "+" : ""} channels · {channels.length.toLocaleString()} total
+          </div>
+          <div className="grid min-h-0 flex-1 grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2 overflow-auto">
+            {filtered.map((ch) => <ChannelCard key={ch.id} ch={ch} onPlay={() => setPlaying(ch)} />)}
+            {filtered.length === 0 && (
+              <div className="col-span-full py-10 text-center text-sm text-white/35">No channels match.</div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function ChannelCard({ ch, onPlay }: { ch: Channel; onPlay: () => void }) {
+  const [imgOk, setImgOk] = useState(true);
+  return (
+    <button
+      onClick={onPlay}
+      className="group flex flex-col items-center gap-2 rounded-xl border border-white/10 bg-white/[0.02] p-3 text-center transition-colors hover:border-emerald-500/30 hover:bg-white/[0.05]"
+    >
+      <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-lg bg-black/30">
+        {ch.logo && imgOk ? (
+          <img src={ch.logo} alt="" className="max-h-full max-w-full object-contain" onError={() => setImgOk(false)} />
+        ) : (
+          <Tv className="h-6 w-6 text-white/30" />
+        )}
+      </div>
+      <div className="min-w-0">
+        <p className="truncate text-xs font-medium text-white/85">{ch.name}</p>
+        <p className="text-[10px] text-white/35">{ch.country}{ch.quality ? ` · ${ch.quality}` : ""}</p>
+      </div>
+    </button>
+  );
+}
+
+function Player({ channel, onClose }: { channel: Channel; onClose: () => void }) {
+  const video = useRef<HTMLVideoElement>(null);
+  const [status, setStatus] = useState<"loading" | "playing" | "error">("loading");
+  const [usingProxy, setUsingProxy] = useState(false);
+
+  useEffect(() => {
+    const el = video.current;
+    if (!el) return;
+    let hls: Hls | null = null;
+    let cancelled = false;
+
+    // Attach a source (direct or proxied). On a fatal error while direct, retry
+    // once through the gateway proxy (CORS fallback).
+    const attach = (viaProxy: boolean) => {
+      const src = viaProxy ? proxied(channel.url, channel.ua, channel.ref) : channel.url;
+      setUsingProxy(viaProxy);
+      if (hls) { hls.destroy(); hls = null; }
+
+      if (el.canPlayType("application/vnd.apple.mpegurl")) {
+        // Safari: native HLS.
+        el.src = src;
+        el.play().then(() => !cancelled && setStatus("playing")).catch(() => {
+          if (!viaProxy) attach(true); else setStatus("error");
+        });
+        return;
+      }
+      if (!Hls.isSupported()) { setStatus("error"); return; }
+      hls = new Hls({ maxBufferLength: 20 });
+      hls.loadSource(src);
+      hls.attachMedia(el);
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        el.play().then(() => !cancelled && setStatus("playing")).catch(() => {});
+      });
+      hls.on(Hls.Events.ERROR, (_e, data) => {
+        if (!data.fatal || cancelled) return;
+        if (!viaProxy) attach(true); // fall back to the proxy once
+        else setStatus("error");
+      });
+    };
+
+    setStatus("loading");
+    attach(false);
+    return () => { cancelled = true; if (hls) hls.destroy(); };
+  }, [channel]);
+
+  return (
+    <div className="fixed inset-0 z-[11000] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm" onClick={onClose}>
+      <div className="relative w-full max-w-4xl overflow-hidden rounded-2xl border border-white/10 bg-black shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-2 border-b border-white/10 bg-[#0d0e12] px-4 py-2.5">
+          <SignalHigh className="h-4 w-4 text-emerald-400" />
+          <span className="flex-1 truncate text-sm font-medium text-white">{channel.name}</span>
+          <span className="text-[10px] text-white/35">{channel.country}{usingProxy ? " · proxied" : ""}</span>
+          <button onClick={onClose} className="rounded-md p-1 text-white/40 hover:bg-white/10 hover:text-white"><X className="h-4 w-4" /></button>
+        </div>
+        <div className="relative aspect-video bg-black">
+          <video ref={video} controls autoPlay playsInline className="h-full w-full" />
+          {status === "loading" && (
+            <div className="absolute inset-0 flex items-center justify-center gap-2 text-sm text-white/50">
+              <Loader2 className="h-5 w-5 animate-spin" /> Tuning in…
+            </div>
+          )}
+          {status === "error" && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-center text-sm text-white/50">
+              <p>This channel isn't playable right now.</p>
+              <p className="text-[11px] text-white/30">The stream may be offline or geo-blocked.</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
