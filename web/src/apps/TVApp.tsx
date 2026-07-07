@@ -2,29 +2,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Hls from "hls.js";
 import { Search, Tv, Loader2, X, SignalHigh } from "lucide-react";
 
-// TVApp is a live-TV browser over the iptv-org public dataset. It merges the
-// streams list (playable URLs) with channel metadata (name, logo, category,
-// country), lets you filter/search, and plays HLS in the center workspace. It
-// tries direct playback first and falls back to the enx gateway proxy when a
-// stream blocks cross-origin (CORS).
+// TVApp is a live-TV browser. The enx gateway loads the iptv-org catalog and
+// probes every channel in the background (sports first), so this only ever shows
+// channels confirmed ONLINE — no dead links, no client-side probing. Playback
+// tries direct first and falls back to the gateway proxy on CORS.
 
-const API = "https://iptv-org.github.io/api";
-
-interface RawStream {
-  channel: string | null;
-  title: string | null;
-  url: string;
-  quality: string | null;
-  user_agent: string | null;
-  referrer: string | null;
-}
-interface RawChannel {
-  id: string;
-  name: string;
-  logo?: string;
-  country: string;
-  categories: string[];
-}
 interface Channel {
   id: string;
   name: string;
@@ -47,39 +29,33 @@ function proxied(url: string, ua?: string | null, ref?: string | null) {
 
 export function TVApp() {
   const [channels, setChannels] = useState<Channel[] | null>(null);
+  const [loading, setLoading] = useState(true); // backend still probing
+  const [progress, setProgress] = useState({ checked: 0, total: 0 });
   const [error, setError] = useState("");
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("all");
   const [playing, setPlaying] = useState<Channel | null>(null);
 
+  // Poll the gateway for the online channel list; it fills in as probing
+  // proceeds, so results appear live and stop polling once the first pass is done.
   useEffect(() => {
     let alive = true;
-    Promise.all([
-      fetch(`${API}/streams.json`).then((r) => r.json()) as Promise<RawStream[]>,
-      fetch(`${API}/channels.json`).then((r) => r.json()) as Promise<RawChannel[]>,
-    ])
-      .then(([streams, chans]) => {
+    let timer: ReturnType<typeof setTimeout>;
+    const tick = async () => {
+      try {
+        const r = await fetch("/api/tv/channels");
+        const d = (await r.json()).data ?? {};
         if (!alive) return;
-        const meta = new Map(chans.map((c) => [c.id, c]));
-        // One entry per channel that has both a stream + metadata.
-        const seen = new Set<string>();
-        const list: Channel[] = [];
-        for (const s of streams) {
-          if (!s.channel || !s.url || seen.has(s.channel)) continue;
-          const m = meta.get(s.channel);
-          if (!m) continue;
-          seen.add(s.channel);
-          list.push({
-            id: m.id, name: m.name, logo: m.logo ?? "", country: m.country,
-            categories: m.categories ?? [], url: s.url, quality: s.quality,
-            ua: s.user_agent, ref: s.referrer,
-          });
-        }
-        list.sort((a, b) => a.name.localeCompare(b.name));
-        setChannels(list);
-      })
-      .catch(() => alive && setError("Couldn't load the channel list."));
-    return () => { alive = false; };
+        setChannels((d.channels ?? []).map((c: Channel) => ({ ...c })));
+        setLoading(!!d.loading);
+        setProgress({ checked: d.checked ?? 0, total: d.total ?? 0 });
+        if (d.loading) timer = setTimeout(tick, 4000); // keep polling while probing
+      } catch {
+        if (alive) { setError("Couldn't load channels."); }
+      }
+    };
+    tick();
+    return () => { alive = false; clearTimeout(timer); };
   }, []);
 
   const cats = useMemo(() => {
@@ -122,14 +98,23 @@ export function TVApp() {
 
       {error ? (
         <div className="flex flex-1 items-center justify-center text-sm text-white/40">{error}</div>
-      ) : channels === null ? (
-        <div className="flex flex-1 items-center justify-center gap-2 text-sm text-white/40">
-          <Loader2 className="h-4 w-4 animate-spin" /> Loading channels…
+      ) : channels === null || (channels.length === 0 && loading) ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-2 text-sm text-white/40">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          <span>Finding channels that are online…</span>
+          {progress.total > 0 && (
+            <span className="text-[11px] text-white/30">checked {progress.checked.toLocaleString()} / {progress.total.toLocaleString()} (sports first)</span>
+          )}
         </div>
       ) : (
         <>
-          <div className="text-[11px] text-white/35">
-            {filtered.length}{filtered.length >= 600 ? "+" : ""} channels · {channels.length.toLocaleString()} total
+          <div className="flex items-center gap-2 text-[11px] text-white/35">
+            <span>{filtered.length}{filtered.length >= 600 ? "+" : ""} shown · {channels.length.toLocaleString()} online</span>
+            {loading && (
+              <span className="flex items-center gap-1 text-emerald-300/60">
+                <Loader2 className="h-3 w-3 animate-spin" /> still checking {progress.checked.toLocaleString()}/{progress.total.toLocaleString()}…
+              </span>
+            )}
           </div>
           <div className="grid min-h-0 flex-1 grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2 overflow-auto">
             {filtered.map((ch) => <ChannelCard key={ch.id} ch={ch} onPlay={() => setPlaying(ch)} />)}
