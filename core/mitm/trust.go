@@ -59,14 +59,17 @@ func (c *CA) Trusted() bool {
 }
 
 func (c *CA) installDarwin() error {
-	// Adding to the System keychain needs root — prompt via the native admin
-	// dialog. (Deleting a stale copy first is best-effort and non-fatal.)
-	return runElevated("security", "add-trusted-cert", "-d", "-r", "trustRoot",
+	// `add-trusted-cert -d` targets the admin domain (System keychain). It works
+	// headless ONLY in a genuine root process — the elevated __mitm-serve child.
+	// Nesting it under `osascript ... with administrator privileges` fails with
+	// "SecTrustSettingsSetTrustSettings: no user interaction possible", so trust is
+	// installed by the child (isRoot), never via a standalone osascript call here.
+	return run("security", "add-trusted-cert", "-d", "-r", "trustRoot",
 		"-k", "/Library/Keychains/System.keychain", c.CertPath())
 }
 
 func (c *CA) installWindows() error {
-	return runElevated("certutil", "-addstore", "-f", "Root", c.CertPath())
+	return run("certutil", "-addstore", "-f", "Root", c.CertPath())
 }
 
 func (c *CA) installLinux() error {
@@ -74,15 +77,15 @@ func (c *CA) installLinux() error {
 	if dst == "" {
 		return fmt.Errorf("unsupported Linux trust layout")
 	}
-	// Copy the cert into the trust anchors dir and refresh the store — both need
-	// root, so do it in one elevated shell invocation.
-	updater := "update-ca-certificates"
-	if _, err := exec.LookPath("update-ca-certificates"); err != nil {
-		updater = "update-ca-trust extract"
+	// Runs as root in the elevated child: copy the cert into the anchors dir and
+	// refresh the store.
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		return err
 	}
-	script := fmt.Sprintf("mkdir -p %q && cp %q %q && %s",
-		filepath.Dir(dst), c.CertPath(), dst, updater)
-	return runElevated("sh", "-c", script)
+	if err := copyFile(c.CertPath(), dst); err != nil {
+		return err
+	}
+	return linuxUpdateTrust()
 }
 
 // linuxTrustPath returns the CA anchor path for the current distro family, or "".
@@ -136,3 +139,13 @@ func copyFile(src, dst string) error {
 
 func fileExists(p string) bool { _, err := os.Stat(p); return err == nil }
 func dirExists(p string) bool  { fi, err := os.Stat(p); return err == nil && fi.IsDir() }
+
+// isRoot reports whether we're running with root/admin privileges.
+func isRoot() bool {
+	if runtime.GOOS == "windows" {
+		// Best-effort: certutil -addstore fails cleanly without admin, so we just
+		// try and let the elevated child be the privileged path.
+		return false
+	}
+	return os.Geteuid() == 0
+}

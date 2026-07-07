@@ -86,13 +86,24 @@ func (m *Manager) elevatedRunning() bool {
 }
 
 // RunElevatedServe is the entrypoint of the privileged child (os.Args:
-// [__mitm-serve <dir>]). It reads serve.json, installs the CA + hosts, binds :443
-// and serves until the stop-file appears, then cleans up.
+// [__mitm-serve <dir> [trust-only]]). It reads serve.json, installs the CA (and,
+// unless trust-only, the hosts + :443 proxy), serving until the stop-file appears.
 func RunElevatedServe(args []string) {
 	if len(args) < 1 {
 		os.Exit(2)
 	}
 	dir := args[0]
+	trustOnly := len(args) > 1 && args[1] == "trust-only"
+	if trustOnly {
+		// Just install the CA into the trust store as root, then exit.
+		if ca, err := LoadOrCreateCA(dir); err == nil {
+			if err := ca.InstallCA(); err != nil {
+				fmt.Fprintln(os.Stderr, "mitm: trust:", err)
+				os.Exit(1)
+			}
+		}
+		return
+	}
 	raw, err := os.ReadFile(filepath.Join(dir, "serve.json"))
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "mitm: read config:", err)
@@ -177,6 +188,55 @@ func spawnElevated(exe string, args []string) error {
 	default:
 		return spawnLinuxElevated(exe, args)
 	}
+}
+
+// spawnElevatedWait runs exe+args elevated and waits for it to finish (used for
+// quick one-shot privileged tasks like trust-only install, so errors surface).
+func spawnElevatedWait(exe string, args []string) error {
+	switch runtime.GOOS {
+	case "darwin":
+		parts := append([]string{exe}, args...)
+		quoted := make([]string, len(parts))
+		for i, p := range parts {
+			quoted[i] = shellQuote(p)
+		}
+		esc := strings.ReplaceAll(strings.Join(quoted, " "), `\`, `\\`)
+		esc = strings.ReplaceAll(esc, `"`, `\"`)
+		script := fmt.Sprintf(`do shell script "%s" with administrator privileges`, esc)
+		out, err := exec.Command("osascript", "-e", script).CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("elevation failed: %s", strings.TrimSpace(string(out)))
+		}
+		return nil
+	case "windows":
+		return spawnWindowsElevatedWait(exe, args)
+	default:
+		full := append([]string{exe}, args...)
+		if _, err := exec.LookPath("pkexec"); err == nil {
+			out, err := exec.Command("pkexec", full...).CombinedOutput()
+			if err != nil {
+				return fmt.Errorf("elevation failed: %s", strings.TrimSpace(string(out)))
+			}
+			return nil
+		}
+		cmd := exec.Command("sudo", full...)
+		cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
+		return cmd.Run()
+	}
+}
+
+func spawnWindowsElevatedWait(exe string, args []string) error {
+	q := make([]string, len(args))
+	for i, a := range args {
+		q[i] = "'" + strings.ReplaceAll(a, "'", "''") + "'"
+	}
+	ps := fmt.Sprintf("Start-Process -FilePath '%s' -ArgumentList %s -Verb RunAs -WindowStyle Hidden -Wait",
+		strings.ReplaceAll(exe, "'", "''"), strings.Join(q, ","))
+	out, err := exec.Command("powershell", "-NoProfile", "-Command", ps).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("elevation failed: %s", strings.TrimSpace(string(out)))
+	}
+	return nil
 }
 
 func spawnDarwin(exe string, args []string) error {

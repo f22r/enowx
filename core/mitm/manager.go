@@ -107,15 +107,19 @@ func (m *Manager) Status() Status {
 	return st
 }
 
-// InstallTrust generates (if needed) + installs the CA into the trust store.
+// InstallTrust installs the CA into the trust store. It runs the privileged child
+// in trust-only mode (one admin prompt), so `security add-trusted-cert` executes
+// in a real root context — nesting it under osascript fails on macOS with
+// "SecTrustSettings: no user interaction possible".
 func (m *Manager) InstallTrust() error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	ca, err := m.ensureCA()
+	if _, err := m.ensureCA(); err != nil {
+		return err
+	}
+	exe, err := os.Executable()
 	if err != nil {
 		return err
 	}
-	return ca.InstallCA()
+	return spawnElevatedWait(exe, []string{"__mitm-serve", m.dir, "trust-only"})
 }
 
 // Start brings up the proxy. It launches a privileged child (via an admin
