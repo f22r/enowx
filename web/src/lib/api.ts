@@ -684,14 +684,14 @@ export const subscriptionApi = {
   searchUsers: (q: string) => api.get<{ users: UserHit[] }>(`/api/search-users?q=${encodeURIComponent(q)}`),
 };
 
-export interface GmailStoreInfo { price_per_account: number; available: number }
+export interface GmailStoreInfo { price_per_account: number; available: number; min_order: number; order_step: number }
 export interface GmailAccount { email: string; password: string; recovery?: string }
 export interface GmailStockRow { id: string; email: string; recovery?: string; status: string; created_at: string; sold_at?: string }
 export interface GmailOrderRow { id: string; username?: string; quantity: number; price_idr: number; order_ref: string; status: string; delivered_at?: string; created_at: string }
 
 export const gmailStoreApi = {
   info: () => api.get<GmailStoreInfo>("/api/store/gmail"),
-  buy: (quantity: number) => api.post<{ order_ref: string; checkout_url: string; amount: number }>("/api/store/gmail/order", { quantity }),
+  buy: (quantity: number) => api.post<{ order_ref: string; qr_string?: string; pay_url?: string; amount: number }>("/api/store/gmail/order", { quantity }),
   orderStatus: (ref: string) => api.get<{ status: string; quantity: number }>(`/api/store/gmail/order/${encodeURIComponent(ref)}`),
   accounts: (ref: string) => api.get<{ accounts: GmailAccount[] }>(`/api/store/gmail/order/${encodeURIComponent(ref)}/accounts`),
 };
